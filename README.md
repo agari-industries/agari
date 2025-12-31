@@ -1,0 +1,2 @@
+# agari
+Riichi Score Calculator
