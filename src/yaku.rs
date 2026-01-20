@@ -5,6 +5,7 @@ use crate::hand::{HandStructure, Meld};
 use crate::tile::{Tile, Suit, Honor};
 use crate::context::{GameContext, WinType, count_dora};
 use crate::parse::TileCounts;
+use crate::wait::is_pinfu;
 
 /// Represents a scoring pattern (yaku)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -14,7 +15,7 @@ pub enum Yaku {
     Ippatsu,          // Win within 1 turn of riichi
     MenzenTsumo,      // Self-draw with closed hand
     Tanyao,           // All simples (no terminals or honors)
-    Pinfu,            // All sequences, valueless pair, two-sided wait (TODO: wait detection)
+    Pinfu,            // All sequences, valueless pair, two-sided wait
     Iipeikou,         // Two identical sequences
     Yakuhai(Honor),   // Triplet of dragons or value winds
     RinshanKaihou,    // Win on kan replacement tile
@@ -233,6 +234,13 @@ pub fn detect_yaku_with_context(
                 // Tanyao
                 if all_tiles.iter().all(|t| t.is_simple()) {
                     yaku_list.push(Yaku::Tanyao);
+                }
+                
+                // Pinfu (requires winning tile to be set)
+                if let Some(winning_tile) = context.winning_tile {
+                    if is_pinfu(structure, winning_tile, context) {
+                        yaku_list.push(Yaku::Pinfu);
+                    }
                 }
                 
                 // Iipeikou / Ryanpeikou (closed only)
@@ -932,5 +940,100 @@ mod tests {
         assert!(result.is_yakuman);
         assert_eq!(result.total_han, 13);
         assert_eq!(result.total_han_with_dora(), 13); // Still 13, dora not added
+    }
+
+    // ===== Pinfu Tests =====
+
+    #[test]
+    fn test_pinfu_basic() {
+        // All sequences, non-yakuhai pair, ryanmen wait
+        // 123m 456m 789p 234s 55p - won on 4s (from 23s wait - ryanmen)
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 4));
+        let results = get_yaku_with_context("123456m789p234s55p", &context);
+        
+        assert!(has_yaku(&results, Yaku::Pinfu), "Should have pinfu");
+        assert!(has_yaku(&results, Yaku::MenzenTsumo), "Should have menzen tsumo");
+    }
+
+    #[test]
+    fn test_pinfu_with_tanyao() {
+        // Pinfu + Tanyao combination
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 5));
+        let results = get_yaku_with_context("234567m234p345s66p", &context);
+        
+        assert!(has_yaku(&results, Yaku::Pinfu));
+        assert!(has_yaku(&results, Yaku::Tanyao));
+    }
+
+    #[test]
+    fn test_pinfu_fails_with_triplet() {
+        // Has a triplet, can't be pinfu
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::honor(Honor::White));
+        let results = get_yaku_with_context("123m456p789s11155z", &context);
+        
+        assert!(!has_yaku(&results, Yaku::Pinfu));
+    }
+
+    #[test]
+    fn test_pinfu_fails_with_dragon_pair() {
+        // Dragon pair = yakuhai pair, not pinfu
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 4));
+        let results = get_yaku_with_context("123m456m789p234s55z", &context);
+        
+        assert!(!has_yaku(&results, Yaku::Pinfu), "Dragon pair means no pinfu");
+    }
+
+    #[test]
+    fn test_pinfu_fails_with_value_wind_pair() {
+        // Seat wind pair = yakuhai pair, not pinfu
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 4));
+        let results = get_yaku_with_context("123m456m789p234s22z", &context);
+        
+        assert!(!has_yaku(&results, Yaku::Pinfu), "Seat wind pair means no pinfu");
+    }
+
+    #[test]
+    fn test_pinfu_ok_with_non_value_wind_pair() {
+        // West wind pair when seat is South, round is East = not yakuhai
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 4));
+        let results = get_yaku_with_context("123m456m789p234s33z", &context);
+        
+        assert!(has_yaku(&results, Yaku::Pinfu), "Non-value wind pair allows pinfu");
+    }
+
+    #[test]
+    fn test_pinfu_fails_with_kanchan_wait() {
+        // All sequences, good pair, but kanchan wait (won on middle tile 3s from 24s)
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 3));
+        let results = get_yaku_with_context("123m456m789p234s55p", &context);
+        
+        assert!(!has_yaku(&results, Yaku::Pinfu), "Kanchan wait means no pinfu");
+    }
+
+    #[test]
+    fn test_pinfu_fails_when_open() {
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .open()
+            .with_winning_tile(Tile::suited(Suit::Sou, 4));
+        let results = get_yaku_with_context("123m456m789p234s55p", &context);
+        
+        assert!(!has_yaku(&results, Yaku::Pinfu), "Open hand can't be pinfu");
+    }
+
+    #[test]
+    fn test_pinfu_no_winning_tile_no_pinfu() {
+        // Without winning tile set, pinfu cannot be detected
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South);
+        // Note: no .with_winning_tile()
+        let results = get_yaku_with_context("123m456m789p234s55p", &context);
+        
+        assert!(!has_yaku(&results, Yaku::Pinfu), "No winning tile = no pinfu detection");
     }
 }

@@ -17,6 +17,8 @@ pub enum WinType {
 pub struct GameContext {
     // === Win condition ===
     pub win_type: WinType,
+    /// The tile that completed the hand (needed for wait type and fu calculation)
+    pub winning_tile: Option<Tile>,
     
     // === Winds ===
     /// The round wind (East round = East, South round = South, etc.)
@@ -60,6 +62,7 @@ impl GameContext {
     pub fn new(win_type: WinType, round_wind: Honor, seat_wind: Honor) -> Self {
         GameContext {
             win_type,
+            winning_tile: None,
             round_wind,
             seat_wind,
             is_open: false,
@@ -74,6 +77,12 @@ impl GameContext {
             ura_dora_indicators: Vec::new(),
             aka_count: 0,
         }
+    }
+
+    /// Builder-style: set the winning tile
+    pub fn with_winning_tile(mut self, tile: Tile) -> Self {
+        self.winning_tile = Some(tile);
+        self
     }
 
     /// Builder-style: set hand as open
@@ -325,5 +334,13 @@ mod tests {
         assert_eq!(context.dora_indicators.len(), 1);
         assert_eq!(context.aka_count, 1);
         assert!(context.is_closed());
+    }
+
+    #[test]
+    fn test_winning_tile_builder() {
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .with_winning_tile(Tile::suited(Suit::Man, 5));
+        
+        assert_eq!(context.winning_tile, Some(Tile::suited(Suit::Man, 5)));
     }
 }
