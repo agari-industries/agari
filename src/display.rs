@@ -195,6 +195,14 @@ pub fn format_structure(structure: &HandStructure, use_unicode: bool) -> String 
                     .join(" ")
             }
         }
+        HandStructure::Kokushi { pair } => {
+            if use_unicode {
+                format!("Kokushi (pair: {}{})", tile_to_unicode(pair), tile_to_unicode(pair))
+            } else {
+                let ascii = tile_to_ascii(pair);
+                format!("Kokushi (pair: [{ascii}{ascii}])")
+            }
+        }
         HandStructure::Standard { melds, pair } => {
             let mut parts: Vec<String> = melds.iter()
                 .map(|m| format_meld(m, use_unicode))

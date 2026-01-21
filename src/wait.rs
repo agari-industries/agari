@@ -29,6 +29,10 @@ pub enum WaitType {
     /// Single tile / pair wait (e.g., holding one 5m, waiting for another)
     /// 2 fu
     Tanki,
+    
+    /// 13-sided kokushi wait (waiting on any of the 13 orphans)
+    /// Special yakuman wait
+    Kokushi13,
 }
 
 impl WaitType {
@@ -40,12 +44,13 @@ impl WaitType {
             WaitType::Kanchan => 2,
             WaitType::Penchan => 2,
             WaitType::Tanki => 2,
+            WaitType::Kokushi13 => 0, // Yakuman, fu doesn't matter
         }
     }
     
     /// Is this a "good" wait (multiple outs)?
     pub fn is_good_wait(&self) -> bool {
-        matches!(self, WaitType::Ryanmen | WaitType::Shanpon)
+        matches!(self, WaitType::Ryanmen | WaitType::Shanpon | WaitType::Kokushi13)
     }
 }
 
@@ -71,6 +76,16 @@ pub fn detect_wait_types(structure: &HandStructure, winning_tile: Tile) -> Vec<W
                 vec![WaitType::Tanki]
             } else {
                 vec![]
+            }
+        }
+        
+        HandStructure::Kokushi { pair } => {
+            // Kokushi: tanki on pair tile, or could be 13-wait
+            if *pair == winning_tile {
+                vec![WaitType::Tanki]
+            } else {
+                // If not waiting on pair, it's 13-sided wait
+                vec![WaitType::Kokushi13]
             }
         }
         
@@ -203,6 +218,8 @@ pub fn is_pinfu(
     match structure {
         HandStructure::Chiitoitsu { .. } => false,
         
+        HandStructure::Kokushi { .. } => false, // Kokushi can never be pinfu
+        
         HandStructure::Standard { melds, pair } => {
             // 1. All melds must be sequences
             let all_sequences = melds.iter().all(|m| matches!(m, Meld::Shuntsu(_)));
@@ -249,7 +266,7 @@ pub fn best_wait_type(structure: &HandStructure, winning_tile: Tile) -> Option<W
     let wait_types = detect_wait_types(structure, winning_tile);
     
     // Prefer waits with 0 fu, and among 0-fu waits, prefer Ryanmen (for Pinfu eligibility)
-    // Priority order: Ryanmen (0) > Shanpon (1) > Kanchan (2) > Penchan (3) > Tanki (4)
+    // Priority order: Ryanmen (0) > Shanpon (1) > Kanchan (2) > Penchan (3) > Tanki (4) > Kokushi13 (5)
     wait_types.into_iter()
         .min_by_key(|wt| {
             let priority = match wt {
@@ -258,6 +275,7 @@ pub fn best_wait_type(structure: &HandStructure, winning_tile: Tile) -> Option<W
                 WaitType::Kanchan => 2,
                 WaitType::Penchan => 3,
                 WaitType::Tanki => 4,
+                WaitType::Kokushi13 => 5, // Add this arm to handle the 13-sided wait
             };
             (wt.fu(), priority)
         })

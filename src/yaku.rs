@@ -26,10 +26,13 @@ pub enum Yaku {
     DoubleRiichi,     // Riichi on first turn
     Toitoi,           // All triplets
     SanshokuDoujun,   // Same sequence in all 3 suits
+    SanshokuDoukou,   // Same triplet in all 3 suits
     Ittsu,            // 1-9 straight in one suit
     Chiitoitsu,       // Seven pairs
     Chanta,           // All groups contain terminal or honor
     SanAnkou,         // Three concealed triplets
+    Honroutou,        // All terminals and honors
+    Shousangen,       // Small three dragons (2 dragon triplets + dragon pair)
     
     // === 3 han ===
     Honitsu,          // Half flush (one suit + honors)
@@ -42,6 +45,20 @@ pub enum Yaku {
     // === Yakuman (limit hands) ===
     Tenhou,           // Dealer wins on initial deal
     Chiihou,          // Non-dealer wins on first draw
+    KokushiMusou,     // Thirteen orphans
+    Suuankou,         // Four concealed triplets
+    Daisangen,        // Big three dragons
+    Shousuushii,      // Little four winds
+    Daisuushii,       // Big four winds
+    Tsuuiisou,        // All honors
+    Chinroutou,       // All terminals
+    Ryuuiisou,        // All green
+    ChuurenPoutou,    // Nine gates
+    
+    // === Double Yakuman ===
+    Kokushi13Wait,       // Kokushi with 13-sided wait
+    SuuankouTanki,       // Suuankou with tanki wait
+    JunseiChuurenPoutou, // Pure nine gates (9-sided wait)
 }
 
 impl Yaku {
@@ -65,10 +82,13 @@ impl Yaku {
             Yaku::DoubleRiichi => 2,
             Yaku::Toitoi => 2,
             Yaku::SanshokuDoujun => 2,
+            Yaku::SanshokuDoukou => 2,
             Yaku::Ittsu => 2,
             Yaku::Chiitoitsu => 2,
             Yaku::Chanta => 2,
             Yaku::SanAnkou => 2,
+            Yaku::Honroutou => 2,
+            Yaku::Shousangen => 2,
             
             // 3 han
             Yaku::Honitsu => 3,
@@ -81,6 +101,20 @@ impl Yaku {
             // Yakuman (13 han equivalent)
             Yaku::Tenhou => 13,
             Yaku::Chiihou => 13,
+            Yaku::KokushiMusou => 13,
+            Yaku::Suuankou => 13,
+            Yaku::Daisangen => 13,
+            Yaku::Shousuushii => 13,
+            Yaku::Daisuushii => 13,
+            Yaku::Tsuuiisou => 13,
+            Yaku::Chinroutou => 13,
+            Yaku::Ryuuiisou => 13,
+            Yaku::ChuurenPoutou => 13,
+            
+            // Double Yakuman (26 han equivalent)
+            Yaku::Kokushi13Wait => 26,
+            Yaku::SuuankouTanki => 26,
+            Yaku::JunseiChuurenPoutou => 26,
         }
     }
     
@@ -95,8 +129,14 @@ impl Yaku {
             Yaku::Pinfu => None,
             Yaku::Iipeikou => None,
             Yaku::Ryanpeikou => None,
-            Yaku::Tenhou => None,   // By definition, must be closed
-            Yaku::Chiihou => None,  // By definition, must be closed
+            Yaku::Tenhou => None,
+            Yaku::Chiihou => None,
+            Yaku::Suuankou => None,
+            Yaku::SuuankouTanki => None,
+            Yaku::ChuurenPoutou => None,
+            Yaku::JunseiChuurenPoutou => None,
+            Yaku::KokushiMusou => None,
+            Yaku::Kokushi13Wait => None,
             
             // These lose 1 han when open
             Yaku::SanshokuDoujun => Some(1),
@@ -113,8 +153,19 @@ impl Yaku {
             Yaku::HaiteiRaoyue => Some(1),
             Yaku::HouteiRaoyui => Some(1),
             Yaku::Toitoi => Some(2),
+            Yaku::SanshokuDoukou => Some(2),
             Yaku::Chiitoitsu => Some(2), // Can't actually be open, but logically same
             Yaku::SanAnkou => Some(2),
+            Yaku::Honroutou => Some(2),
+            Yaku::Shousangen => Some(2),
+            
+            // Yakuman that can be open
+            Yaku::Daisangen => Some(13),
+            Yaku::Shousuushii => Some(13),
+            Yaku::Daisuushii => Some(13),
+            Yaku::Tsuuiisou => Some(13),
+            Yaku::Chinroutou => Some(13),
+            Yaku::Ryuuiisou => Some(13),
         }
     }
     
@@ -125,7 +176,14 @@ impl Yaku {
     
     /// Check if this is a yakuman (limit hand)
     pub fn is_yakuman(&self) -> bool {
-        matches!(self, Yaku::Tenhou | Yaku::Chiihou)
+        matches!(self, 
+            Yaku::Tenhou | Yaku::Chiihou | 
+            Yaku::KokushiMusou | Yaku::Kokushi13Wait |
+            Yaku::Suuankou | Yaku::SuuankouTanki |
+            Yaku::Daisangen | Yaku::Shousuushii | Yaku::Daisuushii |
+            Yaku::Tsuuiisou | Yaku::Chinroutou | Yaku::Ryuuiisou |
+            Yaku::ChuurenPoutou | Yaku::JunseiChuurenPoutou
+        )
     }
 }
 
@@ -171,6 +229,73 @@ pub fn detect_yaku_with_context(
         yaku_list.push(Yaku::Chiihou);
     }
     
+    // === Structure-based Yakuman ===
+    match structure {
+        HandStructure::Kokushi { pair } => {
+            if let Some(winning_tile) = context.winning_tile {
+                if winning_tile != *pair {
+                    // 13-wait means the winning tile is NOT the pair
+                    yaku_list.push(Yaku::Kokushi13Wait);
+                } else {
+                    // If pair == winning_tile, it was tanki on the pair
+                    yaku_list.push(Yaku::KokushiMusou);
+                }
+            } else {
+                yaku_list.push(Yaku::KokushiMusou);
+            }
+        }
+        
+        HandStructure::Chiitoitsu { pairs } => {
+            // Tsuuiisou (all honors) in chiitoitsu
+            if pairs.iter().all(|t| t.is_honor()) {
+                yaku_list.push(Yaku::Tsuuiisou);
+            }
+            // Chinroutou (all terminals) in chiitoitsu
+            else if pairs.iter().all(|t| t.is_terminal()) {
+                yaku_list.push(Yaku::Chinroutou);
+            }
+        }
+        
+        HandStructure::Standard { melds, pair } => {
+            // Suuankou (Four Concealed Triplets)
+            if let Some(yaku) = check_suuankou(melds, *pair, context) {
+                yaku_list.push(yaku);
+            }
+            
+            // Daisangen (Big Three Dragons)
+            if check_daisangen(melds) {
+                yaku_list.push(Yaku::Daisangen);
+            }
+            
+            // Shousuushii / Daisuushii (Four Winds)
+            if let Some(yaku) = check_four_winds(melds, *pair) {
+                yaku_list.push(yaku);
+            }
+            
+            // Tsuuiisou (All Honors)
+            if check_tsuuiisou(melds, *pair) {
+                yaku_list.push(Yaku::Tsuuiisou);
+            }
+            
+            // Chinroutou (All Terminals)
+            if check_chinroutou(melds, *pair) {
+                yaku_list.push(Yaku::Chinroutou);
+            }
+            
+            // Ryuuiisou (All Green)
+            if check_ryuuiisou(melds, *pair) {
+                yaku_list.push(Yaku::Ryuuiisou);
+            }
+            
+            // Chuuren Poutou (Nine Gates) - closed only
+            if !is_open {
+                if let Some(yaku) = check_chuuren_poutou(counts, context) {
+                    yaku_list.push(yaku);
+                }
+            }
+        }
+    }
+    
     // If we have yakuman, skip regular yaku detection
     let has_yakuman = yaku_list.iter().any(|y| y.is_yakuman());
     
@@ -214,11 +339,20 @@ pub fn detect_yaku_with_context(
         // === Structure-based yaku ===
         
         match structure {
+            HandStructure::Kokushi { .. } => {
+                // Kokushi is yakuman, handled above
+            }
+            
             HandStructure::Chiitoitsu { pairs } => {
                 yaku_list.push(Yaku::Chiitoitsu);
                 
                 if pairs.iter().all(|t| t.is_simple()) {
                     yaku_list.push(Yaku::Tanyao);
+                }
+                
+                // Honroutou in chiitoitsu
+                if pairs.iter().all(|t| t.is_terminal_or_honor()) {
+                    yaku_list.push(Yaku::Honroutou);
                 }
                 
                 if let Some(flush) = check_flush_tiles(pairs) {
@@ -267,6 +401,11 @@ pub fn detect_yaku_with_context(
                     yaku_list.push(Yaku::SanshokuDoujun);
                 }
                 
+                // Sanshoku doukou (same triplet in all 3 suits)
+                if check_sanshoku_doukou(melds) {
+                    yaku_list.push(Yaku::SanshokuDoukou);
+                }
+                
                 // Ittsu
                 if check_ittsu(melds) {
                     yaku_list.push(Yaku::Ittsu);
@@ -277,14 +416,36 @@ pub fn detect_yaku_with_context(
                     yaku_list.push(Yaku::Chanta);
                 }
                 
-                // San Ankou (three concealed triplets) - simplified: all triplets when closed + tsumo
-                if !is_open && context.win_type == WinType::Tsumo {
-                    let triplet_count = melds.iter()
-                        .filter(|m| matches!(m, Meld::Koutsu(_)))
-                        .count();
-                    if triplet_count >= 3 {
+                // San Ankou (three concealed triplets)
+                if !is_open {
+                    let mut concealed_triplets = 0;
+                    for meld in melds {
+                        if let Meld::Koutsu(tile) = meld {
+                            // A triplet is concealed if:
+                            // 1. It was won by Tsumo (self-draw).
+                            // 2. It was won by Ron, but the winning tile did NOT complete this triplet.
+                            if context.win_type == WinType::Tsumo {
+                                concealed_triplets += 1;
+                            } else if let Some(wt) = context.winning_tile {
+                                if *tile != wt {
+                                    concealed_triplets += 1;
+                                }
+                            }
+                        }
+                    }
+                    if concealed_triplets == 3 {
                         yaku_list.push(Yaku::SanAnkou);
                     }
+                }
+                
+                // Honroutou (all terminals and honors)
+                if check_honroutou(melds, *pair) {
+                    yaku_list.push(Yaku::Honroutou);
+                }
+                
+                // Shousangen (small three dragons)
+                if check_shousangen(melds, *pair) {
+                    yaku_list.push(Yaku::Shousangen);
                 }
                 
                 // === 3 han yaku ===
@@ -551,10 +712,281 @@ fn check_flush_tiles(tiles: &[Tile]) -> Option<Yaku> {
     }
 }
 
+// ============================================================================
+// Yakuman Helper Functions
+// ============================================================================
+
+/// Check for Suuankou (Four Concealed Triplets)
+fn check_suuankou(melds: &[Meld], pair: Tile, context: &GameContext) -> Option<Yaku> {
+    // Must be closed hand
+    if context.is_open {
+        return None;
+    }
+    
+    // Count triplets (all must be koutsu, no sequences)
+    let triplet_count = melds.iter()
+        .filter(|m| matches!(m, Meld::Koutsu(_)))
+        .count();
+    
+    if triplet_count != 4 {
+        return None;
+    }
+    
+    // For ron, the winning tile must complete the pair (tanki wait)
+    // Otherwise one of the triplets was completed by the ron tile and isn't concealed
+    if context.win_type == WinType::Ron {
+        if let Some(winning_tile) = context.winning_tile {
+            // Check if winning tile is the pair (tanki wait)
+            if winning_tile == pair {
+                return Some(Yaku::SuuankouTanki); // Double yakuman
+            }
+            // If winning tile completed a triplet via ron, it's not suuankou
+            return None;
+        }
+        return None;
+    }
+    
+    // Tsumo - check for tanki wait (double yakuman)
+    if let Some(winning_tile) = context.winning_tile {
+        if winning_tile == pair {
+            return Some(Yaku::SuuankouTanki);
+        }
+    }
+    
+    Some(Yaku::Suuankou)
+}
+
+/// Check for Daisangen (Big Three Dragons)
+fn check_daisangen(melds: &[Meld]) -> bool {
+    let dragon_triplets = melds.iter()
+        .filter(|m| {
+            matches!(m, Meld::Koutsu(t) if t.is_dragon())
+        })
+        .count();
+    
+    dragon_triplets == 3
+}
+
+/// Check for Shousuushii or Daisuushii
+fn check_four_winds(melds: &[Meld], pair: Tile) -> Option<Yaku> {
+    let wind_triplets: Vec<Honor> = melds.iter()
+        .filter_map(|m| {
+            if let Meld::Koutsu(Tile::Honor(honor)) = m {
+                if matches!(honor, Honor::East | Honor::South | Honor::West | Honor::North) {
+                    return Some(*honor);
+                }
+            }
+            None
+        })
+        .collect();
+    
+    if wind_triplets.len() == 4 {
+        return Some(Yaku::Daisuushii);
+    }
+    
+    if wind_triplets.len() == 3 {
+        // Check if pair is the fourth wind
+        if let Tile::Honor(honor) = pair {
+            if matches!(honor, Honor::East | Honor::South | Honor::West | Honor::North) {
+                if !wind_triplets.contains(&honor) {
+                    return Some(Yaku::Shousuushii);
+                }
+            }
+        }
+    }
+    
+    None
+}
+
+/// Check for Tsuuiisou (All Honors)
+fn check_tsuuiisou(melds: &[Meld], pair: Tile) -> bool {
+    if !pair.is_honor() {
+        return false;
+    }
+    
+    melds.iter().all(|m| {
+        match m {
+            Meld::Koutsu(t) => t.is_honor(),
+            Meld::Shuntsu(_) => false, // Sequences can't be honors
+        }
+    })
+}
+
+/// Check for Chinroutou (All Terminals)
+fn check_chinroutou(melds: &[Meld], pair: Tile) -> bool {
+    if !pair.is_terminal() {
+        return false;
+    }
+    
+    melds.iter().all(|m| {
+        match m {
+            Meld::Koutsu(t) => t.is_terminal(),
+            Meld::Shuntsu(_) => false, // Sequences can't be all terminals
+        }
+    })
+}
+
+/// Check for Ryuuiisou (All Green)
+fn check_ryuuiisou(melds: &[Meld], pair: Tile) -> bool {
+    if !pair.is_green() {
+        return false;
+    }
+    
+    melds.iter().all(|m| {
+        match m {
+            Meld::Koutsu(t) => t.is_green(),
+            Meld::Shuntsu(start) => {
+                // Only valid green sequence is 234s
+                matches!(start, Tile::Suited { suit: Suit::Sou, value: 2 })
+            }
+        }
+    })
+}
+
+/// Check for Chuuren Poutou (Nine Gates)
+fn check_chuuren_poutou(counts: &TileCounts, context: &GameContext) -> Option<Yaku> {
+    // Must be closed
+    if context.is_open {
+        return None;
+    }
+    
+    // Find the suit (must be single suit, no honors)
+    let mut suit: Option<Suit> = None;
+    for tile in counts.keys() {
+        match tile {
+            Tile::Suited { suit: s, .. } => {
+                if suit.is_none() {
+                    suit = Some(*s);
+                } else if suit != Some(*s) {
+                    return None; // Multiple suits
+                }
+            }
+            Tile::Honor(_) => return None, // Has honors
+        }
+    }
+    
+    let suit = suit?;
+    
+    // Check the pattern: 1112345678999 + any one tile
+    // Required counts: 1:3+, 2:1+, 3:1+, 4:1+, 5:1+, 6:1+, 7:1+, 8:1+, 9:3+
+    // Total should be 14
+    
+    let mut total = 0u8;
+    let mut pattern_match = true;
+    let mut extra_tile: Option<u8> = None;
+    
+    for value in 1..=9 {
+        let tile = Tile::suited(suit, value);
+        let count = counts.get(&tile).copied().unwrap_or(0);
+        total += count;
+        
+        let required = if value == 1 || value == 9 { 3 } else { 1 };
+        
+        if count < required {
+            pattern_match = false;
+            break;
+        }
+        
+        // Track extra tile (the +1 that makes it 14)
+        if count > required {
+            if extra_tile.is_some() && count > required + 1 {
+                pattern_match = false;
+                break;
+            }
+            extra_tile = Some(value);
+        }
+    }
+    
+    if !pattern_match || total != 14 {
+        return None;
+    }
+    
+    // Check for junsei (pure) nine gates - 9-sided wait
+    // This happens when winning tile could be any of 1-9
+    if let Some(winning_tile) = context.winning_tile {
+        if let Tile::Suited { value: wv, suit: ws } = winning_tile {
+            if ws == suit {
+                // If the extra tile equals winning tile, check if removing it
+                // leaves exactly the base pattern
+                if extra_tile == Some(wv) {
+                    // This is the pure 9-sided wait
+                    return Some(Yaku::JunseiChuurenPoutou);
+                }
+            }
+        }
+    }
+    
+    Some(Yaku::ChuurenPoutou)
+}
+
+/// Check for Sanshoku Doukou (same triplet value in all three suits)
+fn check_sanshoku_doukou(melds: &[Meld]) -> bool {
+    let triplets: Vec<(Suit, u8)> = melds.iter()
+        .filter_map(|m| {
+            if let Meld::Koutsu(Tile::Suited { suit, value }) = m {
+                Some((*suit, *value))
+            } else {
+                None
+            }
+        })
+        .collect();
+    
+    // Check if there's a value that appears in all three suits as triplets
+    for value in 1..=9 {
+        let mut has_man = false;
+        let mut has_pin = false;
+        let mut has_sou = false;
+        
+        for (suit, v) in &triplets {
+            if *v == value {
+                match suit {
+                    Suit::Man => has_man = true,
+                    Suit::Pin => has_pin = true,
+                    Suit::Sou => has_sou = true,
+                }
+            }
+        }
+        
+        if has_man && has_pin && has_sou {
+            return true;
+        }
+    }
+    
+    false
+}
+
+/// Check for Honroutou (all terminals and honors, no sequences)
+fn check_honroutou(melds: &[Meld], pair: Tile) -> bool {
+    if !pair.is_terminal_or_honor() {
+        return false;
+    }
+    
+    melds.iter().all(|m| {
+        match m {
+            Meld::Koutsu(t) => t.is_terminal_or_honor(),
+            Meld::Shuntsu(_) => false, // No sequences allowed
+        }
+    })
+}
+
+/// Check for Shousangen (small three dragons)
+fn check_shousangen(melds: &[Meld], pair: Tile) -> bool {
+    // Need exactly 2 dragon triplets and dragon pair
+    let dragon_triplets = melds.iter()
+        .filter(|m| {
+            matches!(m, Meld::Koutsu(t) if t.is_dragon())
+        })
+        .count();
+    
+    let pair_is_dragon = pair.is_dragon();
+    
+    dragon_triplets == 2 && pair_is_dragon
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parse::{parse_hand, parse_hand_with_aka, to_counts};
+    use crate::parse::{parse_hand, to_counts};
     use crate::hand::decompose_hand;
     use crate::context::{GameContext, WinType};
 
@@ -796,7 +1228,7 @@ mod tests {
 
     #[test]
     fn test_akadora_counting() {
-        let parsed = parse_hand_with_aka("123m406p789s11122z").unwrap();
+        let parsed = crate::parse::parse_hand_with_aka("123m406p789s11122z").unwrap();
         let counts = to_counts(&parsed.tiles);
         let structures = decompose_hand(&counts);
         
@@ -1035,5 +1467,31 @@ mod tests {
         let results = get_yaku_with_context("123m456m789p234s55p", &context);
         
         assert!(!has_yaku(&results, Yaku::Pinfu), "No winning tile = no pinfu detection");
+    }
+
+    #[test]
+    fn test_san_ankou_ron_invalidation() {
+        // Hand: 111m 222p 333s 456s 77z
+        let hand_str = "111m222p333s456s77z";
+        let winning_tile = Tile::suited(Suit::Sou, 3);
+        
+        // 1. Tsumo Case - All triplets remain concealed
+        let context_tsumo = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .with_winning_tile(winning_tile);
+        let results_tsumo = get_yaku_with_context(hand_str, &context_tsumo);
+        assert!(has_yaku(&results_tsumo, Yaku::SanAnkou));
+
+        // 2. Ron Case (Completing triplet) - The 333s triplet is now "open"
+        let context_ron = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .with_winning_tile(winning_tile);
+        let results_ron = get_yaku_with_context(hand_str, &context_ron);
+        assert!(!has_yaku(&results_ron, Yaku::SanAnkou));
+
+        // 3. Ron Case (Tanki wait on pair) - All three triplets stay concealed
+        let pair_tile = Tile::honor(Honor::Red); 
+        let context_tanki = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .with_winning_tile(pair_tile);
+        let results_tanki = get_yaku_with_context(hand_str, &context_tanki);
+        assert!(has_yaku(&results_tanki, Yaku::SanAnkou));
     }
 }

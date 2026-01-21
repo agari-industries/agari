@@ -132,6 +132,17 @@ pub fn calculate_fu(
             }
         }
         
+        HandStructure::Kokushi { .. } => {
+            // Kokushi is yakuman, fu doesn't matter but return 30
+            FuResult {
+                total: 30,
+                breakdown: FuBreakdown {
+                    base: 30,
+                    ..Default::default()
+                },
+            }
+        }
+        
         HandStructure::Standard { melds, pair } => {
             calculate_standard_fu(melds, *pair, context)
         }

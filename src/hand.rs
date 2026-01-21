@@ -1,4 +1,4 @@
-use crate::tile::Tile;
+use crate::tile::{Tile, KOKUSHI_TILES};
 use crate::parse::TileCounts;
 
 /// A single meld (group of 3 tiles)
@@ -22,11 +22,21 @@ pub enum HandStructure {
     Chiitoitsu {
         pairs: Vec<Tile>,
     },
+    /// Thirteen orphans (kokushi musou)
+    Kokushi {
+        /// The tile that appears twice (the pair)
+        pair: Tile,
+    },
 }
 
 /// Find all valid decompositions of a hand
 pub fn decompose_hand(counts: &TileCounts) -> Vec<HandStructure> {
     let mut results = Vec::new();
+    
+    // Check for kokushi musou (thirteen orphans)
+    if let Some(pair) = check_kokushi(counts) {
+        results.push(HandStructure::Kokushi { pair });
+    }
     
     // Check for chiitoitsu
     if is_chiitoitsu(counts) {
@@ -133,6 +143,61 @@ pub fn is_chiitoitsu(counts: &TileCounts) -> bool {
     counts.len() == 7 && counts.values().all(|&c| c == 2)
 }
 
+/// Check if hand is kokushi musou (thirteen orphans).
+/// Returns the pair tile if valid, None otherwise.
+fn check_kokushi(counts: &TileCounts) -> Option<Tile> {
+    let total: u8 = counts.values().sum();
+    if total != 14 {
+        return None;
+    }
+    
+    // Must have at least one of each kokushi tile
+    for &tile in &KOKUSHI_TILES {
+        if counts.get(&tile).copied().unwrap_or(0) < 1 {
+            return None;
+        }
+    }
+    
+    // Must have no non-terminal/honor tiles
+    for tile in counts.keys() {
+        if !tile.is_terminal_or_honor() {
+            return None;
+        }
+    }
+    
+    // Find the pair (the tile that appears twice)
+    let mut pair_tile = None;
+    for &tile in &KOKUSHI_TILES {
+        let count = counts.get(&tile).copied().unwrap_or(0);
+        if count == 2 {
+            if pair_tile.is_some() {
+                return None; // More than one pair
+            }
+            pair_tile = Some(tile);
+        } else if count > 2 {
+            return None; // More than 2 of any tile
+        }
+    }
+    
+    pair_tile
+}
+
+/// Check for kokushi 13-sided wait (all tiles unique before winning tile)
+pub fn is_kokushi_13_wait(counts: &TileCounts) -> bool {
+    let total: u8 = counts.values().sum();
+    if total != 13 {
+        return false;
+    }
+    
+    for &tile in &KOKUSHI_TILES {
+        if counts.get(&tile).copied().unwrap_or(0) != 1 {
+            return false;
+        }
+    }
+    
+    counts.len() == 13
+}
+
 pub fn is_standard_hand(counts: &TileCounts) -> bool {
     for (&tile, &count) in counts {
         if count >= 2 {
@@ -197,7 +262,7 @@ fn can_form_melds(mut counts: TileCounts, needed: u32) -> bool {
 }
 
 pub fn is_winning_hand(counts: &TileCounts) -> bool {
-    is_chiitoitsu(counts) || is_standard_hand(counts)
+    check_kokushi(counts).is_some() || is_chiitoitsu(counts) || is_standard_hand(counts)
 }
 
 #[cfg(test)]

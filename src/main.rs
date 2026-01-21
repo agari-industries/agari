@@ -553,16 +553,35 @@ fn yaku_name(yaku: &Yaku) -> &'static str {
         Yaku::HouteiRaoyui => "Houtei Raoyui (Last Tile Discard)",
         Yaku::DoubleRiichi => "Double Riichi",
         Yaku::Toitoi => "Toitoi (All Triplets)",
-        Yaku::SanshokuDoujun => "Sanshoku (Mixed Triple Sequence)",
+        Yaku::SanshokuDoujun => "Sanshoku Doujun (Mixed Triple Sequence)",
+        Yaku::SanshokuDoukou => "Sanshoku Doukou (Triple Triplets)",
         Yaku::Ittsu => "Ittsu (Pure Straight)",
         Yaku::Chiitoitsu => "Chiitoitsu (Seven Pairs)",
         Yaku::Chanta => "Chanta (Outside Hand)",
         Yaku::SanAnkou => "San Ankou (Three Concealed Triplets)",
+        Yaku::Honroutou => "Honroutou (All Terminals and Honors)",
+        Yaku::Shousangen => "Shousangen (Little Three Dragons)",
         Yaku::Honitsu => "Honitsu (Half Flush)",
         Yaku::Junchan => "Junchan (Terminals in All Groups)",
-        Yaku::Ryanpeikou => "Ryanpeikou (Twice Pure Double)",
+        Yaku::Ryanpeikou => "Ryanpeikou (Twice Pure Double Sequence)",
         Yaku::Chinitsu => "Chinitsu (Full Flush)",
+        
+        // Yakuman
         Yaku::Tenhou => "Tenhou (Heavenly Hand)",
         Yaku::Chiihou => "Chiihou (Earthly Hand)",
+        Yaku::KokushiMusou => "Kokushi Musou (Thirteen Orphans)",
+        Yaku::Suuankou => "Suuankou (Four Concealed Triplets)",
+        Yaku::Daisangen => "Daisangen (Big Three Dragons)",
+        Yaku::Shousuushii => "Shousuushii (Little Four Winds)",
+        Yaku::Daisuushii => "Daisuushii (Big Four Winds)",
+        Yaku::Tsuuiisou => "Tsuuiisou (All Honors)",
+        Yaku::Chinroutou => "Chinroutou (All Terminals)",
+        Yaku::Ryuuiisou => "Ryuuiisou (All Green)",
+        Yaku::ChuurenPoutou => "Chuuren Poutou (Nine Gates)",
+        
+        // Double Yakuman
+        Yaku::Kokushi13Wait => "Kokushi Musou 13-wait",
+        Yaku::SuuankouTanki => "Suuankou Tanki",
+        Yaku::JunseiChuurenPoutou => "Junsei Chuuren Poutou",
     }
 }
