@@ -1,7 +1,7 @@
 //! Game context for scoring - tracks win conditions, winds, dora, etc.
 
-use crate::tile::{Tile, Honor};
 use crate::parse::TileCounts;
+use crate::tile::{Honor, Tile};
 
 /// How the hand was won
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,39 +19,41 @@ pub struct GameContext {
     pub win_type: WinType,
     /// The tile that completed the hand (needed for wait type and fu calculation)
     pub winning_tile: Option<Tile>,
-    
+
     // === Winds ===
     /// The round wind (East round = East, South round = South, etc.)
     pub round_wind: Honor,
     /// The player's seat wind
     pub seat_wind: Honor,
-    
+
     // === Hand state ===
     /// Whether the hand has called tiles (chi/pon/kan)
     /// A closed hand (menzen) has is_open = false
     pub is_open: bool,
-    
+
     // === Riichi ===
     pub is_riichi: bool,
     pub is_double_riichi: bool,
     pub is_ippatsu: bool,
-    
+
     // === Situational yaku ===
     /// Won on kan replacement tile (rinshan kaihou)
     pub is_rinshan: bool,
+    /// Ron on another player's added kan tile (chankan)
+    pub is_chankan: bool,
     /// Last tile of the game (haitei for tsumo, houtei for ron)
     pub is_last_tile: bool,
     /// Dealer's first draw win (tenhou) - only valid for dealer + tsumo + first draw
     pub is_tenhou: bool,
     /// Non-dealer's first draw win (chiihou) - for future use
     pub is_chiihou: bool,
-    
+
     // === Dora ===
     /// Dora indicators (the tile shown, not the actual dora)
     pub dora_indicators: Vec<Tile>,
     /// Ura dora indicators (revealed only on riichi win)
     pub ura_dora_indicators: Vec<Tile>,
-    
+
     // === Akadora (red fives) ===
     /// Number of red fives in the winning hand
     pub aka_count: u8,
@@ -70,6 +72,7 @@ impl GameContext {
             is_double_riichi: false,
             is_ippatsu: false,
             is_rinshan: false,
+            is_chankan: false,
             is_last_tile: false,
             is_tenhou: false,
             is_chiihou: false,
@@ -116,6 +119,12 @@ impl GameContext {
         self
     }
 
+    /// Builder-style: set chankan (ron on added kan)
+    pub fn chankan(mut self) -> Self {
+        self.is_chankan = true;
+        self
+    }
+
     /// Builder-style: set last tile (haitei/houtei)
     pub fn last_tile(mut self) -> Self {
         self.is_last_tile = true;
@@ -156,12 +165,12 @@ impl GameContext {
     pub fn is_value_wind(&self, wind: Honor) -> bool {
         wind == self.round_wind || wind == self.seat_wind
     }
-    
+
     /// Check if hand is closed (menzen)
     pub fn is_closed(&self) -> bool {
         !self.is_open
     }
-    
+
     /// Check if player is dealer (seat wind == East)
     pub fn is_dealer(&self) -> bool {
         self.seat_wind == Honor::East
@@ -169,7 +178,7 @@ impl GameContext {
 }
 
 /// Calculate what tile is dora given a dora indicator
-/// 
+///
 /// Dora indicator -> Actual dora:
 /// - Suited: indicator + 1 (wraps 9 -> 1)
 /// - Winds: E -> S -> W -> N -> E
@@ -200,13 +209,13 @@ pub fn indicator_to_dora(indicator: Tile) -> Tile {
 /// Count total dora in a hand given the game context
 pub fn count_dora(counts: &TileCounts, context: &GameContext) -> u8 {
     let mut total = 0u8;
-    
+
     // Count regular dora
     for indicator in &context.dora_indicators {
         let dora = indicator_to_dora(*indicator);
         total += counts.get(&dora).copied().unwrap_or(0);
     }
-    
+
     // Count ura dora (only if riichi)
     if context.is_riichi {
         for indicator in &context.ura_dora_indicators {
@@ -214,18 +223,18 @@ pub fn count_dora(counts: &TileCounts, context: &GameContext) -> u8 {
             total += counts.get(&dora).copied().unwrap_or(0);
         }
     }
-    
+
     // Add akadora count
     total += context.aka_count;
-    
+
     total
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tile::Suit;
     use crate::parse::{parse_hand, to_counts};
+    use crate::tile::Suit;
 
     #[test]
     fn test_indicator_to_dora_suited() {
@@ -234,7 +243,7 @@ mod tests {
             indicator_to_dora(Tile::suited(Suit::Man, 1)),
             Tile::suited(Suit::Man, 2)
         );
-        
+
         // 9p indicator -> 1p dora (wraps)
         assert_eq!(
             indicator_to_dora(Tile::suited(Suit::Pin, 9)),
@@ -244,17 +253,38 @@ mod tests {
 
     #[test]
     fn test_indicator_to_dora_winds() {
-        assert_eq!(indicator_to_dora(Tile::honor(Honor::East)), Tile::honor(Honor::South));
-        assert_eq!(indicator_to_dora(Tile::honor(Honor::South)), Tile::honor(Honor::West));
-        assert_eq!(indicator_to_dora(Tile::honor(Honor::West)), Tile::honor(Honor::North));
-        assert_eq!(indicator_to_dora(Tile::honor(Honor::North)), Tile::honor(Honor::East));
+        assert_eq!(
+            indicator_to_dora(Tile::honor(Honor::East)),
+            Tile::honor(Honor::South)
+        );
+        assert_eq!(
+            indicator_to_dora(Tile::honor(Honor::South)),
+            Tile::honor(Honor::West)
+        );
+        assert_eq!(
+            indicator_to_dora(Tile::honor(Honor::West)),
+            Tile::honor(Honor::North)
+        );
+        assert_eq!(
+            indicator_to_dora(Tile::honor(Honor::North)),
+            Tile::honor(Honor::East)
+        );
     }
 
     #[test]
     fn test_indicator_to_dora_dragons() {
-        assert_eq!(indicator_to_dora(Tile::honor(Honor::White)), Tile::honor(Honor::Green));
-        assert_eq!(indicator_to_dora(Tile::honor(Honor::Green)), Tile::honor(Honor::Red));
-        assert_eq!(indicator_to_dora(Tile::honor(Honor::Red)), Tile::honor(Honor::White));
+        assert_eq!(
+            indicator_to_dora(Tile::honor(Honor::White)),
+            Tile::honor(Honor::Green)
+        );
+        assert_eq!(
+            indicator_to_dora(Tile::honor(Honor::Green)),
+            Tile::honor(Honor::Red)
+        );
+        assert_eq!(
+            indicator_to_dora(Tile::honor(Honor::Red)),
+            Tile::honor(Honor::White)
+        );
     }
 
     #[test]
@@ -262,10 +292,10 @@ mod tests {
         // Hand with three 2m tiles, dora indicator is 1m (so 2m is dora)
         let tiles = parse_hand("222m456p789s11122z").unwrap();
         let counts = to_counts(&tiles);
-        
+
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
             .with_dora(vec![Tile::suited(Suit::Man, 1)]);
-        
+
         assert_eq!(count_dora(&counts, &context), 3);
     }
 
@@ -274,13 +304,13 @@ mod tests {
         // Hand with 2m and 5p
         let tiles = parse_hand("222m555p789s11122z").unwrap();
         let counts = to_counts(&tiles);
-        
+
         // Dora indicator 1m (dora = 2m), ura indicator 4p (ura = 5p)
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
             .riichi()
             .with_dora(vec![Tile::suited(Suit::Man, 1)])
             .with_ura_dora(vec![Tile::suited(Suit::Pin, 4)]);
-        
+
         // 3 dora (2m) + 3 ura (5p) = 6
         assert_eq!(count_dora(&counts, &context), 6);
     }
@@ -289,12 +319,12 @@ mod tests {
     fn test_count_dora_ura_only_with_riichi() {
         let tiles = parse_hand("222m555p789s11122z").unwrap();
         let counts = to_counts(&tiles);
-        
+
         // Same indicators but NO riichi
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
             .with_dora(vec![Tile::suited(Suit::Man, 1)])
             .with_ura_dora(vec![Tile::suited(Suit::Pin, 4)]);
-        
+
         // Only regular dora counts (3), ura doesn't count without riichi
         assert_eq!(count_dora(&counts, &context), 3);
     }
@@ -303,20 +333,19 @@ mod tests {
     fn test_count_dora_with_aka() {
         let tiles = parse_hand("123m456p789s11122z").unwrap();
         let counts = to_counts(&tiles);
-        
+
         // No dora indicators, but 2 akadora
-        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
-            .with_aka(2);
-        
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East).with_aka(2);
+
         assert_eq!(count_dora(&counts, &context), 2);
     }
 
     #[test]
     fn test_value_wind() {
         let context = GameContext::new(WinType::Ron, Honor::East, Honor::South);
-        
-        assert!(context.is_value_wind(Honor::East));   // Round wind
-        assert!(context.is_value_wind(Honor::South));  // Seat wind
+
+        assert!(context.is_value_wind(Honor::East)); // Round wind
+        assert!(context.is_value_wind(Honor::South)); // Seat wind
         assert!(!context.is_value_wind(Honor::West));
         assert!(!context.is_value_wind(Honor::North));
     }
@@ -328,7 +357,7 @@ mod tests {
             .ippatsu()
             .with_dora(vec![Tile::suited(Suit::Man, 1)])
             .with_aka(1);
-        
+
         assert!(context.is_riichi);
         assert!(context.is_ippatsu);
         assert_eq!(context.dora_indicators.len(), 1);
@@ -340,7 +369,7 @@ mod tests {
     fn test_winning_tile_builder() {
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
             .with_winning_tile(Tile::suited(Suit::Man, 5));
-        
+
         assert_eq!(context.winning_tile, Some(Tile::suited(Suit::Man, 5)));
     }
 }

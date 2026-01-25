@@ -2,8 +2,8 @@
 //!
 //! Supports both Unicode mahjong characters (🀇🀈🀉...) and ASCII fallback.
 
-use crate::tile::{Tile, Suit, Honor};
 use crate::hand::{HandStructure, Meld};
+use crate::tile::{Honor, Suit, Tile};
 
 /// Get the Unicode character for a tile with a trailing space for better rendering.
 pub fn tile_to_unicode(tile: &Tile) -> String {
@@ -43,17 +43,15 @@ pub fn tile_to_ascii(tile: &Tile) -> String {
             };
             format!("{}{}", value, s)
         }
-        Tile::Honor(honor) => {
-            match honor {
-                Honor::East => "E".to_string(),
-                Honor::South => "S".to_string(),
-                Honor::West => "W".to_string(),
-                Honor::North => "N".to_string(),
-                Honor::White => "Wh".to_string(),
-                Honor::Green => "Gr".to_string(),
-                Honor::Red => "Rd".to_string(),
-            }
-        }
+        Tile::Honor(honor) => match honor {
+            Honor::East => "E".to_string(),
+            Honor::South => "S".to_string(),
+            Honor::West => "W".to_string(),
+            Honor::North => "N".to_string(),
+            Honor::White => "Wh".to_string(),
+            Honor::Green => "Gr".to_string(),
+            Honor::Red => "Rd".to_string(),
+        },
     }
 }
 
@@ -68,7 +66,7 @@ pub fn tiles_to_ascii(tiles: &[Tile]) -> String {
     let mut current_suit: Option<Suit> = None;
     let mut pending_values: Vec<u8> = Vec::new();
     let mut honors: Vec<&Honor> = Vec::new();
-    
+
     for tile in tiles {
         match tile {
             Tile::Suited { suit, value } => {
@@ -107,7 +105,7 @@ pub fn tiles_to_ascii(tiles: &[Tile]) -> String {
             }
         }
     }
-    
+
     if let Some(s) = current_suit {
         for v in &pending_values {
             result.push_str(&v.to_string());
@@ -118,7 +116,7 @@ pub fn tiles_to_ascii(tiles: &[Tile]) -> String {
             Suit::Sou => 's',
         });
     }
-    
+
     if !honors.is_empty() {
         for h in &honors {
             let n = match h {
@@ -134,14 +132,14 @@ pub fn tiles_to_ascii(tiles: &[Tile]) -> String {
         }
         result.push('z');
     }
-    
+
     result
 }
 
 /// Format a meld for display
 pub fn format_meld(meld: &Meld, use_unicode: bool) -> String {
     match meld {
-        Meld::Shuntsu(start) => {
+        Meld::Shuntsu(start, _is_open) => {
             if let Tile::Suited { suit, value } = start {
                 let tiles = [
                     Tile::suited(*suit, *value),
@@ -151,20 +149,38 @@ pub fn format_meld(meld: &Meld, use_unicode: bool) -> String {
                 if use_unicode {
                     tiles_to_unicode(&tiles)
                 } else {
-                    format!("[{}{}{}{}]", value, value + 1, value + 2, 
-                        match suit { Suit::Man => 'm', Suit::Pin => 'p', Suit::Sou => 's' })
+                    format!(
+                        "[{}{}{}{}]",
+                        value,
+                        value + 1,
+                        value + 2,
+                        match suit {
+                            Suit::Man => 'm',
+                            Suit::Pin => 'p',
+                            Suit::Sou => 's',
+                        }
+                    )
                 }
             } else {
                 "???".to_string()
             }
         }
-        Meld::Koutsu(tile) => {
+        Meld::Koutsu(tile, _is_open) => {
             let tiles = [*tile, *tile, *tile];
             if use_unicode {
                 tiles_to_unicode(&tiles)
             } else {
                 let ascii = tile_to_ascii(tile);
                 format!("[{ascii}{ascii}{ascii}]")
+            }
+        }
+        Meld::Kan(tile, _kan_type) => {
+            let tiles = [*tile, *tile, *tile, *tile];
+            if use_unicode {
+                tiles_to_unicode(&tiles)
+            } else {
+                let ascii = tile_to_ascii(tile);
+                format!("[{ascii}{ascii}{ascii}{ascii}]")
             }
         }
     }
@@ -176,9 +192,10 @@ pub fn format_structure(structure: &HandStructure, use_unicode: bool) -> String 
         HandStructure::Chiitoitsu { pairs } => {
             let mut sorted_pairs = pairs.clone();
             sorted_pairs.sort();
-            
+
             if use_unicode {
-                sorted_pairs.iter()
+                sorted_pairs
+                    .iter()
                     .map(|t| {
                         let uni = tile_to_unicode(t);
                         format!("{uni}{uni}")
@@ -186,7 +203,8 @@ pub fn format_structure(structure: &HandStructure, use_unicode: bool) -> String 
                     .collect::<Vec<_>>()
                     .join(" ")
             } else {
-                sorted_pairs.iter()
+                sorted_pairs
+                    .iter()
                     .map(|t| {
                         let ascii = tile_to_ascii(t);
                         format!("[{ascii}{ascii}]")
@@ -197,17 +215,20 @@ pub fn format_structure(structure: &HandStructure, use_unicode: bool) -> String 
         }
         HandStructure::Kokushi { pair } => {
             if use_unicode {
-                format!("Kokushi (pair: {}{})", tile_to_unicode(pair), tile_to_unicode(pair))
+                format!(
+                    "Kokushi (pair: {}{})",
+                    tile_to_unicode(pair),
+                    tile_to_unicode(pair)
+                )
             } else {
                 let ascii = tile_to_ascii(pair);
                 format!("Kokushi (pair: [{ascii}{ascii}])")
             }
         }
         HandStructure::Standard { melds, pair } => {
-            let mut parts: Vec<String> = melds.iter()
-                .map(|m| format_meld(m, use_unicode))
-                .collect();
-            
+            let mut parts: Vec<String> =
+                melds.iter().map(|m| format_meld(m, use_unicode)).collect();
+
             if use_unicode {
                 let uni = tile_to_unicode(pair);
                 parts.push(format!("{uni}{uni}"));
@@ -215,7 +236,7 @@ pub fn format_structure(structure: &HandStructure, use_unicode: bool) -> String 
                 let ascii = tile_to_ascii(pair);
                 parts.push(format!("[{ascii}{ascii}]"));
             }
-            
+
             parts.join(" ")
         }
     }
@@ -246,7 +267,7 @@ pub fn suit_name(suit: &Suit) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_tile_to_unicode() {
         assert_eq!(tile_to_unicode(&Tile::suited(Suit::Man, 1)), "🀇 ");
@@ -254,7 +275,7 @@ mod tests {
         assert_eq!(tile_to_unicode(&Tile::honor(Honor::East)), "🀀 ");
         assert_eq!(tile_to_unicode(&Tile::honor(Honor::Red)), "🀄︎ ");
     }
-    
+
     #[test]
     fn test_tiles_to_unicode() {
         let tiles = [

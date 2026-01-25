@@ -6,9 +6,9 @@
 //! 3. Whether the winner is dealer or not
 //! 4. Whether the win was by tsumo or ron
 
-use crate::hand::{HandStructure, Meld};
-use crate::tile::{Tile, Honor};
 use crate::context::{GameContext, WinType};
+use crate::hand::{HandStructure, Meld};
+use crate::tile::{Honor, Tile};
 use crate::wait::{best_wait_type, is_pinfu};
 use crate::yaku::YakuResult;
 
@@ -44,7 +44,7 @@ impl ScoreLevel {
             ScoreLevel::DoubleYakuman => 16000,
         }
     }
-    
+
     /// Display name for this level
     pub fn name(&self) -> &'static str {
         match self {
@@ -71,13 +71,13 @@ pub struct FuResult {
 /// Detailed breakdown of fu components
 #[derive(Debug, Clone, Default)]
 pub struct FuBreakdown {
-    pub base: u8,           // Always 20
-    pub menzen_ron: u8,     // +10 for closed hand ron
-    pub tsumo: u8,          // +2 for tsumo (except pinfu)
-    pub melds: u8,          // Fu from triplets/kans
-    pub pair: u8,           // Fu from yakuhai pair
-    pub wait: u8,           // Fu from wait type
-    pub raw_total: u8,      // Sum before rounding
+    pub base: u8,       // Always 20
+    pub menzen_ron: u8, // +10 for closed hand ron
+    pub tsumo: u8,      // +2 for tsumo (except pinfu)
+    pub melds: u8,      // Fu from triplets/kans
+    pub pair: u8,       // Fu from yakuhai pair
+    pub wait: u8,       // Fu from wait type
+    pub raw_total: u8,  // Sum before rounding
 }
 
 /// Payment structure for a winning hand
@@ -116,10 +116,7 @@ pub struct ScoringResult {
 ///
 /// # Returns
 /// FuResult with total fu and breakdown
-pub fn calculate_fu(
-    structure: &HandStructure,
-    context: &GameContext,
-) -> FuResult {
+pub fn calculate_fu(structure: &HandStructure, context: &GameContext) -> FuResult {
     match structure {
         HandStructure::Chiitoitsu { .. } => {
             // Chiitoitsu is always exactly 25 fu (no rounding)
@@ -131,7 +128,7 @@ pub fn calculate_fu(
                 },
             }
         }
-        
+
         HandStructure::Kokushi { .. } => {
             // Kokushi is yakuman, fu doesn't matter but return 30
             FuResult {
@@ -142,33 +139,33 @@ pub fn calculate_fu(
                 },
             }
         }
-        
-        HandStructure::Standard { melds, pair } => {
-            calculate_standard_fu(melds, *pair, context)
-        }
+
+        HandStructure::Standard { melds, pair } => calculate_standard_fu(melds, *pair, context),
     }
 }
 
 /// Calculate fu for a standard hand (4 melds + pair)
-fn calculate_standard_fu(
-    melds: &[Meld],
-    pair: Tile,
-    context: &GameContext,
-) -> FuResult {
+fn calculate_standard_fu(melds: &[Meld], pair: Tile, context: &GameContext) -> FuResult {
     let mut breakdown = FuBreakdown {
         base: 20,
         ..Default::default()
     };
-    
+
     // Check for pinfu + tsumo (special case: exactly 20 fu, no rounding)
     let winning_tile = context.winning_tile;
     let is_pinfu_hand = winning_tile
-        .map(|wt| is_pinfu(&HandStructure::Standard { 
-            melds: melds.to_vec(), 
-            pair 
-        }, wt, context))
+        .map(|wt| {
+            is_pinfu(
+                &HandStructure::Standard {
+                    melds: melds.to_vec(),
+                    pair,
+                },
+                wt,
+                context,
+            )
+        })
         .unwrap_or(false);
-    
+
     if is_pinfu_hand && context.win_type == WinType::Tsumo {
         // Pinfu + Tsumo = exactly 20 fu, no additional fu, no rounding
         return FuResult {
@@ -179,70 +176,92 @@ fn calculate_standard_fu(
             },
         };
     }
-    
+
     // Menzen Ron: +10 fu for closed hand winning by ron
     if !context.is_open && context.win_type == WinType::Ron {
         breakdown.menzen_ron = 10;
     }
-    
+
     // Tsumo: +2 fu (but NOT for pinfu)
     if context.win_type == WinType::Tsumo && !is_pinfu_hand {
         breakdown.tsumo = 2;
     }
-    
-    // Meld fu
+
+    // Meld fu (now uses per-meld open/closed state)
     for meld in melds {
-        breakdown.melds += meld_fu(meld, context.is_open);
+        breakdown.melds += meld_fu(meld);
     }
-    
+
     // Pair fu (yakuhai pairs)
     breakdown.pair = pair_fu(pair, context);
-    
+
     // Wait fu
     if let Some(wt) = winning_tile {
         if let Some(wait_type) = best_wait_type(
-            &HandStructure::Standard { melds: melds.to_vec(), pair },
-            wt
+            &HandStructure::Standard {
+                melds: melds.to_vec(),
+                pair,
+            },
+            wt,
         ) {
             breakdown.wait = wait_type.fu();
         }
     }
-    
+
     // Calculate raw total
-    breakdown.raw_total = breakdown.base 
-        + breakdown.menzen_ron 
-        + breakdown.tsumo 
-        + breakdown.melds 
-        + breakdown.pair 
+    breakdown.raw_total = breakdown.base
+        + breakdown.menzen_ron
+        + breakdown.tsumo
+        + breakdown.melds
+        + breakdown.pair
         + breakdown.wait;
-    
+
     // Round up to nearest 10
     let total = round_up_to_10(breakdown.raw_total);
-    
+
     // Special case: open hand with no fu beyond base = 30 fu minimum
     // (An open hand with all sequences and no yakuhai pair is still 30 fu)
-    let total = if context.is_open && total < 30 { 30 } else { total };
-    
+    let total = if context.is_open && total < 30 {
+        30
+    } else {
+        total
+    };
+
     FuResult { total, breakdown }
 }
 
 /// Calculate fu for a single meld
-fn meld_fu(meld: &Meld, is_open: bool) -> u8 {
+///
+/// Fu values for triplets (koutsu):
+/// - Simple (2-8): 2 open, 4 closed
+/// - Terminal/Honor (1,9,honors): 4 open, 8 closed
+///
+/// Fu values for kans:
+/// - Simple (2-8): 8 open, 16 closed
+/// - Terminal/Honor (1,9,honors): 16 open, 32 closed
+fn meld_fu(meld: &Meld) -> u8 {
     match meld {
-        Meld::Shuntsu(_) => 0, // Sequences give no fu
-        
-        Meld::Koutsu(tile) => {
+        Meld::Shuntsu(_, _) => 0, // Sequences give no fu
+
+        Meld::Koutsu(tile, is_meld_open) => {
             let is_terminal_or_honor = tile.is_terminal_or_honor();
-            
+
             // Base: 2 fu for simple triplet, 4 for terminal/honor triplet
             // Double for closed
             let base = if is_terminal_or_honor { 4 } else { 2 };
-            
-            if is_open {
-                base
-            } else {
-                base * 2
-            }
+
+            if *is_meld_open { base } else { base * 2 }
+        }
+
+        Meld::Kan(tile, kan_type) => {
+            let is_terminal_or_honor = tile.is_terminal_or_honor();
+
+            // Kan fu is 4x the triplet fu
+            // Simple: 8 open, 16 closed
+            // Terminal/Honor: 16 open, 32 closed
+            let base = if is_terminal_or_honor { 16 } else { 8 };
+
+            if kan_type.is_open() { base } else { base * 2 }
         }
     }
 }
@@ -254,7 +273,7 @@ fn pair_fu(pair: Tile, context: &GameContext) -> u8 {
             match honor {
                 // Dragons always give 2 fu
                 Honor::White | Honor::Green | Honor::Red => 2,
-                
+
                 // Winds give 2 fu if they're value winds
                 // Double wind (both round and seat) gives 2 fu (some rules say 4)
                 wind => {
@@ -310,19 +329,19 @@ pub fn determine_score_level(han: u8, fu: u8, is_yakuman: bool) -> ScoreLevel {
 }
 
 /// Calculate basic points from han and fu
-/// 
+///
 /// Basic formula: fu × 2^(han+2)
 /// Capped at 2000 (mangan)
 pub fn calculate_basic_points(han: u8, fu: u8, is_yakuman: bool) -> u32 {
     let level = determine_score_level(han, fu, is_yakuman);
-    
+
     if level != ScoreLevel::Normal {
         return level.basic_points();
     }
-    
+
     // Normal calculation: fu × 2^(han+2)
     let basic = (fu as u32) * 2u32.pow((han + 2) as u32);
-    
+
     // Cap at mangan (2000)
     basic.min(2000)
 }
@@ -391,20 +410,20 @@ pub fn calculate_score(
 ) -> ScoringResult {
     // Calculate fu
     let fu = calculate_fu(structure, context);
-    
+
     // Get total han (yaku + dora)
     let han = yaku_result.total_han_with_dora();
-    
+
     // Determine score level
     let score_level = determine_score_level(han, fu.total, yaku_result.is_yakuman);
-    
+
     // Calculate basic points
     let basic_points = calculate_basic_points(han, fu.total, yaku_result.is_yakuman);
-    
+
     // Calculate payment
     let is_dealer = context.is_dealer();
     let payment = calculate_payment(basic_points, is_dealer, context.win_type);
-    
+
     ScoringResult {
         fu,
         han,
@@ -418,30 +437,30 @@ pub fn calculate_score(
 /// Format a scoring result for display
 pub fn format_score(result: &ScoringResult, yaku_result: &YakuResult) -> String {
     let mut output = String::new();
-    
+
     // Yaku list
     output.push_str("Yaku:\n");
     for yaku in &yaku_result.yaku_list {
         let han = yaku.han();
         output.push_str(&format!("  • {:?} ({} han)\n", yaku, han));
     }
-    
+
     // Dora
     if yaku_result.dora_count > 0 {
         output.push_str(&format!("  • Dora ({} han)\n", yaku_result.dora_count));
     }
-    
+
     // Han and Fu
     output.push_str(&format!("\n{} han / {} fu\n", result.han, result.fu.total));
-    
+
     // Score level (if applicable)
     if result.score_level != ScoreLevel::Normal {
         output.push_str(&format!("{}\n", result.score_level.name()));
     }
-    
+
     // Payment
     output.push_str(&format!("\nTotal: {} points\n", result.payment.total));
-    
+
     if let Some(from_discarder) = result.payment.from_discarder {
         output.push_str(&format!("Ron: {} from discarder\n", from_discarder));
     } else {
@@ -450,14 +469,14 @@ pub fn format_score(result: &ScoringResult, yaku_result: &YakuResult) -> String 
                 output.push_str(&format!("Tsumo: {} all\n", from_each));
             }
         } else {
-            if let (Some(from_dealer), Some(from_non_dealer)) = 
-                (result.payment.from_dealer, result.payment.from_non_dealer) 
+            if let (Some(from_dealer), Some(from_non_dealer)) =
+                (result.payment.from_dealer, result.payment.from_non_dealer)
             {
                 output.push_str(&format!("Tsumo: {}/{}\n", from_dealer, from_non_dealer));
             }
         }
     }
-    
+
     output
 }
 
@@ -468,28 +487,29 @@ pub fn format_score(result: &ScoringResult, yaku_result: &YakuResult) -> String 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parse::{parse_hand, to_counts};
     use crate::hand::decompose_hand;
-    use crate::yaku::detect_yaku_with_context;
+    use crate::parse::{parse_hand, to_counts};
     use crate::tile::Suit;
+    use crate::yaku::detect_yaku_with_context;
 
     // ===== Helper Functions =====
-    
+
     fn score_hand(hand: &str, context: &GameContext) -> Vec<ScoringResult> {
         let tiles = parse_hand(hand).unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
-        structures.iter().map(|s| {
-            let yaku_result = detect_yaku_with_context(s, &counts, context);
-            calculate_score(s, &yaku_result, context)
-        }).collect()
+
+        structures
+            .iter()
+            .map(|s| {
+                let yaku_result = detect_yaku_with_context(s, &counts, context);
+                calculate_score(s, &yaku_result, context)
+            })
+            .collect()
     }
-    
+
     fn best_score(results: &[ScoringResult]) -> &ScoringResult {
-        results.iter()
-            .max_by_key(|r| r.payment.total)
-            .unwrap()
+        results.iter().max_by_key(|r| r.payment.total).unwrap()
     }
 
     // ===== Fu Calculation Tests =====
@@ -500,14 +520,15 @@ mod tests {
         let tiles = parse_hand("1122m3344p5566s77z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
-        let chiitoi = structures.iter()
+
+        let chiitoi = structures
+            .iter()
             .find(|s| matches!(s, HandStructure::Chiitoitsu { .. }))
             .unwrap();
-        
+
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South);
         let fu = calculate_fu(chiitoi, &context);
-        
+
         assert_eq!(fu.total, 25);
     }
 
@@ -516,16 +537,17 @@ mod tests {
         // Pinfu + Tsumo = exactly 20 fu
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
             .with_winning_tile(Tile::suited(Suit::Sou, 4)); // Ryanmen wait
-        
+
         let tiles = parse_hand("123456m789p234s55p").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         // Find a structure that qualifies for pinfu
-        let fu_results: Vec<_> = structures.iter()
+        let fu_results: Vec<_> = structures
+            .iter()
             .map(|s| calculate_fu(s, &context))
             .collect();
-        
+
         // At least one should be 20 fu (pinfu tsumo)
         assert!(fu_results.iter().any(|f| f.total == 20));
     }
@@ -535,13 +557,13 @@ mod tests {
         // Closed hand ron = +10 fu
         let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
             .with_winning_tile(Tile::suited(Suit::Man, 4));
-        
+
         let tiles = parse_hand("234m456p789s11122z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let fu = calculate_fu(&structures[0], &context);
-        
+
         // Base 20 + Menzen Ron 10 + triplet fu = at least 30
         assert!(fu.total >= 30);
         assert_eq!(fu.breakdown.menzen_ron, 10);
@@ -552,13 +574,13 @@ mod tests {
         // Tsumo = +2 fu (non-pinfu hand)
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
             .with_winning_tile(Tile::honor(Honor::East));
-        
+
         let tiles = parse_hand("123m456p789s11122z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let fu = calculate_fu(&structures[0], &context);
-        
+
         assert_eq!(fu.breakdown.tsumo, 2);
     }
 
@@ -568,16 +590,16 @@ mod tests {
         let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
             .open()
             .with_winning_tile(Tile::suited(Suit::Man, 5));
-        
+
         // 555m (simple triplet) + sequences
         let tiles = parse_hand("555m456p789s11122z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let fu = calculate_fu(&structures[0], &context);
-        
+
         // Should have 2 fu from the simple triplet (open)
-        // Plus 8 fu from terminal/honor triplet (111z, but this is closed... 
+        // Plus 8 fu from terminal/honor triplet (111z, but this is closed...
         // Wait, in an open hand, are the non-called melds closed?
         // Yes! Only the called melds are open. But for simplicity we're treating
         // all melds as having the same open/closed status as the hand.
@@ -590,14 +612,14 @@ mod tests {
         // Closed triplet of terminals = 8 fu
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
             .with_winning_tile(Tile::suited(Suit::Man, 2));
-        
+
         // 111m (terminal triplet, closed) + sequences
         let tiles = parse_hand("111234m456p789s22z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let fu = calculate_fu(&structures[0], &context);
-        
+
         // Closed terminal triplet = 8 fu
         assert!(fu.breakdown.melds >= 8);
     }
@@ -607,15 +629,15 @@ mod tests {
         // Dragon pair = 2 fu
         let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
             .with_winning_tile(Tile::suited(Suit::Man, 4));
-        
+
         // 234m 456p 789s 111z 55z - pair of white dragons (5z)
         let tiles = parse_hand("234m456p789s11155z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         assert!(!structures.is_empty(), "Should have valid decomposition");
         let fu = calculate_fu(&structures[0], &context);
-        
+
         assert_eq!(fu.breakdown.pair, 2);
     }
 
@@ -624,15 +646,15 @@ mod tests {
         // Pair of double wind (both round and seat) = 4 fu
         let context = GameContext::new(WinType::Ron, Honor::East, Honor::East)
             .with_winning_tile(Tile::suited(Suit::Man, 4));
-        
+
         // 234m 456p 789s 222z 11z - pair of east (both round and seat wind)
         let tiles = parse_hand("234m456p789s22211z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         assert!(!structures.is_empty(), "Should have valid decomposition");
         let fu = calculate_fu(&structures[0], &context);
-        
+
         // Double wind = 4 fu (2 for round wind + 2 for seat wind)
         assert_eq!(fu.breakdown.pair, 4);
     }
@@ -642,13 +664,13 @@ mod tests {
         // Kanchan wait = 2 fu
         let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
             .with_winning_tile(Tile::suited(Suit::Man, 3)); // Middle of 234
-        
+
         let tiles = parse_hand("234m456p789s11122z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let fu = calculate_fu(&structures[0], &context);
-        
+
         assert_eq!(fu.breakdown.wait, 2);
     }
 
@@ -659,6 +681,106 @@ mod tests {
         assert_eq!(round_up_to_10(30), 30);
         assert_eq!(round_up_to_10(31), 40);
         assert_eq!(round_up_to_10(25), 30); // But chiitoitsu stays 25
+    }
+
+    // ===== Kan Fu Tests =====
+
+    #[test]
+    fn test_fu_kan_simple_open() {
+        use crate::hand::{KanType, Meld};
+
+        // Open kan of simples = 8 fu
+        let kan = Meld::kan(Tile::suited(Suit::Man, 5), KanType::Open);
+        assert_eq!(meld_fu(&kan), 8);
+
+        // Added kan (shouminkan) is also open = 8 fu
+        let added_kan = Meld::kan(Tile::suited(Suit::Pin, 3), KanType::Added);
+        assert_eq!(meld_fu(&added_kan), 8);
+    }
+
+    #[test]
+    fn test_fu_kan_simple_closed() {
+        use crate::hand::{KanType, Meld};
+
+        // Closed kan of simples = 16 fu
+        let kan = Meld::kan(Tile::suited(Suit::Sou, 7), KanType::Closed);
+        assert_eq!(meld_fu(&kan), 16);
+    }
+
+    #[test]
+    fn test_fu_kan_terminal_open() {
+        use crate::hand::{KanType, Meld};
+
+        // Open kan of terminals = 16 fu
+        let kan = Meld::kan(Tile::suited(Suit::Man, 1), KanType::Open);
+        assert_eq!(meld_fu(&kan), 16);
+
+        let kan_9 = Meld::kan(Tile::suited(Suit::Pin, 9), KanType::Added);
+        assert_eq!(meld_fu(&kan_9), 16);
+    }
+
+    #[test]
+    fn test_fu_kan_terminal_closed() {
+        use crate::hand::{KanType, Meld};
+
+        // Closed kan of terminals = 32 fu
+        let kan = Meld::kan(Tile::suited(Suit::Sou, 1), KanType::Closed);
+        assert_eq!(meld_fu(&kan), 32);
+    }
+
+    #[test]
+    fn test_fu_kan_honor_open() {
+        use crate::hand::{KanType, Meld};
+        use crate::tile::Honor;
+
+        // Open kan of honors = 16 fu
+        let kan = Meld::kan(Tile::honor(Honor::East), KanType::Open);
+        assert_eq!(meld_fu(&kan), 16);
+
+        let dragon_kan = Meld::kan(Tile::honor(Honor::White), KanType::Added);
+        assert_eq!(meld_fu(&dragon_kan), 16);
+    }
+
+    #[test]
+    fn test_fu_kan_honor_closed() {
+        use crate::hand::{KanType, Meld};
+        use crate::tile::Honor;
+
+        // Closed kan of honors = 32 fu
+        let kan = Meld::kan(Tile::honor(Honor::Red), KanType::Closed);
+        assert_eq!(meld_fu(&kan), 32);
+
+        let wind_kan = Meld::kan(Tile::honor(Honor::North), KanType::Closed);
+        assert_eq!(meld_fu(&wind_kan), 32);
+    }
+
+    #[test]
+    fn test_fu_comparison_triplet_vs_kan() {
+        use crate::hand::{KanType, Meld};
+
+        // Kan fu should be 4x the equivalent triplet fu
+        let simple_tile = Tile::suited(Suit::Man, 5);
+        let terminal_tile = Tile::suited(Suit::Pin, 1);
+
+        // Open simple: triplet 2, kan 8
+        let triplet_open = Meld::Koutsu(simple_tile, true);
+        let kan_open = Meld::kan(simple_tile, KanType::Open);
+        assert_eq!(meld_fu(&kan_open), meld_fu(&triplet_open) * 4);
+
+        // Closed simple: triplet 4, kan 16
+        let triplet_closed = Meld::koutsu(simple_tile);
+        let kan_closed = Meld::kan(simple_tile, KanType::Closed);
+        assert_eq!(meld_fu(&kan_closed), meld_fu(&triplet_closed) * 4);
+
+        // Open terminal: triplet 4, kan 16
+        let triplet_term_open = Meld::Koutsu(terminal_tile, true);
+        let kan_term_open = Meld::kan(terminal_tile, KanType::Open);
+        assert_eq!(meld_fu(&kan_term_open), meld_fu(&triplet_term_open) * 4);
+
+        // Closed terminal: triplet 8, kan 32
+        let triplet_term_closed = Meld::koutsu(terminal_tile);
+        let kan_term_closed = Meld::kan(terminal_tile, KanType::Closed);
+        assert_eq!(meld_fu(&kan_term_closed), meld_fu(&triplet_term_closed) * 4);
     }
 
     // ===== Score Level Tests =====
@@ -700,13 +822,13 @@ mod tests {
     fn test_basic_points_simple() {
         // 1 han 30 fu = 30 × 2^3 = 240
         assert_eq!(calculate_basic_points(1, 30, false), 240);
-        
+
         // 2 han 30 fu = 30 × 2^4 = 480
         assert_eq!(calculate_basic_points(2, 30, false), 480);
-        
+
         // 3 han 30 fu = 30 × 2^5 = 960
         assert_eq!(calculate_basic_points(3, 30, false), 960);
-        
+
         // 4 han 30 fu = 30 × 2^6 = 1920
         assert_eq!(calculate_basic_points(4, 30, false), 1920);
     }
@@ -715,7 +837,7 @@ mod tests {
     fn test_basic_points_mangan_cap() {
         // 4 han 40 fu = mangan = 2000
         assert_eq!(calculate_basic_points(4, 40, false), 2000);
-        
+
         // 5 han = mangan = 2000
         assert_eq!(calculate_basic_points(5, 30, false), 2000);
     }
@@ -734,7 +856,7 @@ mod tests {
     fn test_payment_dealer_tsumo() {
         // Dealer tsumo mangan: 4000 all (× 3 = 12000)
         let payment = calculate_payment(2000, true, WinType::Tsumo);
-        
+
         assert_eq!(payment.from_non_dealer, Some(4000));
         assert_eq!(payment.from_dealer, None);
         assert_eq!(payment.total, 12000);
@@ -744,7 +866,7 @@ mod tests {
     fn test_payment_non_dealer_tsumo() {
         // Non-dealer tsumo mangan: 4000/2000
         let payment = calculate_payment(2000, false, WinType::Tsumo);
-        
+
         assert_eq!(payment.from_dealer, Some(4000));
         assert_eq!(payment.from_non_dealer, Some(2000));
         assert_eq!(payment.total, 8000);
@@ -754,7 +876,7 @@ mod tests {
     fn test_payment_dealer_ron() {
         // Dealer ron mangan: 12000
         let payment = calculate_payment(2000, true, WinType::Ron);
-        
+
         assert_eq!(payment.from_discarder, Some(12000));
         assert_eq!(payment.total, 12000);
     }
@@ -763,7 +885,7 @@ mod tests {
     fn test_payment_non_dealer_ron() {
         // Non-dealer ron mangan: 8000
         let payment = calculate_payment(2000, false, WinType::Ron);
-        
+
         assert_eq!(payment.from_discarder, Some(8000));
         assert_eq!(payment.total, 8000);
     }
@@ -784,10 +906,10 @@ mod tests {
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
             .riichi()
             .with_winning_tile(Tile::suited(Suit::Man, 4));
-        
+
         let results = score_hand("234m456p789s11122z", &context);
         let best = best_score(&results);
-        
+
         // Should have at least 2 han (riichi + menzen tsumo)
         assert!(best.han >= 2);
         assert!(best.payment.total > 0);
@@ -798,10 +920,10 @@ mod tests {
         // Pinfu + Tsumo = 2 han, 20 fu
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
             .with_winning_tile(Tile::suited(Suit::Sou, 4)); // Ryanmen
-        
+
         let results = score_hand("123456m789p234s55p", &context);
         let best = best_score(&results);
-        
+
         // Should be 20 fu (pinfu tsumo special case)
         assert_eq!(best.fu.total, 20);
         // Should have 2 han (pinfu + menzen tsumo)
@@ -814,11 +936,11 @@ mod tests {
         // Using a hand without Ittsu to avoid extra han
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
             .with_winning_tile(Tile::suited(Suit::Man, 5));
-        
+
         // 111m 234m 345m 555m 99m - chinitsu without ittsu
         let results = score_hand("111234345555m99m", &context);
         let best = best_score(&results);
-        
+
         // Chinitsu closed = 6 han + menzen tsumo = 1 han = 7 han = Haneman
         assert_eq!(best.score_level, ScoreLevel::Haneman);
         assert_eq!(best.basic_points, 3000);
@@ -830,10 +952,10 @@ mod tests {
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
             .tenhou()
             .with_winning_tile(Tile::suited(Suit::Man, 4));
-        
+
         let results = score_hand("234m456p789s11122z", &context);
         let best = best_score(&results);
-        
+
         assert_eq!(best.score_level, ScoreLevel::Yakuman);
         assert_eq!(best.han, 13);
         // Dealer yakuman tsumo = 16000 all = 48000 total
@@ -843,23 +965,23 @@ mod tests {
     #[test]
     fn test_common_scores() {
         // Test some common score patterns
-        
+
         // 1 han 30 fu non-dealer ron = 240 × 4 = 960 → 1000
         let payment = calculate_payment(calculate_basic_points(1, 30, false), false, WinType::Ron);
         assert_eq!(payment.total, 1000);
-        
+
         // 2 han 30 fu non-dealer ron = 480 × 4 = 1920 → 2000
         let payment = calculate_payment(calculate_basic_points(2, 30, false), false, WinType::Ron);
         assert_eq!(payment.total, 2000);
-        
+
         // 3 han 40 fu non-dealer ron = 1280 × 4 = 5120 → 5200
         let payment = calculate_payment(calculate_basic_points(3, 40, false), false, WinType::Ron);
         assert_eq!(payment.total, 5200);
-        
+
         // 4 han 30 fu non-dealer ron = 1920 × 4 = 7680 → 7700 (NOT mangan, need 40+ fu)
         let payment = calculate_payment(calculate_basic_points(4, 30, false), false, WinType::Ron);
         assert_eq!(payment.total, 7700);
-        
+
         // 4 han 40 fu non-dealer ron = mangan = 8000
         let payment = calculate_payment(calculate_basic_points(4, 40, false), false, WinType::Ron);
         assert_eq!(payment.total, 8000);
@@ -870,15 +992,15 @@ mod tests {
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
             .riichi()
             .with_winning_tile(Tile::suited(Suit::Man, 4));
-        
+
         let tiles = parse_hand("234m456p789s11122z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
         let yaku_result = detect_yaku_with_context(&structures[0], &counts, &context);
         let score_result = calculate_score(&structures[0], &yaku_result, &context);
-        
+
         let formatted = format_score(&score_result, &yaku_result);
-        
+
         // Should contain key information
         assert!(formatted.contains("Riichi"));
         assert!(formatted.contains("han"));

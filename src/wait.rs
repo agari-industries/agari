@@ -3,9 +3,9 @@
 //! The "wait" describes what shape the hand was in before the winning tile
 //! completed it. This affects fu calculation and Pinfu eligibility.
 
-use crate::hand::{HandStructure, Meld};
-use crate::tile::{Tile, Honor};
 use crate::context::GameContext;
+use crate::hand::{HandStructure, Meld};
+use crate::tile::{Honor, Tile};
 
 /// The type of wait that led to the winning hand
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -13,23 +13,23 @@ pub enum WaitType {
     /// Two-sided sequence wait (e.g., 23 waiting on 1 or 4)
     /// 0 fu
     Ryanmen,
-    
+
     /// Middle/closed wait (e.g., 13 waiting on 2)
     /// 2 fu
     Kanchan,
-    
+
     /// Edge wait (e.g., 12 waiting on 3, or 89 waiting on 7)
     /// 2 fu
     Penchan,
-    
+
     /// Dual triplet wait (e.g., 11+22 as pairs, waiting on either)
     /// 0 fu (but the resulting triplet contributes fu)
     Shanpon,
-    
+
     /// Single tile / pair wait (e.g., holding one 5m, waiting for another)
     /// 2 fu
     Tanki,
-    
+
     /// 13-sided kokushi wait (waiting on any of the 13 orphans)
     /// Special yakuman wait
     Kokushi13,
@@ -47,10 +47,13 @@ impl WaitType {
             WaitType::Kokushi13 => 0, // Yakuman, fu doesn't matter
         }
     }
-    
+
     /// Is this a "good" wait (multiple outs)?
     pub fn is_good_wait(&self) -> bool {
-        matches!(self, WaitType::Ryanmen | WaitType::Shanpon | WaitType::Kokushi13)
+        matches!(
+            self,
+            WaitType::Ryanmen | WaitType::Shanpon | WaitType::Kokushi13
+        )
     }
 }
 
@@ -78,7 +81,7 @@ pub fn detect_wait_types(structure: &HandStructure, winning_tile: Tile) -> Vec<W
                 vec![]
             }
         }
-        
+
         HandStructure::Kokushi { pair } => {
             // Kokushi: tanki on pair tile, or could be 13-wait
             if *pair == winning_tile {
@@ -88,34 +91,35 @@ pub fn detect_wait_types(structure: &HandStructure, winning_tile: Tile) -> Vec<W
                 vec![WaitType::Kokushi13]
             }
         }
-        
+
         HandStructure::Standard { melds, pair } => {
             let mut wait_types = Vec::new();
-            
+
             // Check if winning tile completed the pair (tanki wait)
             if *pair == winning_tile {
                 wait_types.push(WaitType::Tanki);
             }
-            
+
             // Check each meld
             for meld in melds {
                 match meld {
-                    Meld::Koutsu(t) if *t == winning_tile => {
+                    Meld::Koutsu(t, _) if *t == winning_tile => {
                         // Triplet contains winning tile → was shanpon wait
                         // (had a pair, waiting for third to make triplet)
                         wait_types.push(WaitType::Shanpon);
                     }
-                    
-                    Meld::Shuntsu(start_tile) => {
+
+                    Meld::Shuntsu(start_tile, _) => {
                         if let Some(wt) = check_shuntsu_wait(*start_tile, winning_tile) {
                             wait_types.push(wt);
                         }
                     }
-                    
+
+                    // Kans don't affect wait type detection (they're already complete)
                     _ => {}
                 }
             }
-            
+
             wait_types
         }
     }
@@ -135,22 +139,22 @@ fn check_shuntsu_wait(start_tile: Tile, winning_tile: Tile) -> Option<WaitType> 
         Tile::Suited { suit, value } => (suit, value),
         Tile::Honor(_) => return None, // Can't happen, but handle gracefully
     };
-    
+
     let (w_suit, w_val) = match winning_tile {
         Tile::Suited { suit, value } => (suit, value),
         Tile::Honor(_) => return None, // Honor can't be in a sequence
     };
-    
+
     // Must be same suit
     if suit != w_suit {
         return None;
     }
-    
+
     // Check if winning tile is in this sequence (start, start+1, start+2)
     if w_val < start_val || w_val > start_val + 2 {
         return None;
     }
-    
+
     // Determine wait type based on position in sequence
     Some(wait_type_for_shuntsu_position(start_val, w_val))
 }
@@ -205,33 +209,29 @@ fn wait_type_for_shuntsu_position(start_val: u8, winning_val: u8) -> WaitType {
 ///
 /// # Returns
 /// true if all Pinfu conditions are met
-pub fn is_pinfu(
-    structure: &HandStructure,
-    winning_tile: Tile,
-    context: &GameContext,
-) -> bool {
+pub fn is_pinfu(structure: &HandStructure, winning_tile: Tile, context: &GameContext) -> bool {
     // Must be closed hand
     if context.is_open {
         return false;
     }
-    
+
     match structure {
         HandStructure::Chiitoitsu { .. } => false,
-        
+
         HandStructure::Kokushi { .. } => false, // Kokushi can never be pinfu
-        
+
         HandStructure::Standard { melds, pair } => {
-            // 1. All melds must be sequences
-            let all_sequences = melds.iter().all(|m| matches!(m, Meld::Shuntsu(_)));
+            // 1. All melds must be sequences (no triplets or kans)
+            let all_sequences = melds.iter().all(|m| m.is_sequence());
             if !all_sequences {
                 return false;
             }
-            
+
             // 2. Pair must not be yakuhai
             if is_yakuhai_pair(*pair, context) {
                 return false;
             }
-            
+
             // 3. Must have ryanmen wait
             let wait_types = detect_wait_types(structure, winning_tile);
             wait_types.contains(&WaitType::Ryanmen)
@@ -259,35 +259,34 @@ fn is_yakuhai_pair(pair: Tile, context: &GameContext) -> bool {
 }
 
 /// Find the best (lowest fu) wait type for a structure.
-/// 
+///
 /// Used when calculating fu - we want the interpretation that gives
 /// the lowest wait fu (typically ryanmen if available).
 pub fn best_wait_type(structure: &HandStructure, winning_tile: Tile) -> Option<WaitType> {
     let wait_types = detect_wait_types(structure, winning_tile);
-    
+
     // Prefer waits with 0 fu, and among 0-fu waits, prefer Ryanmen (for Pinfu eligibility)
     // Priority order: Ryanmen (0) > Shanpon (1) > Kanchan (2) > Penchan (3) > Tanki (4) > Kokushi13 (5)
-    wait_types.into_iter()
-        .min_by_key(|wt| {
-            let priority = match wt {
-                WaitType::Ryanmen => 0,
-                WaitType::Shanpon => 1,
-                WaitType::Kanchan => 2,
-                WaitType::Penchan => 3,
-                WaitType::Tanki => 4,
-                WaitType::Kokushi13 => 5, // Add this arm to handle the 13-sided wait
-            };
-            (wt.fu(), priority)
-        })
+    wait_types.into_iter().min_by_key(|wt| {
+        let priority = match wt {
+            WaitType::Ryanmen => 0,
+            WaitType::Shanpon => 1,
+            WaitType::Kanchan => 2,
+            WaitType::Penchan => 3,
+            WaitType::Tanki => 4,
+            WaitType::Kokushi13 => 5, // Add this arm to handle the 13-sided wait
+        };
+        (wt.fu(), priority)
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tile::Suit;
-    use crate::parse::{parse_hand, to_counts};
-    use crate::hand::decompose_hand;
     use crate::context::WinType;
+    use crate::hand::decompose_hand;
+    use crate::parse::{parse_hand, to_counts};
+    use crate::tile::Suit;
 
     // ===== Basic Wait Type Tests =====
 
@@ -296,7 +295,7 @@ mod tests {
         // 234m - winning with 2 (from 34 wait) is ryanmen
         let wt = wait_type_for_shuntsu_position(2, 2);
         assert_eq!(wt, WaitType::Ryanmen);
-        
+
         // 234m - winning with 4 (from 23 wait) is ryanmen
         let wt = wait_type_for_shuntsu_position(2, 4);
         assert_eq!(wt, WaitType::Ryanmen);
@@ -307,7 +306,7 @@ mod tests {
         // 234m - winning with 3 (from 24 wait) is kanchan
         let wt = wait_type_for_shuntsu_position(2, 3);
         assert_eq!(wt, WaitType::Kanchan);
-        
+
         // 567m - winning with 6 (from 57 wait) is kanchan
         let wt = wait_type_for_shuntsu_position(5, 6);
         assert_eq!(wt, WaitType::Kanchan);
@@ -332,7 +331,7 @@ mod tests {
         // 123m - winning with 1 (from 23 wait) is ryanmen (23 waits on 1 or 4)
         let wt = wait_type_for_shuntsu_position(1, 1);
         assert_eq!(wt, WaitType::Ryanmen);
-        
+
         // 789m - winning with 9 (from 78 wait) is ryanmen (78 waits on 6 or 9)
         let wt = wait_type_for_shuntsu_position(7, 9);
         assert_eq!(wt, WaitType::Ryanmen);
@@ -346,10 +345,10 @@ mod tests {
         let tiles = parse_hand("123m456p789s11177z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let winning_tile = Tile::honor(Honor::Red);
         let wait_types = detect_wait_types(&structures[0], winning_tile);
-        
+
         assert!(wait_types.contains(&WaitType::Tanki));
     }
 
@@ -359,10 +358,10 @@ mod tests {
         let tiles = parse_hand("123m456p789s11122z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let winning_tile = Tile::honor(Honor::East);
         let wait_types = detect_wait_types(&structures[0], winning_tile);
-        
+
         assert!(wait_types.contains(&WaitType::Shanpon));
     }
 
@@ -372,10 +371,10 @@ mod tests {
         let tiles = parse_hand("234m456p789s11122z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let winning_tile = Tile::suited(Suit::Man, 4);
         let wait_types = detect_wait_types(&structures[0], winning_tile);
-        
+
         assert!(wait_types.contains(&WaitType::Ryanmen));
     }
 
@@ -387,10 +386,10 @@ mod tests {
         let tiles = parse_hand("234m456p789s11122z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let winning_tile = Tile::suited(Suit::Man, 3);
         let wait_types = detect_wait_types(&structures[0], winning_tile);
-        
+
         assert!(wait_types.contains(&WaitType::Kanchan));
     }
 
@@ -402,19 +401,22 @@ mod tests {
         let tiles = parse_hand("111123m456p789s22z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let winning_tile = Tile::suited(Suit::Man, 1);
-        
+
         // Check that at least one structure has multiple wait interpretations
         let has_multiple_waits = structures.iter().any(|structure| {
             let wait_types = detect_wait_types(structure, winning_tile);
             wait_types.len() > 1
         });
-        
+
         // At minimum, there should be structures with different wait types
         assert!(!structures.is_empty());
         // The hand 111123m should allow multiple wait interpretations for 1m
-        assert!(has_multiple_waits, "Should find structure with multiple wait types");
+        assert!(
+            has_multiple_waits,
+            "Should find structure with multiple wait types"
+        );
     }
 
     #[test]
@@ -422,15 +424,16 @@ mod tests {
         let tiles = parse_hand("1122m3344p5566s77z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         // Find the chiitoitsu structure
-        let chiitoi = structures.iter()
+        let chiitoi = structures
+            .iter()
             .find(|s| matches!(s, HandStructure::Chiitoitsu { .. }))
             .expect("Should have chiitoitsu structure");
-        
+
         let winning_tile = Tile::honor(Honor::Red); // 7z
         let wait_types = detect_wait_types(chiitoi, winning_tile);
-        
+
         assert_eq!(wait_types, vec![WaitType::Tanki]);
     }
 
@@ -444,13 +447,14 @@ mod tests {
         let tiles = parse_hand("123456m789p234s55p").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South);
         let winning_tile = Tile::suited(Suit::Sou, 4); // Ryanmen from 23s
-        
-        let has_pinfu = structures.iter()
+
+        let has_pinfu = structures
+            .iter()
             .any(|s| is_pinfu(s, winning_tile, &context));
-        
+
         assert!(has_pinfu, "Should qualify for pinfu");
     }
 
@@ -460,13 +464,14 @@ mod tests {
         let tiles = parse_hand("123m456p789s11155z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South);
         let winning_tile = Tile::honor(Honor::White);
-        
-        let has_pinfu = structures.iter()
+
+        let has_pinfu = structures
+            .iter()
             .any(|s| is_pinfu(s, winning_tile, &context));
-        
+
         assert!(!has_pinfu, "Triplet hand can't be pinfu");
     }
 
@@ -476,13 +481,14 @@ mod tests {
         let tiles = parse_hand("123m456m789p234s55z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South);
         let winning_tile = Tile::suited(Suit::Sou, 4);
-        
-        let has_pinfu = structures.iter()
+
+        let has_pinfu = structures
+            .iter()
             .any(|s| is_pinfu(s, winning_tile, &context));
-        
+
         assert!(!has_pinfu, "Yakuhai pair (dragon) means no pinfu");
     }
 
@@ -492,14 +498,15 @@ mod tests {
         let tiles = parse_hand("123m456m789p234s22z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         // South is seat wind, so 2z (south) pair is yakuhai
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South);
         let winning_tile = Tile::suited(Suit::Sou, 4);
-        
-        let has_pinfu = structures.iter()
+
+        let has_pinfu = structures
+            .iter()
             .any(|s| is_pinfu(s, winning_tile, &context));
-        
+
         assert!(!has_pinfu, "Value wind pair means no pinfu");
     }
 
@@ -509,13 +516,14 @@ mod tests {
         let tiles = parse_hand("123m456m789p234s33z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South);
         let winning_tile = Tile::suited(Suit::Sou, 4); // Ryanmen
-        
-        let has_pinfu = structures.iter()
+
+        let has_pinfu = structures
+            .iter()
             .any(|s| is_pinfu(s, winning_tile, &context));
-        
+
         assert!(has_pinfu, "Non-value wind pair allows pinfu");
     }
 
@@ -525,13 +533,14 @@ mod tests {
         let tiles = parse_hand("123m456m789p234s55p").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South);
         let winning_tile = Tile::suited(Suit::Sou, 3); // Kanchan from 24s
-        
-        let has_pinfu = structures.iter()
+
+        let has_pinfu = structures
+            .iter()
             .any(|s| is_pinfu(s, winning_tile, &context));
-        
+
         assert!(!has_pinfu, "Kanchan wait means no pinfu");
     }
 
@@ -540,14 +549,14 @@ mod tests {
         let tiles = parse_hand("123m456m789p234s55p").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
-        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
-            .open(); // Open hand!
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South).open(); // Open hand!
         let winning_tile = Tile::suited(Suit::Sou, 4);
-        
-        let has_pinfu = structures.iter()
+
+        let has_pinfu = structures
+            .iter()
             .any(|s| is_pinfu(s, winning_tile, &context));
-        
+
         assert!(!has_pinfu, "Open hand can't be pinfu");
     }
 
@@ -559,9 +568,9 @@ mod tests {
         let tiles = parse_hand("111123m456p789s22z").unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        
+
         let winning_tile = Tile::suited(Suit::Man, 1);
-        
+
         // For structures where multiple waits exist, best should be ryanmen (0 fu)
         for structure in &structures {
             if let Some(best) = best_wait_type(structure, winning_tile) {
