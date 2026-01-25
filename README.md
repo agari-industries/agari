@@ -179,7 +179,7 @@ The code includes a sophisticated Unicode mapper. Instead of just printing "1m",
 
 ## CLI Usage
 
-```bash
+```text
 # Basic hand scoring
 agari 123m456p789s11122z
 
