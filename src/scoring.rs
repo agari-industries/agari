@@ -1007,4 +1007,100 @@ mod tests {
         assert!(formatted.contains("fu"));
         assert!(formatted.contains("Total:"));
     }
+
+    // ===== Kan Scoring Tests =====
+
+    #[test]
+    fn test_hand_with_closed_kan_fu() {
+        use crate::hand::decompose_hand_with_melds;
+        use crate::parse::parse_hand_with_aka;
+
+        // Hand: [1111m] 222m 333m 555p 11z (15 tiles with closed kan)
+        let parsed = parse_hand_with_aka("[1111m]222333m555p11z").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds: Vec<_> = parsed
+            .called_melds
+            .iter()
+            .map(|cm| cm.meld.clone())
+            .collect();
+
+        let structures = decompose_hand_with_melds(&counts, &called_melds);
+        assert!(!structures.is_empty());
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .with_winning_tile(Tile::suited(Suit::Man, 2));
+
+        let fu = calculate_fu(&structures[0], &context);
+
+        // Closed terminal kan = 32 fu
+        // Closed simple triplet 222m = 4 fu
+        // Closed simple triplet 333m = 4 fu
+        // Closed simple triplet 555p = 4 fu
+        // Double wind pair 11z = 4 fu
+        // Tsumo = 2 fu
+        // Base = 20 fu
+        // Total = 32 + 4 + 4 + 4 + 4 + 2 + 20 = 70 fu
+        assert_eq!(fu.total, 70);
+    }
+
+    #[test]
+    fn test_hand_with_open_kan_fu() {
+        use crate::hand::decompose_hand_with_melds;
+        use crate::parse::parse_hand_with_aka;
+
+        // Hand: (5555m) 123p 456p 789s 11z (15 tiles with open kan)
+        let parsed = parse_hand_with_aka("(5555m)123456p789s11z").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds: Vec<_> = parsed
+            .called_melds
+            .iter()
+            .map(|cm| cm.meld.clone())
+            .collect();
+
+        let structures = decompose_hand_with_melds(&counts, &called_melds);
+        assert!(!structures.is_empty());
+
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .open()
+            .with_winning_tile(Tile::suited(Suit::Pin, 3));
+
+        let fu = calculate_fu(&structures[0], &context);
+
+        // Open simple kan = 8 fu
+        // Verify the kan contributes the right fu
+        assert_eq!(fu.breakdown.melds, 8);
+        // Total fu will include base 20 + kan 8 + wait fu, rounded up
+        assert!(fu.total >= 30);
+    }
+
+    #[test]
+    fn test_hand_with_honor_kan() {
+        use crate::hand::decompose_hand_with_melds;
+        use crate::parse::parse_hand_with_aka;
+
+        // Hand: [5555z] 123m 456p 789s 11z (15 tiles with closed dragon kan)
+        let parsed = parse_hand_with_aka("[5555z]123m456p789s11z").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds: Vec<_> = parsed
+            .called_melds
+            .iter()
+            .map(|cm| cm.meld.clone())
+            .collect();
+
+        let structures = decompose_hand_with_melds(&counts, &called_melds);
+        assert!(!structures.is_empty());
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .with_winning_tile(Tile::suited(Suit::Man, 2));
+
+        let fu = calculate_fu(&structures[0], &context);
+
+        // Closed honor kan = 32 fu
+        // Sequences = 0 fu each
+        // Double wind pair = 4 fu
+        // Tsumo = 2 fu
+        // Base = 20 fu
+        // Total = 32 + 0 + 0 + 0 + 4 + 2 + 20 = 58 -> rounded to 60 fu
+        assert_eq!(fu.total, 60);
+    }
 }

@@ -8,8 +8,8 @@ use std::process;
 use agari::{
     context::{GameContext, WinType},
     display::{format_structure, honor_name, tile_to_unicode},
-    hand::decompose_hand,
-    parse::{parse_hand_with_aka, to_counts, validate_hand},
+    hand::{decompose_hand, decompose_hand_with_melds},
+    parse::{parse_hand_with_aka, to_counts, validate_hand, validate_hand_with_melds},
     scoring::{ScoreLevel, ScoringResult, calculate_score},
     shanten::{ShantenType, calculate_shanten, calculate_ukeire},
     tile::{Honor, Suit, Tile},
@@ -30,6 +30,12 @@ HAND FORMAT:
     Honors: 1z=East, 2z=South, 3z=West, 4z=North, 5z=White, 6z=Green, 7z=Red
     Red fives: Use 0 instead of 5 (e.g., 0m = red 5-man)
 
+    Called melds (kans, pons, chis):
+    [1111m]  = Closed kan (ankan) of 1-man
+    (1111m)  = Open kan (daiminkan) of 1-man
+    (111m)   = Open triplet (pon) of 1-man
+    (123m)   = Open sequence (chi) of 1-2-3 man
+
 EXAMPLES:
     agari 123m456p789s11122z              Basic hand
     agari 123m456p789s11122z -t           Tsumo win
@@ -37,6 +43,8 @@ EXAMPLES:
     agari 123m456p789s11122z -w 2m -t     Won on 2-man by tsumo
     agari 123m456p789s11122z -d 1m        With dora indicator 1m (2m is dora)
     agari 234567m234567p22s -w 5p -t      Pinfu tanyao
+    agari "[1111m]222333m555p11z" -t      Hand with closed kan (15 tiles)
+    agari "[1111m](2222p)345s11z" -t      Hand with closed + open kan (16 tiles)
 
 OPTIONS:
     -w, --win <TILE>      Winning tile (e.g., 2m, 5z)
@@ -183,22 +191,35 @@ fn main() {
         }
     };
 
+    // Check if hand has called melds (kans, pons, chis)
+    let has_called_melds = !parsed.called_melds.is_empty();
+
     // For shanten mode, we don't require exactly 14 tiles
     // (13 tiles for tenpai calculation is common)
     if !shanten_mode {
         // Validate hand size for scoring
-        if let Err(e) = validate_hand(&parsed.tiles) {
-            eprintln!("❌ Invalid hand: {}", e);
-            process::exit(1);
+        if has_called_melds {
+            if let Err(e) = validate_hand_with_melds(&parsed) {
+                eprintln!("❌ Invalid hand: {}", e);
+                process::exit(1);
+            }
+        } else {
+            if let Err(e) = validate_hand(&parsed.tiles) {
+                eprintln!("❌ Invalid hand: {}", e);
+                process::exit(1);
+            }
         }
     } else {
-        // For shanten, allow 13-14 tiles
+        // For shanten, allow 1-14 tiles (not counting melds)
         let tile_count = parsed.tiles.len();
         if tile_count < 1 || tile_count > 14 {
             eprintln!("❌ Invalid hand: expected 1-14 tiles, got {}", tile_count);
             process::exit(1);
         }
     }
+
+    // If hand has open melds, mark hand as open
+    let has_open_melds = parsed.called_melds.iter().any(|m| m.meld.is_open());
 
     // Parse winds
     let round_wind = match parse_wind(&round_wind_str) {
@@ -258,7 +279,7 @@ fn main() {
         context = context.with_winning_tile(wt);
     }
 
-    if open {
+    if open || has_open_melds {
         context = context.open();
     }
 
@@ -305,7 +326,17 @@ fn main() {
     }
 
     // Decompose the hand
-    let structures = decompose_hand(&counts);
+    let structures = if has_called_melds {
+        // Extract the Meld objects from CalledMeld
+        let called_melds: Vec<_> = parsed
+            .called_melds
+            .iter()
+            .map(|cm| cm.meld.clone())
+            .collect();
+        decompose_hand_with_melds(&counts, &called_melds)
+    } else {
+        decompose_hand(&counts)
+    };
 
     if structures.is_empty() {
         eprintln!("❌ This hand has no valid winning structure.");

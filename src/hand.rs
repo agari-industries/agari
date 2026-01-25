@@ -159,6 +159,57 @@ pub fn decompose_hand(counts: &TileCounts) -> Vec<HandStructure> {
     results
 }
 
+/// Find all valid decompositions of a hand with pre-declared called melds
+///
+/// The called_melds are already fixed (kans, pons, chis), and we need to
+/// find valid decompositions for the remaining tiles in hand.
+pub fn decompose_hand_with_melds(
+    hand_tiles: &TileCounts,
+    called_melds: &[Meld],
+) -> Vec<HandStructure> {
+    let mut results = Vec::new();
+
+    // Count how many melds we need to form from hand tiles
+    let melds_needed = 4 - called_melds.len() as u32;
+
+    // For standard hands with called melds
+    for (&pair_tile, &count) in hand_tiles {
+        if count >= 2 {
+            // Try this tile as the pair
+            let mut remaining = hand_tiles.clone();
+            *remaining.get_mut(&pair_tile).unwrap() -= 2;
+            if remaining[&pair_tile] == 0 {
+                remaining.remove(&pair_tile);
+            }
+
+            // Find all ways to form the remaining melds
+            let meld_combinations = find_all_meld_combinations(remaining, melds_needed);
+
+            for hand_melds in meld_combinations {
+                // Combine called melds with hand melds
+                let mut all_melds: Vec<Meld> = called_melds.to_vec();
+                all_melds.extend(hand_melds);
+                all_melds.sort_by_key(|m| m.tile());
+
+                results.push(HandStructure::Standard {
+                    melds: all_melds,
+                    pair: pair_tile,
+                });
+            }
+        }
+    }
+
+    // Note: Chiitoitsu and Kokushi cannot have called melds
+    // (Chiitoitsu requires 7 pairs, Kokushi requires specific 13 tiles)
+    // So we don't check for those when called_melds is non-empty
+
+    // Remove duplicates
+    results.sort_by(|a, b| format!("{:?}", a).cmp(&format!("{:?}", b)));
+    results.dedup();
+
+    results
+}
+
 /// Find all ways to form exactly `needed` melds from the given tiles
 fn find_all_meld_combinations(mut counts: TileCounts, needed: u32) -> Vec<Vec<Meld>> {
     // Remove zero-count entries
