@@ -2,8 +2,9 @@
 //!
 //! A command-line tool for calculating the score of a Riichi Mahjong hand.
 
-use std::env;
 use std::process;
+
+use clap::Parser;
 
 use agari::{
     context::{GameContext, WinType},
@@ -16,15 +17,7 @@ use agari::{
     yaku::{Yaku, detect_yaku_with_context},
 };
 
-const HELP: &str = r#"
-╔════════════════════════════════════════════════════════════════════════════╗
-║                     AGARI - Mahjong Score Calculator                       ║
-╚════════════════════════════════════════════════════════════════════════════╝
-
-USAGE:
-    agari <HAND> [OPTIONS]
-
-HAND FORMAT:
+const AFTER_HELP: &str = r#"HAND FORMAT:
     Standard notation: numbers followed by suit letter
     m = Man (Characters), p = Pin (Dots), s = Sou (Bamboo), z = Honors
     Honors: 1z=East, 2z=South, 3z=West, 4z=North, 5z=White, 6z=Green, 7z=Red
@@ -44,146 +37,103 @@ EXAMPLES:
     agari 123m456p789s11122z -d 1m        With dora indicator 1m (2m is dora)
     agari 234567m234567p22s -w 5p -t      Pinfu tanyao
     agari "[1111m]222333m555p11z" -t      Hand with closed kan (15 tiles)
-    agari "[1111m](2222p)345s11z" -t      Hand with closed + open kan (16 tiles)
+    agari "[1111m](2222p)345678s11z" -t   Hand with closed + open kan (16 tiles)"#;
 
-OPTIONS:
-    -w, --win <TILE>      Winning tile (e.g., 2m, 5z)
-    -t, --tsumo           Win by self-draw (default: ron)
-    -o, --open            Hand is open (has called tiles)
-    -r, --riichi          Riichi declared
-    --double-riichi       Double riichi (first turn)
-    --ippatsu             Ippatsu (win within one turn of riichi)
+#[derive(Parser)]
+#[command(name = "agari")]
+#[command(about = "Riichi Mahjong Hand Scoring Calculator")]
+#[command(after_help = AFTER_HELP)]
+struct Args {
+    /// Hand notation (e.g., 123m456p789s11122z)
+    hand: String,
 
-    --round <WIND>        Round wind: e/s/w/n (default: e)
-    --seat <WIND>         Seat wind: e/s/w/n (default: e)
+    /// Winning tile (e.g., 2m, 5z)
+    #[arg(short = 'w', long = "win")]
+    winning_tile: Option<String>,
 
-    -d, --dora <TILES>    Dora indicators (comma-separated: 1m,5z)
-    --ura <TILES>         Ura dora indicators (with riichi only)
+    /// Win by self-draw (default: ron)
+    #[arg(short, long)]
+    tsumo: bool,
 
-    --last-tile           Win on last tile (Haitei/Houtei)
-    --rinshan             Win on kan replacement tile
-    --chankan             Ron on another player's added kan
-    --tenhou              Dealer's first draw win
-    --chiihou             Non-dealer's first draw win
+    /// Hand is open (has called tiles)
+    #[arg(short, long)]
+    open: bool,
 
-    --shanten             Calculate shanten (tiles from tenpai) instead of score
-    --ukeire              Show ukeire (tile acceptance) with shanten
+    /// Riichi declared
+    #[arg(short, long)]
+    riichi: bool,
 
-    --ascii               Use ASCII output instead of Unicode
-    --all                 Show all possible interpretations
-    -h, --help            Show this help message
-"#;
+    /// Double riichi (first turn)
+    #[arg(long)]
+    double_riichi: bool,
+
+    /// Ippatsu (win within one turn of riichi)
+    #[arg(long)]
+    ippatsu: bool,
+
+    /// Round wind: e/s/w/n
+    #[arg(long, default_value = "e")]
+    round: String,
+
+    /// Seat wind: e/s/w/n
+    #[arg(long, default_value = "e")]
+    seat: String,
+
+    /// Dora indicators (comma-separated: 1m,5z)
+    #[arg(short, long)]
+    dora: Option<String>,
+
+    /// Ura dora indicators (with riichi only)
+    #[arg(long)]
+    ura: Option<String>,
+
+    /// Win on last tile (Haitei/Houtei)
+    #[arg(long)]
+    last_tile: bool,
+
+    /// Win on kan replacement tile
+    #[arg(long)]
+    rinshan: bool,
+
+    /// Ron on another player's added kan
+    #[arg(long)]
+    chankan: bool,
+
+    /// Dealer's first draw win
+    #[arg(long)]
+    tenhou: bool,
+
+    /// Non-dealer's first draw win
+    #[arg(long)]
+    chiihou: bool,
+
+    /// Calculate shanten (tiles from tenpai) instead of score
+    #[arg(long)]
+    shanten: bool,
+
+    /// Show ukeire (tile acceptance) with shanten
+    #[arg(long)]
+    ukeire: bool,
+
+    /// Use ASCII output instead of Unicode
+    #[arg(long)]
+    ascii: bool,
+
+    /// Show all possible interpretations
+    #[arg(long)]
+    all: bool,
+}
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let args = Args::parse();
 
-    if args.len() < 2 {
-        println!("{}", HELP);
-        process::exit(0);
-    }
-
-    // Parse arguments
-    let mut hand_str: Option<String> = None;
-    let mut winning_tile_str: Option<String> = None;
-    let mut tsumo = false;
-    let mut open = false;
-    let mut riichi = false;
-    let mut double_riichi = false;
-    let mut ippatsu = false;
-    let mut round_wind_str = "e".to_string();
-    let mut seat_wind_str = "e".to_string();
-    let mut dora_str: Option<String> = None;
-    let mut ura_str: Option<String> = None;
-    let mut last_tile = false;
-    let mut rinshan = false;
-    let mut chankan = false;
-    let mut tenhou = false;
-    let mut chiihou = false;
-    let mut ascii = false;
-    let mut show_all = false;
-    let mut shanten_mode = false;
-    let mut ukeire_mode = false;
-
-    let mut i = 1;
-    while i < args.len() {
-        let arg = &args[i];
-        match arg.as_str() {
-            "-h" | "--help" => {
-                println!("{}", HELP);
-                process::exit(0);
-            }
-            "-t" | "--tsumo" => tsumo = true,
-            "-o" | "--open" => open = true,
-            "-r" | "--riichi" => riichi = true,
-            "--double-riichi" => {
-                double_riichi = true;
-                riichi = true;
-            }
-            "--ippatsu" => ippatsu = true,
-            "--last-tile" => last_tile = true,
-            "--rinshan" => rinshan = true,
-            "--chankan" => chankan = true,
-            "--tenhou" => tenhou = true,
-            "--chiihou" => chiihou = true,
-            "--ascii" => ascii = true,
-            "--all" => show_all = true,
-            "--shanten" => shanten_mode = true,
-            "--ukeire" => {
-                shanten_mode = true;
-                ukeire_mode = true;
-            }
-            "-w" | "--win" => {
-                i += 1;
-                if i < args.len() {
-                    winning_tile_str = Some(args[i].clone());
-                }
-            }
-            "--round" => {
-                i += 1;
-                if i < args.len() {
-                    round_wind_str = args[i].clone();
-                }
-            }
-            "--seat" => {
-                i += 1;
-                if i < args.len() {
-                    seat_wind_str = args[i].clone();
-                }
-            }
-            "-d" | "--dora" => {
-                i += 1;
-                if i < args.len() {
-                    dora_str = Some(args[i].clone());
-                }
-            }
-            "--ura" => {
-                i += 1;
-                if i < args.len() {
-                    ura_str = Some(args[i].clone());
-                }
-            }
-            _ => {
-                if !arg.starts_with('-') && hand_str.is_none() {
-                    hand_str = Some(arg.clone());
-                } else if arg.starts_with('-') {
-                    eprintln!("❌ Unknown option: {}", arg);
-                    process::exit(1);
-                }
-            }
-        }
-        i += 1;
-    }
-
-    let hand_str = match hand_str {
-        Some(h) => h,
-        None => {
-            eprintln!("❌ No hand provided. Use -h for help.");
-            process::exit(1);
-        }
-    };
+    // Extract arguments
+    let shanten_mode = args.shanten || args.ukeire;
+    let ukeire_mode = args.ukeire;
+    let riichi = args.riichi || args.double_riichi;
 
     // Parse the hand
-    let parsed = match parse_hand_with_aka(&hand_str) {
+    let parsed = match parse_hand_with_aka(&args.hand) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("❌ Error parsing hand: {}", e);
@@ -222,7 +172,7 @@ fn main() {
     let has_open_melds = parsed.called_melds.iter().any(|m| m.meld.is_open());
 
     // Parse winds
-    let round_wind = match parse_wind(&round_wind_str) {
+    let round_wind = match parse_wind(&args.round) {
         Ok(w) => w,
         Err(e) => {
             eprintln!("❌ {}", e);
@@ -230,7 +180,7 @@ fn main() {
         }
     };
 
-    let seat_wind = match parse_wind(&seat_wind_str) {
+    let seat_wind = match parse_wind(&args.seat) {
         Ok(w) => w,
         Err(e) => {
             eprintln!("❌ {}", e);
@@ -239,7 +189,7 @@ fn main() {
     };
 
     // Parse dora indicators
-    let dora_indicators = match dora_str.as_ref().map(|s| parse_tile_list(s)).transpose() {
+    let dora_indicators = match args.dora.as_ref().map(|s| parse_tile_list(s)).transpose() {
         Ok(d) => d.unwrap_or_default(),
         Err(e) => {
             eprintln!("❌ Error parsing dora: {}", e);
@@ -247,7 +197,7 @@ fn main() {
         }
     };
 
-    let ura_indicators = match ura_str.as_ref().map(|s| parse_tile_list(s)).transpose() {
+    let ura_indicators = match args.ura.as_ref().map(|s| parse_tile_list(s)).transpose() {
         Ok(u) => u.unwrap_or_default(),
         Err(e) => {
             eprintln!("❌ Error parsing ura dora: {}", e);
@@ -256,7 +206,8 @@ fn main() {
     };
 
     // Parse winning tile
-    let winning_tile = match winning_tile_str
+    let winning_tile = match args
+        .winning_tile
         .as_ref()
         .map(|s| parse_single_tile(s))
         .transpose()
@@ -269,7 +220,11 @@ fn main() {
     };
 
     // Build game context
-    let win_type = if tsumo { WinType::Tsumo } else { WinType::Ron };
+    let win_type = if args.tsumo {
+        WinType::Tsumo
+    } else {
+        WinType::Ron
+    };
     let mut context = GameContext::new(win_type, round_wind, seat_wind)
         .with_dora(dora_indicators)
         .with_ura_dora(ura_indicators)
@@ -279,43 +234,43 @@ fn main() {
         context = context.with_winning_tile(wt);
     }
 
-    if open || has_open_melds {
+    if args.open || has_open_melds {
         context = context.open();
     }
 
-    if double_riichi {
+    if args.double_riichi {
         context = context.double_riichi();
     } else if riichi {
         context = context.riichi();
     }
 
-    if ippatsu {
+    if args.ippatsu {
         context = context.ippatsu();
     }
 
-    if last_tile {
+    if args.last_tile {
         context = context.last_tile();
     }
 
-    if rinshan {
+    if args.rinshan {
         context = context.rinshan();
     }
 
-    if chankan {
+    if args.chankan {
         context = context.chankan();
     }
 
-    if tenhou {
+    if args.tenhou {
         context = context.tenhou();
     }
 
-    if chiihou {
+    if args.chiihou {
         context = context.chiihou();
     }
 
     // Convert to tile counts
     let counts = to_counts(&parsed.tiles);
-    let use_unicode = !ascii;
+    let use_unicode = !args.ascii;
 
     // Shanten mode: calculate shanten and optionally ukeire
     if shanten_mode {
@@ -357,7 +312,7 @@ fn main() {
     results.sort_by(|a, b| b.2.payment.total.cmp(&a.2.payment.total));
 
     // Filter to best interpretation only (unless --all)
-    let results_to_show: &[_] = if show_all { &results } else { &results[..1] };
+    let results_to_show: &[_] = if args.all { &results } else { &results[..1] };
 
     // Display results
     print_header(use_unicode);

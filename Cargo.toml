@@ -6,3 +6,6 @@ edition = "2024"
 [[bin]]
 name = "agari"
 path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
