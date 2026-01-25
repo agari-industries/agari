@@ -11,6 +11,7 @@ use agari::{
     hand::decompose_hand,
     parse::{parse_hand_with_aka, to_counts, validate_hand},
     scoring::{ScoreLevel, ScoringResult, calculate_score},
+    shanten::{ShantenType, calculate_shanten, calculate_ukeire},
     tile::{Honor, Suit, Tile},
     yaku::{Yaku, detect_yaku_with_context},
 };
@@ -57,6 +58,9 @@ OPTIONS:
     --tenhou              Dealer's first draw win
     --chiihou             Non-dealer's first draw win
 
+    --shanten             Calculate shanten (tiles from tenpai) instead of score
+    --ukeire              Show ukeire (tile acceptance) with shanten
+
     --ascii               Use ASCII output instead of Unicode
     --all                 Show all possible interpretations
     -h, --help            Show this help message
@@ -89,6 +93,8 @@ fn main() {
     let mut chiihou = false;
     let mut ascii = false;
     let mut show_all = false;
+    let mut shanten_mode = false;
+    let mut ukeire_mode = false;
 
     let mut i = 1;
     while i < args.len() {
@@ -113,6 +119,11 @@ fn main() {
             "--chiihou" => chiihou = true,
             "--ascii" => ascii = true,
             "--all" => show_all = true,
+            "--shanten" => shanten_mode = true,
+            "--ukeire" => {
+                shanten_mode = true;
+                ukeire_mode = true;
+            }
             "-w" | "--win" => {
                 i += 1;
                 if i < args.len() {
@@ -172,10 +183,21 @@ fn main() {
         }
     };
 
-    // Validate hand size
-    if let Err(e) = validate_hand(&parsed.tiles) {
-        eprintln!("❌ Invalid hand: {}", e);
-        process::exit(1);
+    // For shanten mode, we don't require exactly 14 tiles
+    // (13 tiles for tenpai calculation is common)
+    if !shanten_mode {
+        // Validate hand size for scoring
+        if let Err(e) = validate_hand(&parsed.tiles) {
+            eprintln!("❌ Invalid hand: {}", e);
+            process::exit(1);
+        }
+    } else {
+        // For shanten, allow 13-14 tiles
+        let tile_count = parsed.tiles.len();
+        if tile_count < 1 || tile_count > 14 {
+            eprintln!("❌ Invalid hand: expected 1-14 tiles, got {}", tile_count);
+            process::exit(1);
+        }
     }
 
     // Parse winds
@@ -270,8 +292,19 @@ fn main() {
         context = context.chiihou();
     }
 
-    // Decompose the hand
+    // Convert to tile counts
     let counts = to_counts(&parsed.tiles);
+    let use_unicode = !ascii;
+
+    // Shanten mode: calculate shanten and optionally ukeire
+    if shanten_mode {
+        print_header(use_unicode);
+        print_shanten(&counts, ukeire_mode, use_unicode);
+        print_footer(use_unicode);
+        return;
+    }
+
+    // Decompose the hand
     let structures = decompose_hand(&counts);
 
     if structures.is_empty() {
@@ -296,8 +329,6 @@ fn main() {
     let results_to_show: &[_] = if show_all { &results } else { &results[..1] };
 
     // Display results
-    let use_unicode = !ascii;
-
     print_header(use_unicode);
 
     for (i, (structure, yaku_result, score)) in results_to_show.iter().enumerate() {
@@ -552,6 +583,77 @@ fn print_score(score: &ScoringResult) {
             "     Raw: {} → Rounded: {}",
             score.fu.breakdown.raw_total, score.fu.total
         );
+    }
+}
+
+fn print_shanten(counts: &agari::parse::TileCounts, show_ukeire: bool, use_unicode: bool) {
+    let result = calculate_shanten(counts);
+
+    println!("\n📊 Shanten Analysis:");
+
+    // Shanten value with description
+    let shanten_desc = match result.shanten {
+        -1 => "Complete hand (Agari)".to_string(),
+        0 => "Tenpai (ready to win)".to_string(),
+        1 => "Iishanten (1 away from tenpai)".to_string(),
+        2 => "Ryanshanten (2 away from tenpai)".to_string(),
+        n => format!("{}-shanten ({} away from tenpai)", n, n),
+    };
+
+    let shanten_emoji = match result.shanten {
+        -1 => "🎉",
+        0 => "🎯",
+        1 => "📈",
+        _ => "📊",
+    };
+
+    println!(
+        "   {} Shanten: {} - {}",
+        shanten_emoji, result.shanten, shanten_desc
+    );
+
+    // Best hand type
+    let type_name = match result.best_type {
+        ShantenType::Standard => "Standard (4 melds + 1 pair)",
+        ShantenType::Chiitoitsu => "Chiitoitsu (7 pairs)",
+        ShantenType::Kokushi => "Kokushi (13 orphans)",
+    };
+    println!("   Best shape: {}", type_name);
+
+    // Ukeire (tile acceptance)
+    if show_ukeire && result.shanten >= 0 {
+        let ukeire = calculate_ukeire(counts);
+
+        println!("\n🀄 Ukeire (Tile Acceptance):");
+
+        if ukeire.tiles.is_empty() {
+            println!("   No tiles improve this hand.");
+        } else {
+            println!(
+                "   {} tiles improve the hand ({} total):",
+                ukeire.tiles.len(),
+                ukeire.total_count
+            );
+            println!();
+
+            // Group tiles by type for nicer display
+            let mut tile_strs: Vec<String> = Vec::new();
+            for ut in &ukeire.tiles {
+                let tile_str = if use_unicode {
+                    format!("{} ", tile_to_unicode(&ut.tile))
+                } else {
+                    format!("{}", ut.tile)
+                };
+                tile_strs.push(format!("{}×{}", tile_str.trim(), ut.available));
+            }
+
+            // Print in rows of ~8 tiles
+            for chunk in tile_strs.chunks(8) {
+                println!("   {}", chunk.join("  "));
+            }
+        }
+    } else if show_ukeire && result.shanten == -1 {
+        println!("\n   Hand is already complete - no tiles needed.");
     }
 }
 
