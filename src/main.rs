@@ -268,8 +268,18 @@ fn main() {
         context = context.chiihou();
     }
 
-    // Convert to tile counts
+    // Convert to tile counts (for hand decomposition)
     let counts = to_counts(&parsed.tiles);
+
+    // For dora counting, we need ALL tiles including those in called melds
+    let all_tiles_counts = {
+        let mut all_tiles = parsed.tiles.clone();
+        for called_meld in &parsed.called_melds {
+            all_tiles.extend(&called_meld.tiles);
+        }
+        to_counts(&all_tiles)
+    };
+
     let use_unicode = !args.ascii;
 
     // Shanten mode: calculate shanten and optionally ukeire
@@ -299,10 +309,12 @@ fn main() {
     }
 
     // Score each decomposition
+    // Note: We use all_tiles_counts for yaku detection to properly count dora
+    // in called melds (pons, chis, kans)
     let mut results: Vec<_> = structures
         .iter()
         .map(|s| {
-            let yaku_result = detect_yaku_with_context(s, &counts, &context);
+            let yaku_result = detect_yaku_with_context(s, &all_tiles_counts, &context);
             let score = calculate_score(s, &yaku_result, &context);
             (s, yaku_result, score)
         })

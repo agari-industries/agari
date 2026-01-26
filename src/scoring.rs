@@ -187,9 +187,12 @@ fn calculate_standard_fu(melds: &[Meld], pair: Tile, context: &GameContext) -> F
         breakdown.tsumo = 2;
     }
 
-    // Meld fu (now uses per-meld open/closed state)
+    // Meld fu (accounting for ron-completed triplets)
+    // When winning by ron on a shanpon wait, the triplet completed by the
+    // winning tile is treated as "open" for fu purposes, because the final
+    // tile came from another player's discard.
     for meld in melds {
-        breakdown.melds += meld_fu(meld);
+        breakdown.melds += meld_fu_with_context(meld, context);
     }
 
     // Pair fu (yakuhai pairs)
@@ -230,7 +233,11 @@ fn calculate_standard_fu(melds: &[Meld], pair: Tile, context: &GameContext) -> F
     FuResult { total, breakdown }
 }
 
-/// Calculate fu for a single meld
+/// Calculate fu for a single meld, accounting for game context
+///
+/// When winning by ron, a triplet completed by the winning tile is treated
+/// as "open" for fu purposes, because the final tile came from another
+/// player's discard. This is a standard Riichi Mahjong rule.
 ///
 /// Fu values for triplets (koutsu):
 /// - Simple (2-8): 2 open, 4 closed
@@ -239,6 +246,54 @@ fn calculate_standard_fu(melds: &[Meld], pair: Tile, context: &GameContext) -> F
 /// Fu values for kans:
 /// - Simple (2-8): 8 open, 16 closed
 /// - Terminal/Honor (1,9,honors): 16 open, 32 closed
+fn meld_fu_with_context(meld: &Meld, context: &GameContext) -> u8 {
+    match meld {
+        Meld::Shuntsu(_, _) => 0, // Sequences give no fu
+
+        Meld::Koutsu(tile, is_meld_open) => {
+            let is_terminal_or_honor = tile.is_terminal_or_honor();
+
+            // Base: 2 fu for simple triplet, 4 for terminal/honor triplet
+            // Double for closed
+            let base = if is_terminal_or_honor { 4 } else { 2 };
+
+            // Check if this triplet was completed by ron (shanpon wait)
+            // If so, treat it as open for fu purposes
+            let is_ron_completed =
+                context.win_type == WinType::Ron && context.winning_tile == Some(*tile);
+
+            if *is_meld_open || is_ron_completed {
+                base // Open fu
+            } else {
+                base * 2 // Closed fu
+            }
+        }
+
+        Meld::Kan(tile, kan_type) => {
+            let is_terminal_or_honor = tile.is_terminal_or_honor();
+
+            // Kan fu is 4x the triplet fu
+            // Simple: 8 open, 16 closed
+            // Terminal/Honor: 16 open, 32 closed
+            let base = if is_terminal_or_honor { 16 } else { 8 };
+
+            // Note: Kans cannot be completed by ron (you can't ron a kan),
+            // so we only check the kan type
+            if kan_type.is_open() { base } else { base * 2 }
+        }
+    }
+}
+
+/// Calculate fu for a single meld (without context, used in tests)
+///
+/// Fu values for triplets (koutsu):
+/// - Simple (2-8): 2 open, 4 closed
+/// - Terminal/Honor (1,9,honors): 4 open, 8 closed
+///
+/// Fu values for kans:
+/// - Simple (2-8): 8 open, 16 closed
+/// - Terminal/Honor (1,9,honors): 16 open, 32 closed
+#[cfg(test)]
 fn meld_fu(meld: &Meld) -> u8 {
     match meld {
         Meld::Shuntsu(_, _) => 0, // Sequences give no fu
@@ -672,6 +727,88 @@ mod tests {
         let fu = calculate_fu(&structures[0], &context);
 
         assert_eq!(fu.breakdown.wait, 2);
+    }
+
+    #[test]
+    fn test_fu_ron_completed_triplet_simple() {
+        // When winning by ron on a shanpon wait, the triplet completed by
+        // the winning tile should be treated as "open" for fu purposes.
+        // Simple triplet completed by ron = 2 fu (not 4 fu)
+
+        // Hand: 222m 678m 444p 666p 11z - shanpon wait on 2m/1z
+        // Winning on 2m by ron
+        // Note: Using West round wind so the East (1z) pair doesn't add fu
+        let context = GameContext::new(WinType::Ron, Honor::West, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 2));
+
+        let tiles = parse_hand("222678m444666p11z").unwrap();
+        let counts = to_counts(&tiles);
+        let structures = decompose_hand(&counts);
+
+        let fu = calculate_fu(&structures[0], &context);
+
+        // 222m completed by ron = 2 fu (open)
+        // 444p closed = 4 fu
+        // 666p closed = 4 fu
+        // 11z pair = 0 fu (not yakuhai since round=West, seat=South)
+        // Base 20 + Menzen Ron 10 + melds (2+4+4) = 40 fu
+        assert_eq!(fu.breakdown.melds, 10); // 2 + 4 + 4
+        assert_eq!(fu.breakdown.pair, 0);
+        assert_eq!(fu.total, 40);
+    }
+
+    #[test]
+    fn test_fu_ron_completed_triplet_honor() {
+        // Honor triplet completed by ron = 4 fu (not 8 fu)
+
+        // Hand: 66p 456s 444z with open melds (222s) (555z)
+        // Winning on 4z (North) by ron
+        use crate::hand::decompose_hand_with_melds;
+        use crate::parse::parse_hand_with_aka;
+
+        let parsed = parse_hand_with_aka("66p456s444z(222s)(555z)").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds: Vec<_> = parsed
+            .called_melds
+            .iter()
+            .map(|cm| cm.meld.clone())
+            .collect();
+        let structures = decompose_hand_with_melds(&counts, &called_melds);
+
+        let context = GameContext::new(WinType::Ron, Honor::South, Honor::South)
+            .open()
+            .with_winning_tile(Tile::honor(Honor::North));
+
+        let fu = calculate_fu(&structures[0], &context);
+
+        // (222s) open simple = 2 fu
+        // (555z) open honor = 4 fu
+        // 444z completed by ron = 4 fu (open honor, not 8 fu closed)
+        // Base 20 + melds (2+4+4) = 30 fu
+        assert_eq!(fu.breakdown.melds, 10); // 2 + 4 + 4
+        assert_eq!(fu.total, 30);
+    }
+
+    #[test]
+    fn test_fu_tsumo_triplet_stays_closed() {
+        // When winning by tsumo, triplets should remain closed
+        // Simple triplet by tsumo = 4 fu (closed)
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 2));
+
+        let tiles = parse_hand("222678m444666p11z").unwrap();
+        let counts = to_counts(&tiles);
+        let structures = decompose_hand(&counts);
+
+        let fu = calculate_fu(&structures[0], &context);
+
+        // 222m by tsumo = 4 fu (closed)
+        // 444p closed = 4 fu
+        // 666p closed = 4 fu
+        // Base 20 + Tsumo 2 + melds (4+4+4) = 34 → 40 fu
+        assert_eq!(fu.breakdown.melds, 12); // 4 + 4 + 4
+        assert_eq!(fu.total, 40);
     }
 
     #[test]
