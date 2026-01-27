@@ -101,21 +101,24 @@ pub fn detect_wait_types(structure: &HandStructure, winning_tile: Tile) -> Vec<W
             }
 
             // Check each meld
+            // Note: Only closed melds can be affected by the winning tile.
+            // Open melds (chi/pon) were already complete when called.
             for meld in melds {
                 match meld {
-                    Meld::Koutsu(t, _) if *t == winning_tile => {
-                        // Triplet contains winning tile → was shanpon wait
+                    Meld::Koutsu(t, is_open) if *t == winning_tile && !is_open => {
+                        // Closed triplet contains winning tile → was shanpon wait
                         // (had a pair, waiting for third to make triplet)
                         wait_types.push(WaitType::Shanpon);
                     }
 
-                    Meld::Shuntsu(start_tile, _) => {
+                    Meld::Shuntsu(start_tile, is_open) if !is_open => {
+                        // Only check closed sequences for wait type
                         if let Some(wt) = check_shuntsu_wait(*start_tile, winning_tile) {
                             wait_types.push(wt);
                         }
                     }
 
-                    // Kans don't affect wait type detection (they're already complete)
+                    // Kans and open melds don't affect wait type detection
                     _ => {}
                 }
             }

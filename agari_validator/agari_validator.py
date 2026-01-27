@@ -241,7 +241,8 @@ class HoraEvent:
 
     def to_agari_args(self) -> list[str]:
         """Convert this hora event to agari CLI arguments."""
-        # Build the hand string
+        # Build the hand string (including winning tile - agari expects 14 tiles)
+        # The -w flag specifies which tile was the winning tile, not an additional tile
         all_tiles = list(self.tehais) + [self.winning_tile]
 
         # Track if hand is truly open (has chi/pon/open kan, but not ankan)
