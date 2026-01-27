@@ -453,7 +453,10 @@ class MjsonParser:
         ]  # Track if riichi player has drawn since riichi
         self.first_turn_tsumo = [True, True, True, True]  # For tenhou/chiihou detection
         self.rinshan_pending = False
+        self.rinshan_actor = None  # Who declared the kan (only they can get rinshan)
         self.chankan_pending = False
+        self.chankan_tile = None  # The tile added in kakan (for chankan validation)
+        self.chankan_actor = None  # Who declared the kakan
         self.is_last_tile = False
         self.last_tile = {}  # Track last tile drawn/discarded per player
         self.tiles_remaining = 70  # Approximate wall tiles remaining
@@ -584,6 +587,7 @@ class MjsonParser:
                     self.tehais[actor].remove(tile)
             self.melds[actor].append(event)
             self.rinshan_pending = True
+            self.rinshan_actor = actor  # Only this player can get rinshan
             for i in range(4):
                 self.first_turn_tsumo[i] = False
                 self.ippatsu_chance[i] = False
@@ -596,6 +600,7 @@ class MjsonParser:
                     self.tehais[actor].remove(tile)
             self.melds[actor].append(event)
             self.rinshan_pending = True
+            self.rinshan_actor = actor  # Only this player can get rinshan
             # Ankan doesn't break ippatsu for the player who declared it
             # But breaks for others
             for i in range(4):
@@ -638,7 +643,10 @@ class MjsonParser:
                         break
 
             self.rinshan_pending = True
+            self.rinshan_actor = actor  # Only this player can get rinshan
             self.chankan_pending = True  # Next player could chankan
+            self.chankan_tile = pai  # Track the added tile for chankan validation
+            self.chankan_actor = actor  # Track who declared the kakan
             for i in range(4):
                 if i != actor:
                     self.ippatsu_chance[i] = False
@@ -664,17 +672,23 @@ class MjsonParser:
         elif event_type == "hora":
             hora = self._create_hora_event(event, source_file)
             self.chankan_pending = False
+            self.chankan_tile = None
+            self.chankan_actor = None
             self.rinshan_pending = False
+            self.rinshan_actor = None
             return hora
 
         # Reset chankan after any non-hora event following kakan
         if event_type not in ("kakan", "hora", "dora"):
             self.chankan_pending = False
+            self.chankan_tile = None
+            self.chankan_actor = None
 
         # Reset rinshan after a discard following a kan (the tsumo after kan is the rinshan draw,
         # so we only reset after that player discards, meaning the rinshan opportunity has passed)
         if event_type == "dahai" and self.rinshan_pending:
             self.rinshan_pending = False
+            self.rinshan_actor = None
 
         self.last_event_type = event_type
         return None
@@ -716,7 +730,8 @@ class MjsonParser:
         is_ippatsu = self.ippatsu_chance[actor]
         is_riichi = self.riichi_declared[actor]
         is_double_riichi = self.double_riichi[actor]
-        is_rinshan = self.rinshan_pending
+        # Rinshan: win on kan replacement tile (must be tsumo by the kan declarer)
+        is_rinshan = self.rinshan_pending and is_tsumo and self.rinshan_actor == actor
         # Rinshan and Haitei are mutually exclusive:
         # - Rinshan = win on kan replacement tile (from dead wall)
         # - Haitei = win on last tile from regular wall
@@ -724,6 +739,21 @@ class MjsonParser:
         is_haitei = self.is_last_tile and not is_rinshan
         is_tenhou = is_tsumo and self.first_turn_tsumo[actor] and actor == self.oya
         is_chiihou = is_tsumo and self.first_turn_tsumo[actor] and actor != self.oya
+
+        # Chankan validation: robbing another player's added kan
+        # Requirements:
+        # 1. Must be ron (not tsumo) - you're stealing someone else's kan tile
+        # 2. Winner must be different from kakan declarer
+        # 3. chankan_pending must be true (a kakan just happened)
+        # Note: We don't strictly validate the winning tile matches the kakan tile
+        # because tile normalization (red fives) makes this complex, and if
+        # chankan_pending is true and it's a ron from someone else, it's chankan.
+        is_chankan = (
+            self.chankan_pending
+            and not is_tsumo
+            and self.chankan_actor is not None
+            and actor != self.chankan_actor
+        )
 
         hora = HoraEvent(
             tehais=tehais,
@@ -741,7 +771,7 @@ class MjsonParser:
             is_double_riichi=is_double_riichi,
             is_ippatsu=is_ippatsu,
             is_rinshan=is_rinshan,
-            is_chankan=self.chankan_pending,
+            is_chankan=is_chankan,
             is_haitei=is_haitei,
             is_tenhou=is_tenhou,
             is_chiihou=is_chiihou,
