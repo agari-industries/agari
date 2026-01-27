@@ -188,11 +188,14 @@ fn calculate_standard_fu(melds: &[Meld], pair: Tile, context: &GameContext) -> F
     }
 
     // Meld fu (accounting for ron-completed triplets)
-    // When winning by ron on a shanpon wait, the triplet completed by the
+    // When winning by ron on a TRUE shanpon wait, the triplet completed by the
     // winning tile is treated as "open" for fu purposes, because the final
     // tile came from another player's discard.
+    //
+    // However, if the winning tile could also complete a sequence (nobetan pattern),
+    // then it's NOT a pure shanpon wait, and the triplet remains closed for fu.
     for meld in melds {
-        breakdown.melds += meld_fu_with_context(meld, context);
+        breakdown.melds += meld_fu_with_context(meld, melds, context);
     }
 
     // Pair fu (yakuhai pairs)
@@ -240,9 +243,15 @@ fn calculate_standard_fu(melds: &[Meld], pair: Tile, context: &GameContext) -> F
 
 /// Calculate fu for a single meld, accounting for game context
 ///
-/// When winning by ron, a triplet completed by the winning tile is treated
-/// as "open" for fu purposes, because the final tile came from another
-/// player's discard. This is a standard Riichi Mahjong rule.
+/// When winning by ron on a TRUE shanpon wait, the triplet completed by the
+/// winning tile is treated as "open" for fu purposes, because the final
+/// tile came from another player's discard.
+///
+/// However, if the winning tile could also complete a sequence in the hand
+/// (nobetan pattern like 11123 waiting on 1 or 4), then it's NOT a pure
+/// shanpon wait. In nobetan, the hand has alternative interpretations where
+/// the winning tile completes a sequence rather than a triplet, so the
+/// triplet should remain "closed" for fu purposes.
 ///
 /// Fu values for triplets (koutsu):
 /// - Simple (2-8): 2 open, 4 closed
@@ -251,7 +260,7 @@ fn calculate_standard_fu(melds: &[Meld], pair: Tile, context: &GameContext) -> F
 /// Fu values for kans:
 /// - Simple (2-8): 8 open, 16 closed
 /// - Terminal/Honor (1,9,honors): 16 open, 32 closed
-fn meld_fu_with_context(meld: &Meld, context: &GameContext) -> u8 {
+fn meld_fu_with_context(meld: &Meld, all_melds: &[Meld], context: &GameContext) -> u8 {
     match meld {
         Meld::Shuntsu(_, _) => 0, // Sequences give no fu
 
@@ -262,12 +271,17 @@ fn meld_fu_with_context(meld: &Meld, context: &GameContext) -> u8 {
             // Double for closed
             let base = if is_terminal_or_honor { 4 } else { 2 };
 
-            // Check if this triplet was completed by ron (shanpon wait)
-            // If so, treat it as open for fu purposes
-            let is_ron_completed =
+            // Check if this triplet was completed by ron
+            let is_ron_on_this_tile =
                 context.win_type == WinType::Ron && context.winning_tile == Some(*tile);
 
-            if *is_meld_open || is_ron_completed {
+            // Only treat as "open" if it's a TRUE shanpon wait.
+            // If the winning tile also appears in a sequence (nobetan pattern),
+            // then the triplet remains closed for fu purposes.
+            let is_true_shanpon =
+                is_ron_on_this_tile && !winning_tile_in_sequence(*tile, all_melds);
+
+            if *is_meld_open || is_true_shanpon {
                 base // Open fu
             } else {
                 base * 2 // Closed fu
@@ -287,6 +301,33 @@ fn meld_fu_with_context(meld: &Meld, context: &GameContext) -> u8 {
             if kan_type.is_open() { base } else { base * 2 }
         }
     }
+}
+
+/// Check if a tile appears in any sequence in the hand.
+/// Used to detect nobetan patterns where the winning tile could complete
+/// either a triplet or a sequence.
+fn winning_tile_in_sequence(tile: Tile, melds: &[Meld]) -> bool {
+    // Honor tiles can never be in sequences
+    let (suit, value) = match tile {
+        Tile::Suited { suit, value } => (suit, value),
+        Tile::Honor(_) => return false,
+    };
+
+    for meld in melds {
+        if let Meld::Shuntsu(start_tile, _) = meld {
+            if let Tile::Suited {
+                suit: seq_suit,
+                value: start_val,
+            } = start_tile
+            {
+                // Check if tile is part of this sequence (start, start+1, start+2)
+                if *seq_suit == suit && value >= *start_val && value <= start_val + 2 {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 /// Calculate fu for a single meld (without context, used in tests)
@@ -813,6 +854,40 @@ mod tests {
         // 666p closed = 4 fu
         // Base 20 + Tsumo 2 + melds (4+4+4) = 34 → 40 fu
         assert_eq!(fu.breakdown.melds, 12); // 4 + 4 + 4
+        assert_eq!(fu.total, 40);
+    }
+
+    #[test]
+    fn test_fu_nobetan_triplet_stays_closed() {
+        // Nobetan pattern: 11123 waiting on 1 or 4
+        // When winning on 1 by ron, the triplet 111 should remain CLOSED
+        // because the 1 also appears in the sequence 123 (not a true shanpon).
+        //
+        // Hand: 99m 111123p 789s (222z) - won on 1p by ron
+        // This is the exact case from the Tenhou validation mismatch.
+        use crate::hand::decompose_hand_with_melds;
+        use crate::parse::parse_hand_with_aka;
+
+        let parsed = parse_hand_with_aka("99m111123p789s(222z)").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds: Vec<_> = parsed
+            .called_melds
+            .iter()
+            .map(|cm| cm.meld.clone())
+            .collect();
+        let structures = decompose_hand_with_melds(&counts, &called_melds);
+
+        // Round wind South, Seat wind North - (222z) is South = yakuhai
+        let context = GameContext::new(WinType::Ron, Honor::South, Honor::North)
+            .open()
+            .with_winning_tile(Tile::suited(Suit::Pin, 1));
+
+        let fu = calculate_fu(&structures[0], &context);
+
+        // 111p is NOT a true shanpon (1p also in 123p sequence) = 8 fu (closed terminal)
+        // (222z) open honor = 4 fu
+        // Base 20 + melds (8+4) = 32 → 40 fu
+        assert_eq!(fu.breakdown.melds, 12); // 8 + 4
         assert_eq!(fu.total, 40);
     }
 

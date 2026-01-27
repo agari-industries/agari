@@ -239,6 +239,40 @@ class HoraEvent:
     # Source file for debugging
     source_file: str = ""
 
+    def is_valid(self) -> bool:
+        """Check if this hora event has valid tile counts.
+
+        This can fail when:
+        - The log is from another player's perspective (hidden tiles shown as "?")
+        - There was an error in hand state tracking
+        """
+        # Count closed tiles
+        closed_tile_count = len(self.tehais) + (1 if self.winning_tile else 0)
+
+        # Count meld tiles
+        meld_tile_count = 0
+        kan_count = 0
+        for meld in self.melds:
+            meld_type = meld.get("type", "")
+            if meld_type in ("ankan", "daiminkan", "kakan"):
+                meld_tile_count += 4
+                kan_count += 1
+            elif meld_type in ("pon", "chi"):
+                meld_tile_count += 3
+
+        # Standard hand: 14 tiles, +1 per kan
+        expected_total = 14 + kan_count
+        actual_total = closed_tile_count + meld_tile_count
+
+        if actual_total != expected_total:
+            return False
+
+        # Check for missing winning tile
+        if not self.winning_tile:
+            return False
+
+        return True
+
     def to_agari_args(self) -> list[str]:
         """Convert this hora event to agari CLI arguments."""
         # Build the hand string (including winning tile - agari expects 14 tiles)
@@ -619,10 +653,14 @@ class MjsonParser:
         # Get ura dora markers
         ura_markers = event.get("ura_markers", [])
 
-        # Determine winning tile - need to find the last relevant tile
-        # For ron: it's the last discarded tile by target
-        # For tsumo: it's the last drawn tile by actor
-        winning_tile = self.last_tile.get(actor if is_tsumo else target, "")
+        # Determine winning tile
+        # First, try to get it directly from the hora event (most reliable)
+        # Fall back to tracking the last relevant tile if not present
+        winning_tile = event.get("pai", "")
+        if not winning_tile:
+            # Fallback: For ron it's the last discarded tile by target
+            # For tsumo it's the last drawn tile by actor
+            winning_tile = self.last_tile.get(actor if is_tsumo else target, "")
 
         # Get the hand (the current state of actor's hand)
         tehais = list(self.tehais[actor])
@@ -879,7 +917,13 @@ def validate_samples(
             random.seed(seed + 1)
         all_horas = random.sample(all_horas, num_samples)
 
-    print(f"Validating {len(all_horas)} hora events...")
+    # Filter out invalid hora events (e.g., from logs with hidden tiles)
+    valid_horas = [h for h in all_horas if h.is_valid()]
+    skipped = len(all_horas) - len(valid_horas)
+    if skipped > 0:
+        print(f"Skipped {skipped} invalid hora events (likely from hidden-tile logs)")
+
+    print(f"Validating {len(valid_horas)} hora events...")
 
     # Run validation
     results = []
@@ -887,7 +931,7 @@ def validate_samples(
     errors = 0
     mismatches = 0
 
-    for i, hora in enumerate(all_horas):
+    for i, hora in enumerate(valid_horas):
         result = runner.run(hora)
         results.append(result)
 
@@ -903,7 +947,7 @@ def validate_samples(
 
         if verbose or not result.is_match:
             args = hora.to_agari_args()
-            print(f"\n[{i + 1}/{len(all_horas)}] {status}")
+            print(f"\n[{i + 1}/{len(valid_horas)}] {status}")
             print(f"  Command: agari {' '.join(args)}")
             print(f"  Tenhou: {hora.tenhou_points} pts (deltas: {hora.tenhou_deltas})")
             print(
@@ -920,16 +964,23 @@ def validate_samples(
                 print(f"  Error:  {result.agari_output[:300]}")
 
     # Summary
+    total_validated = len(valid_horas)
     print("\n" + "=" * 60)
     print("VALIDATION SUMMARY")
     print("=" * 60)
-    print(f"Total samples:  {len(all_horas)}")
-    print(f"Matches:        {matches} ({100 * matches / len(all_horas):.1f}%)")
-    print(f"Mismatches:     {mismatches} ({100 * mismatches / len(all_horas):.1f}%)")
-    print(f"Errors:         {errors} ({100 * errors / len(all_horas):.1f}%)")
+    print(f"Total extracted: {len(all_horas)}")
+    print(f"Skipped invalid: {skipped}")
+    print(f"Total validated: {total_validated}")
+    if total_validated > 0:
+        print(f"Matches:        {matches} ({100 * matches / total_validated:.1f}%)")
+        print(
+            f"Mismatches:     {mismatches} ({100 * mismatches / total_validated:.1f}%)"
+        )
+        print(f"Errors:         {errors} ({100 * errors / total_validated:.1f}%)")
 
     return {
-        "total": len(all_horas),
+        "total": total_validated,
+        "skipped": skipped,
         "matches": matches,
         "mismatches": mismatches,
         "errors": errors,
