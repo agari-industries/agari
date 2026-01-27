@@ -210,8 +210,8 @@ OPTIONS:
     --ippatsu             Ippatsu (win within one turn of riichi)
     --round <WIND>        Round wind: e/s/w/n (default: e)
     --seat <WIND>         Seat wind: e/s/w/n (default: e)
-    -d, --dora <TILES>    Dora indicators (comma-separated)
-    --ura <TILES>         Ura dora indicators (with riichi only)
+    -d, --dora <TILES>    Dora indicators (e.g., 58m or 5m,8m)
+    --ura <TILES>         Ura dora indicators (e.g., 29p or 2p,9p)
     --last-tile           Win on last tile (Haitei/Houtei)
     --rinshan             Win on kan replacement tile
     --chankan             Ron on another player's added kan

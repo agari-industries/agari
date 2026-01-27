@@ -398,9 +398,37 @@ fn parse_tile_list(s: &str) -> Result<Vec<Tile>, String> {
         return Ok(vec![]);
     }
 
-    s.split(',')
-        .map(|part| parse_single_tile(part.trim()))
-        .collect()
+    let mut tiles = Vec::new();
+
+    // Split by comma first, then parse each part
+    for part in s.split(',') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+
+        // Check if this looks like grouped notation (e.g., "58m", "29p")
+        // Grouped notation: multiple digits followed by a single suit letter
+        let chars: Vec<char> = part.chars().collect();
+        if chars.len() >= 2 {
+            let last_char = chars[chars.len() - 1];
+            let all_digits_before = chars[..chars.len() - 1].iter().all(|c| c.is_ascii_digit());
+
+            if all_digits_before && "mpsz".contains(last_char) {
+                // Parse as grouped notation: "58m" -> 5m, 8m
+                for digit in &chars[..chars.len() - 1] {
+                    let single = format!("{}{}", digit, last_char);
+                    tiles.push(parse_single_tile(&single)?);
+                }
+                continue;
+            }
+        }
+
+        // Fall back to single tile parsing (e.g., "5m")
+        tiles.push(parse_single_tile(part)?);
+    }
+
+    Ok(tiles)
 }
 
 fn print_header(use_unicode: bool) {

@@ -10,26 +10,28 @@ When the validator reports a mismatch, check if it falls into one of these categ
 
 ## Known Differences
 
-### 1. Suuankou Tanki (四暗刻単騎) - Double Yakuman vs Single Yakuman
+### 1. Suuankou Tanki Tsumo (四暗刻単騎) - Double Yakuman vs Single Yakuman
 
-**Agari behavior:** Scores Suuankou Tanki as **Double Yakuman (64,000 points for non-dealer ron)**
+**Agari behavior:** Scores Suuankou Tanki **by tsumo** as **Double Yakuman**
 
-**Tenhou behavior:** Scores Suuankou Tanki as **Single Yakuman (32,000 points for non-dealer ron)**
+**Tenhou behavior:** Scores Suuankou Tanki as **Single Yakuman** regardless of win type
 
 **Description:**
-Suuankou (Four Concealed Triplets) with a tanki (single tile) wait is considered a harder wait than the standard shanpon (dual pair) wait. Some rulesets award double yakuman for this achievement, while Tenhou uses single yakuman.
+Suuankou (Four Concealed Triplets) with a tanki (single tile) wait won by tsumo is considered the pinnacle achievement. Agari awards double yakuman for this specific case, while Tenhou uses single yakuman.
+
+Note: As of commit `480b841`, Agari correctly awards **single yakuman** for Suuankou won by **ron** (matching Tenhou), since the ron tile technically "opens" the last triplet. Only tsumo tanki receives double yakuman in Agari.
 
 **How to identify:**
 - Hand has 4 closed triplets/kans + pair
 - Winning tile completes the pair (tanki wait)
-- Agari shows 64,000 points, Tenhou shows 32,000 points
-- Agari reports "Suuankou Tanki (26 han)" or "Double Yakuman"
+- Win is by **tsumo** (not ron)
+- Point difference is 32,000 (single vs double yakuman)
 
 **Example:**
 ```
-agari 666m444p33399s[4444z] -w 9s --round e --seat s -d 3z,5p
-Agari:  80 fu, 26 han, 64000 pts (Double Yakuman)
-Tenhou: 32000 pts (Single Yakuman)
+agari 111m222p333s44455z -w 5z -t
+Agari:  Double Yakuman (96,000 dealer tsumo)
+Tenhou: Single Yakuman (48,000 dealer tsumo)
 ```
 
 ---
@@ -66,6 +68,27 @@ Kokushi Musou (Thirteen Orphans) with a 13-sided wait (holding one of each termi
 
 ---
 
+## Resolved Issues (Previously Listed as Differences)
+
+The following issues were previously thought to be ruleset differences but were actually bugs that have been fixed:
+
+### Suuankou Ron (Fixed in commit 480b841)
+Previously Agari awarded double yakuman for Suuankou tanki even when won by ron. This was incorrect - ron on the pair technically "opens" one of the triplets from the opponent's perspective. Now Agari correctly awards single yakuman for Suuankou ron, matching Tenhou.
+
+### Kokushi 13-wait Detection (Fixed in commit 415860c)
+Previously Kokushi 13-wait detection had edge cases that could cause incorrect scoring. The detection logic has been corrected.
+
+### Fu Calculation for Nobetan Patterns (Fixed in commit c963216)
+Ron-completed triplets in nobetan patterns (e.g., 11123 waiting on 1 or 4) were incorrectly scored as "open" triplets. Now only true shanpon waits treat the ron-completed triplet as open.
+
+### Akadora in Non-Aka Games (Fixed in commit 569d93e)
+The MJAI converter marks tiles as red fives based on Tenhou's tile ID encoding, even when akadora is disabled in the game rules. The validator now strips red five markings when `aka_flag: false`.
+
+### Chankan and Rinshan Detection (Fixed in commit 26c6ab9)
+Edge cases in chankan (robbing a kan) and rinshan (kan replacement draw) detection have been corrected.
+
+---
+
 ## Future Considerations
 
 ### Potential Configuration Options
@@ -94,19 +117,19 @@ When you discover a new ruleset difference during validation:
 
 ### Hand State Tracking Errors
 
-In rare cases (approximately 1 in 8,000+), the validator may extract a hand that has the correct tile count but cannot form a valid mahjong structure. This typically manifests as an "ERROR: This hand has no valid winning structure" from Agari.
+In rare cases, the validator may extract a hand that has the correct tile count but cannot form a valid mahjong structure. This typically manifests as an "ERROR: This hand has no valid winning structure" from Agari.
 
 **Causes:**
 - Complex meld interactions (chankan, rinshan)
 - Hidden tile logs (tiles shown as "?" from other players' perspectives)
-- Edge cases in mjai event ordering
+- Edge cases in MJAI event ordering
 
 **Identification:**
 - Agari reports "no valid winning structure"
 - The hand tiles don't form valid melds
 
 **Resolution:**
-These are validator limitations, not Agari bugs. The errors can be safely ignored when the error rate is < 0.1% of validated hands.
+These are validator limitations, not Agari bugs. The errors can be safely ignored when the error rate is low.
 
 ---
 
