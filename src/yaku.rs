@@ -249,11 +249,12 @@ pub fn detect_yaku_with_context(
     match structure {
         HandStructure::Kokushi { pair } => {
             if let Some(winning_tile) = context.winning_tile {
-                if winning_tile != *pair {
-                    // 13-wait means the winning tile is NOT the pair
+                if winning_tile == *pair {
+                    // 13-wait (junsei kokushi): player had all 13 different terminals/honors,
+                    // waiting on any of them. The winning tile becomes the pair.
                     yaku_list.push(Yaku::Kokushi13Wait);
                 } else {
-                    // If pair == winning_tile, it was tanki on the pair
+                    // Regular kokushi: player had a pair already, waiting for the missing tile
                     yaku_list.push(Yaku::KokushiMusou);
                 }
             } else {

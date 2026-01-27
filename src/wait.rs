@@ -258,10 +258,9 @@ fn is_yakuhai_pair(pair: Tile, context: &GameContext) -> bool {
     }
 }
 
-/// Find the best (lowest fu) wait type for a structure.
+/// Find the best (lowest fu) wait type for Pinfu eligibility.
 ///
-/// Used when calculating fu - we want the interpretation that gives
-/// the lowest wait fu (typically ryanmen if available).
+/// Used when checking for Pinfu - we want to see if a ryanmen wait is possible.
 pub fn best_wait_type(structure: &HandStructure, winning_tile: Tile) -> Option<WaitType> {
     let wait_types = detect_wait_types(structure, winning_tile);
 
@@ -274,7 +273,33 @@ pub fn best_wait_type(structure: &HandStructure, winning_tile: Tile) -> Option<W
             WaitType::Kanchan => 2,
             WaitType::Penchan => 3,
             WaitType::Tanki => 4,
-            WaitType::Kokushi13 => 5, // Add this arm to handle the 13-sided wait
+            WaitType::Kokushi13 => 5,
+        };
+        (wt.fu(), priority)
+    })
+}
+
+/// Find the highest fu wait type for scoring purposes.
+///
+/// In Mahjong, when a hand can be interpreted multiple ways, we choose the
+/// interpretation that gives the player the highest score. For wait types,
+/// this means preferring waits with more fu (kanchan/penchan/tanki over ryanmen).
+pub fn best_wait_type_for_scoring(
+    structure: &HandStructure,
+    winning_tile: Tile,
+) -> Option<WaitType> {
+    let wait_types = detect_wait_types(structure, winning_tile);
+
+    // Prefer waits with higher fu for maximum scoring
+    // Priority order (highest fu first): Tanki (2) > Kanchan (2) > Penchan (2) > Shanpon (0) > Ryanmen (0)
+    wait_types.into_iter().max_by_key(|wt| {
+        let priority = match wt {
+            WaitType::Tanki => 5,     // 2 fu, prefer tanki if equal fu
+            WaitType::Kanchan => 4,   // 2 fu
+            WaitType::Penchan => 3,   // 2 fu
+            WaitType::Shanpon => 1,   // 0 fu
+            WaitType::Ryanmen => 0,   // 0 fu
+            WaitType::Kokushi13 => 2, // 0 fu, yakuman anyway
         };
         (wt.fu(), priority)
     })

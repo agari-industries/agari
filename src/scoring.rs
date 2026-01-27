@@ -9,7 +9,7 @@
 use crate::context::{GameContext, WinType};
 use crate::hand::{HandStructure, Meld};
 use crate::tile::{Honor, Tile};
-use crate::wait::{best_wait_type, is_pinfu};
+use crate::wait::{best_wait_type_for_scoring, is_pinfu};
 use crate::yaku::YakuResult;
 
 /// Score limit levels
@@ -199,8 +199,13 @@ fn calculate_standard_fu(melds: &[Meld], pair: Tile, context: &GameContext) -> F
     breakdown.pair = pair_fu(pair, context);
 
     // Wait fu
+    // If Pinfu is awarded, wait must be ryanmen (0 fu) - use that interpretation
+    // Otherwise, use the highest fu wait type for maximum scoring
     if let Some(wt) = winning_tile {
-        if let Some(wait_type) = best_wait_type(
+        if is_pinfu_hand {
+            // Pinfu requires ryanmen, which is 0 fu
+            breakdown.wait = 0;
+        } else if let Some(wait_type) = best_wait_type_for_scoring(
             &HandStructure::Standard {
                 melds: melds.to_vec(),
                 pair,
