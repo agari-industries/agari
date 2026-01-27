@@ -206,28 +206,47 @@ pub fn indicator_to_dora(indicator: Tile) -> Tile {
     }
 }
 
+/// Breakdown of dora counts by type
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DoraCount {
+    pub regular: u8,
+    pub ura: u8,
+    pub aka: u8,
+}
+
+impl DoraCount {
+    pub fn total(&self) -> u8 {
+        self.regular + self.ura + self.aka
+    }
+}
+
 /// Count total dora in a hand given the game context
 pub fn count_dora(counts: &TileCounts, context: &GameContext) -> u8 {
-    let mut total = 0u8;
+    count_dora_detailed(counts, context).total()
+}
+
+/// Count dora with detailed breakdown by type
+pub fn count_dora_detailed(counts: &TileCounts, context: &GameContext) -> DoraCount {
+    let mut result = DoraCount::default();
 
     // Count regular dora
     for indicator in &context.dora_indicators {
         let dora = indicator_to_dora(*indicator);
-        total += counts.get(&dora).copied().unwrap_or(0);
+        result.regular += counts.get(&dora).copied().unwrap_or(0);
     }
 
     // Count ura dora (only if riichi)
     if context.is_riichi {
         for indicator in &context.ura_dora_indicators {
             let dora = indicator_to_dora(*indicator);
-            total += counts.get(&dora).copied().unwrap_or(0);
+            result.ura += counts.get(&dora).copied().unwrap_or(0);
         }
     }
 
     // Add akadora count
-    total += context.aka_count;
+    result.aka = context.aka_count;
 
-    total
+    result
 }
 
 #[cfg(test)]

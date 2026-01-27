@@ -509,8 +509,15 @@ fn print_yaku(yaku_result: &agari::yaku::YakuResult, context: &GameContext) {
         println!("   • {} ({} han){}", name, han, yakuman_marker);
     }
 
-    if yaku_result.dora_count > 0 {
-        println!("   • Dora ({} han)", yaku_result.dora_count);
+    // Display dora breakdown
+    if yaku_result.regular_dora > 0 {
+        println!("   • Dora ({} han)", yaku_result.regular_dora);
+    }
+    if yaku_result.ura_dora > 0 {
+        println!("   • Ura Dora ({} han)", yaku_result.ura_dora);
+    }
+    if yaku_result.aka_dora > 0 {
+        println!("   • Red Fives (Akadora) ({} han)", yaku_result.aka_dora);
     }
 }
 

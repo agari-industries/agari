@@ -1,6 +1,6 @@
 //! Yaku (scoring pattern) detection for Riichi Mahjong hands.
 
-use crate::context::{GameContext, WinType, count_dora};
+use crate::context::{GameContext, WinType, count_dora_detailed};
 use crate::hand::{HandStructure, Meld};
 use crate::parse::TileCounts;
 use crate::tile::{Honor, Suit, Tile};
@@ -208,6 +208,10 @@ pub struct YakuResult {
     pub yaku_list: Vec<Yaku>,
     pub total_han: u8,
     pub dora_count: u8,
+    /// Breakdown of dora by type (for display purposes)
+    pub regular_dora: u8,
+    pub ura_dora: u8,
+    pub aka_dora: u8,
     pub is_yakuman: bool,
 }
 
@@ -550,13 +554,16 @@ pub fn detect_yaku_with_context(
         yaku_list.iter().map(|y| y.han()).sum()
     };
 
-    // Count dora
-    let dora_count = count_dora(counts, context);
+    // Count dora with breakdown
+    let dora = count_dora_detailed(counts, context);
 
     YakuResult {
         yaku_list,
         total_han,
-        dora_count,
+        dora_count: dora.total(),
+        regular_dora: dora.regular,
+        ura_dora: dora.ura,
+        aka_dora: dora.aka,
         is_yakuman,
     }
 }

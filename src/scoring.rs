@@ -555,9 +555,18 @@ pub fn format_score(result: &ScoringResult, yaku_result: &YakuResult) -> String 
         output.push_str(&format!("  • {:?} ({} han)\n", yaku, han));
     }
 
-    // Dora
-    if yaku_result.dora_count > 0 {
-        output.push_str(&format!("  • Dora ({} han)\n", yaku_result.dora_count));
+    // Dora breakdown
+    if yaku_result.regular_dora > 0 {
+        output.push_str(&format!("  • Dora ({} han)\n", yaku_result.regular_dora));
+    }
+    if yaku_result.ura_dora > 0 {
+        output.push_str(&format!("  • Ura Dora ({} han)\n", yaku_result.ura_dora));
+    }
+    if yaku_result.aka_dora > 0 {
+        output.push_str(&format!(
+            "  • Red Fives (Akadora) ({} han)\n",
+            yaku_result.aka_dora
+        ));
     }
 
     // Han and Fu
