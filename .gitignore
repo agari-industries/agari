@@ -1,2 +1,16 @@
 /target
 .DS_Store
+*.json
+
+
+## Python
+
+# Virtual Environment
+.venv/
+
+# Caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+*.pyc
