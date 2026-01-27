@@ -839,12 +839,11 @@ fn check_suuankou(melds: &[Meld], pair: Tile, context: &GameContext) -> Option<Y
         return None;
     }
 
-    // Check for tanki wait (double yakuman)
-    // For ron, we already know all triplets are concealed (none were completed by ron)
-    // So if we have 4 concealed triplets, we must have waited on the pair
+    // For ron, even if waiting on the pair (tanki), it's regular Suuankou (single yakuman).
+    // Suuankou Tanki (double yakuman) is only awarded for tsumo on a tanki wait.
+    // This follows Tenhou/WRC rules where ron "breaks" the concealment for double yakuman purposes.
     if context.win_type == WinType::Ron {
-        // If we get here with ron, the pair must be the winning tile
-        return Some(Yaku::SuuankouTanki);
+        return Some(Yaku::Suuankou);
     }
 
     // Tsumo - check for tanki wait (double yakuman)
