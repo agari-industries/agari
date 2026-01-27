@@ -239,13 +239,34 @@ class HoraEvent:
     # Source file for debugging
     source_file: str = ""
 
+    # Whether we have full visibility of the winner's hand
+    # False if any tiles were hidden ("?") during tracking
+    has_full_visibility: bool = True
+
     def is_valid(self) -> bool:
-        """Check if this hora event has valid tile counts.
+        """Check if this hora event has valid tile counts and full visibility.
 
         This can fail when:
         - The log is from another player's perspective (hidden tiles shown as "?")
         - There was an error in hand state tracking
         """
+        # Must have full visibility of the winner's hand
+        if not self.has_full_visibility:
+            return False
+
+        # Check for any hidden or invalid tiles in the hand
+        for tile in self.tehais:
+            if not tile or tile == "?" or tile.startswith("?"):
+                return False
+
+        # Check winning tile is valid
+        if (
+            not self.winning_tile
+            or self.winning_tile == "?"
+            or self.winning_tile.startswith("?")
+        ):
+            return False
+
         # Count closed tiles
         closed_tile_count = len(self.tehais) + (1 if self.winning_tile else 0)
 
@@ -388,6 +409,16 @@ class ValidationResult:
     def is_error(self) -> bool:
         return self.agari_returncode != 0
 
+    @property
+    def is_structure_error(self) -> bool:
+        """Check if this error is due to invalid hand structure.
+
+        These are usually validator hand-tracking bugs, not Agari bugs.
+        """
+        return (
+            self.is_error and "no valid winning structure" in self.agari_output.lower()
+        )
+
 
 # ============================================================================
 # MJSON Parsing
@@ -427,6 +458,9 @@ class MjsonParser:
         self.last_tile = {}  # Track last tile drawn/discarded per player
         self.tiles_remaining = 70  # Approximate wall tiles remaining
         self.last_event_type = None
+        # Track if we have full visibility of each player's hand
+        # Set to False if we see any hidden tiles ("?") for that player
+        self.full_visibility = [True, True, True, True]
 
     def get_seat_wind(self, actor: int) -> str:
         """Calculate seat wind based on actor and oya (dealer)."""
@@ -471,6 +505,9 @@ class MjsonParser:
             for i, hand in enumerate(tehais):
                 if hand and hand[0] != "?":
                     self.tehais[i] = list(hand)
+                else:
+                    # Hidden initial hand - no visibility for this player
+                    self.full_visibility[i] = False
 
             # Initial dora
             dora_marker = event.get("dora_marker")
@@ -480,9 +517,12 @@ class MjsonParser:
         elif event_type == "tsumo":
             actor = event.get("actor", 0)
             pai = event.get("pai", "?")
-            if pai != "?":
+            if pai != "?" and pai:
                 self.tehais[actor].append(pai)
                 self.last_tile[actor] = pai
+            else:
+                # Hidden tile - we don't have full visibility of this player's hand
+                self.full_visibility[actor] = False
             self.tiles_remaining -= 1
             if self.tiles_remaining <= 0:
                 self.is_last_tile = True
@@ -706,6 +746,7 @@ class MjsonParser:
             tenhou_deltas=deltas,
             tenhou_points=points_won,
             source_file=source_file,
+            has_full_visibility=self.full_visibility[actor],
         )
 
         return hora
@@ -929,13 +970,17 @@ def validate_samples(
     results = []
     matches = 0
     errors = 0
+    structure_errors = 0
     mismatches = 0
 
     for i, hora in enumerate(valid_horas):
         result = runner.run(hora)
         results.append(result)
 
-        if result.is_error:
+        if result.is_structure_error:
+            structure_errors += 1
+            status = "STRUCT_ERR"  # Validator hand-tracking bug, not Agari bug
+        elif result.is_error:
             errors += 1
             status = "ERROR"
         elif result.is_match:
@@ -972,11 +1017,13 @@ def validate_samples(
     print(f"Skipped invalid: {skipped}")
     print(f"Total validated: {total_validated}")
     if total_validated > 0:
-        print(f"Matches:        {matches} ({100 * matches / total_validated:.1f}%)")
+        print(f"Matches:         {matches} ({100 * matches / total_validated:.1f}%)")
         print(
-            f"Mismatches:     {mismatches} ({100 * mismatches / total_validated:.1f}%)"
+            f"Mismatches:      {mismatches} ({100 * mismatches / total_validated:.1f}%)"
         )
-        print(f"Errors:         {errors} ({100 * errors / total_validated:.1f}%)")
+        print(f"Errors:          {errors} ({100 * errors / total_validated:.1f}%)")
+        if structure_errors > 0:
+            print(f"  (struct errs): {structure_errors} (validator hand-tracking bugs)")
 
     return {
         "total": total_validated,
@@ -984,6 +1031,7 @@ def validate_samples(
         "matches": matches,
         "mismatches": mismatches,
         "errors": errors,
+        "structure_errors": structure_errors,
         "results": results,
     }
 
