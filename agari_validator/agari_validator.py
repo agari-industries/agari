@@ -717,7 +717,11 @@ class MjsonParser:
         is_riichi = self.riichi_declared[actor]
         is_double_riichi = self.double_riichi[actor]
         is_rinshan = self.rinshan_pending
-        is_haitei = self.is_last_tile
+        # Rinshan and Haitei are mutually exclusive:
+        # - Rinshan = win on kan replacement tile (from dead wall)
+        # - Haitei = win on last tile from regular wall
+        # If rinshan is true, haitei cannot be true
+        is_haitei = self.is_last_tile and not is_rinshan
         is_tenhou = is_tsumo and self.first_turn_tsumo[actor] and actor == self.oya
         is_chiihou = is_tsumo and self.first_turn_tsumo[actor] and actor != self.oya
 
