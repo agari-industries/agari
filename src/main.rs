@@ -133,7 +133,41 @@ struct Args {
 #[derive(Serialize)]
 struct JsonOutput {
     hand: String,
+    context: JsonContext,
     interpretations: Vec<JsonInterpretation>,
+}
+
+#[derive(Serialize)]
+struct JsonContext {
+    win_type: String,
+    round_wind: String,
+    seat_wind: String,
+    is_dealer: bool,
+    is_open: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    riichi: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    double_riichi: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    ippatsu: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    dora_indicators: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    ura_dora_indicators: Vec<String>,
+    #[serde(skip_serializing_if = "is_zero")]
+    akadora: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    winning_tile: Option<String>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    last_tile: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    rinshan: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    chankan: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    tenhou: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    chiihou: bool,
 }
 
 #[derive(Serialize)]
@@ -488,8 +522,40 @@ fn main() {
             })
             .collect();
 
+        let json_context = JsonContext {
+            win_type: match context.win_type {
+                WinType::Tsumo => "tsumo".to_string(),
+                WinType::Ron => "ron".to_string(),
+            },
+            round_wind: honor_name(&context.round_wind).to_string(),
+            seat_wind: honor_name(&context.seat_wind).to_string(),
+            is_dealer: context.is_dealer(),
+            is_open: context.is_open,
+            riichi: context.is_riichi,
+            double_riichi: context.is_double_riichi,
+            ippatsu: context.is_ippatsu,
+            dora_indicators: context
+                .dora_indicators
+                .iter()
+                .map(|t| format!("{}", t))
+                .collect(),
+            ura_dora_indicators: context
+                .ura_dora_indicators
+                .iter()
+                .map(|t| format!("{}", t))
+                .collect(),
+            akadora: parsed.aka_count,
+            winning_tile: context.winning_tile.map(|t| format!("{}", t)),
+            last_tile: context.is_last_tile,
+            rinshan: context.is_rinshan,
+            chankan: context.is_chankan,
+            tenhou: context.is_tenhou,
+            chiihou: context.is_chiihou,
+        };
+
         let output = JsonOutput {
             hand: args.hand.clone(),
+            context: json_context,
             interpretations,
         };
 
