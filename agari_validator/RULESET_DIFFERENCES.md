@@ -10,33 +10,7 @@ When the validator reports a mismatch, check if it falls into one of these categ
 
 ## Known Differences
 
-### 1. Suuankou Tanki Tsumo (四暗刻単騎) - Double Yakuman vs Single Yakuman
-
-**Agari behavior:** Scores Suuankou Tanki **by tsumo** as **Double Yakuman**
-
-**Tenhou behavior:** Scores Suuankou Tanki as **Single Yakuman** regardless of win type
-
-**Description:**
-Suuankou (Four Concealed Triplets) with a tanki (single tile) wait won by tsumo is considered the pinnacle achievement. Agari awards double yakuman for this specific case, while Tenhou uses single yakuman.
-
-Note: As of commit `480b841`, Agari correctly awards **single yakuman** for Suuankou won by **ron** (matching Tenhou), since the ron tile technically "opens" the last triplet. Only tsumo tanki receives double yakuman in Agari.
-
-**How to identify:**
-- Hand has 4 closed triplets/kans + pair
-- Winning tile completes the pair (tanki wait)
-- Win is by **tsumo** (not ron)
-- Point difference is 32,000 (single vs double yakuman)
-
-**Example:**
-```
-agari 111m222p333s44455z -w 5z -t
-Agari:  Double Yakuman (96,000 dealer tsumo)
-Tenhou: Single Yakuman (48,000 dealer tsumo)
-```
-
----
-
-### 2. Junsei Chuuren Poutou (純正九蓮宝燈) - Double Yakuman vs Single Yakuman
+### 1. Junsei Chuuren Poutou (純正九蓮宝燈) - Double Yakuman vs Single Yakuman
 
 **Agari behavior:** Scores Junsei Chuuren (9-sided wait) as **Double Yakuman**
 
@@ -52,7 +26,7 @@ Chuuren Poutou (Nine Gates) with a 9-sided wait (1112345678999 waiting on any ti
 
 ---
 
-### 3. Kokushi Musou 13-wait (国士無双十三面待ち) - Double Yakuman vs Single Yakuman
+### 2. Kokushi Musou 13-wait (国士無双十三面待ち) - Double Yakuman vs Single Yakuman
 
 **Agari behavior:** Scores Kokushi 13-wait as **Double Yakuman**
 
@@ -72,8 +46,8 @@ Kokushi Musou (Thirteen Orphans) with a 13-sided wait (holding one of each termi
 
 The following issues were previously thought to be ruleset differences but were actually bugs that have been fixed:
 
-### Suuankou Ron (Fixed in commit 480b841)
-Previously Agari awarded double yakuman for Suuankou tanki even when won by ron. This was incorrect - ron on the pair technically "opens" one of the triplets from the opponent's perspective. Now Agari correctly awards single yakuman for Suuankou ron, matching Tenhou.
+### Suuankou Tanki (Fixed - now matches Tenhou)
+Agari now treats all Suuankou as single yakuman, matching Tenhou's rules. Previously Agari awarded double yakuman for Suuankou Tanki (tsumo on pair wait), but Tenhou treats all forms of Suuankou as single yakuman regardless of wait type or win method.
 
 ### Kokushi 13-wait Detection (Fixed in commit 415860c)
 Previously Kokushi 13-wait detection had edge cases that could cause incorrect scoring. The detection logic has been corrected.
