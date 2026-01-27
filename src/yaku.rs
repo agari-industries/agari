@@ -441,18 +441,49 @@ pub fn detect_yaku_with_context(
                 // San Ankou (three concealed triplets)
                 // Note: Closed kans count as concealed triplets for san ankou
                 {
+                    // First, check if the winning tile could complete a sequence in this hand.
+                    // If it can, then triplets matching the winning tile remain concealed
+                    // (the player could have won on the sequence instead).
+                    let winning_tile_completes_sequence = if let Some(wt) = context.winning_tile {
+                        melds.iter().any(|m| {
+                            if let Meld::Shuntsu(start, _) = m {
+                                // Check if winning tile is part of this sequence
+                                if let (
+                                    Tile::Suited {
+                                        suit: ws,
+                                        value: wv,
+                                    },
+                                    Tile::Suited {
+                                        suit: ss,
+                                        value: sv,
+                                    },
+                                ) = (wt, start)
+                                {
+                                    ws == *ss && wv >= *sv && wv <= sv + 2
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        })
+                    } else {
+                        false
+                    };
+
                     let mut concealed_triplets = 0;
                     for meld in melds {
                         match meld {
                             Meld::Koutsu(tile, is_open_meld) => {
                                 // A triplet is concealed if:
                                 // 1. It's not an open pon
-                                // 2. For ron, the winning tile did NOT complete this triplet
+                                // 2. For ron, the winning tile did NOT complete this triplet,
+                                //    OR the winning tile could have completed a sequence instead
                                 if !is_open_meld {
                                     if context.win_type == WinType::Tsumo {
                                         concealed_triplets += 1;
                                     } else if let Some(wt) = context.winning_tile {
-                                        if *tile != wt {
+                                        if *tile != wt || winning_tile_completes_sequence {
                                             concealed_triplets += 1;
                                         }
                                     }
