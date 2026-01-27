@@ -5,6 +5,7 @@
 use std::process;
 
 use clap::Parser;
+use serde::Serialize;
 
 use agari::{
     context::{GameContext, WinType},
@@ -122,6 +123,103 @@ struct Args {
     /// Show all possible interpretations
     #[arg(long)]
     all: bool,
+
+    /// Output results as JSON
+    #[arg(long)]
+    json: bool,
+}
+
+// JSON output structures
+#[derive(Serialize)]
+struct JsonOutput {
+    hand: String,
+    interpretations: Vec<JsonInterpretation>,
+}
+
+#[derive(Serialize)]
+struct JsonInterpretation {
+    structure: String,
+    yaku: Vec<JsonYaku>,
+    dora: JsonDora,
+    han: u8,
+    fu: u8,
+    score_level: String,
+    payment: JsonPayment,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fu_breakdown: Option<JsonFuBreakdown>,
+}
+
+#[derive(Serialize)]
+struct JsonYaku {
+    name: String,
+    han: u8,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    yakuman: bool,
+}
+
+#[derive(Serialize)]
+struct JsonDora {
+    #[serde(skip_serializing_if = "is_zero")]
+    regular: u8,
+    #[serde(skip_serializing_if = "is_zero")]
+    ura: u8,
+    #[serde(skip_serializing_if = "is_zero")]
+    aka: u8,
+    total: u8,
+}
+
+fn is_zero(n: &u8) -> bool {
+    *n == 0
+}
+
+#[derive(Serialize)]
+struct JsonPayment {
+    total: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    from_discarder: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    from_dealer: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    from_non_dealer: Option<u32>,
+}
+
+#[derive(Serialize)]
+struct JsonFuBreakdown {
+    base: u8,
+    #[serde(skip_serializing_if = "is_zero")]
+    menzen_ron: u8,
+    #[serde(skip_serializing_if = "is_zero")]
+    tsumo: u8,
+    #[serde(skip_serializing_if = "is_zero")]
+    melds: u8,
+    #[serde(skip_serializing_if = "is_zero")]
+    pair: u8,
+    #[serde(skip_serializing_if = "is_zero")]
+    wait: u8,
+    raw: u8,
+    rounded: u8,
+}
+
+#[derive(Serialize)]
+struct JsonShantenOutput {
+    shanten: i8,
+    description: String,
+    best_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ukeire: Option<JsonUkeire>,
+}
+
+#[derive(Serialize)]
+struct JsonUkeire {
+    tile_count: usize,
+    total_available: u8,
+    tiles: Vec<JsonUkeireTile>,
+}
+
+#[derive(Serialize)]
+struct JsonUkeireTile {
+    tile: String,
+    available: u8,
 }
 
 fn main() {
@@ -284,9 +382,13 @@ fn main() {
 
     // Shanten mode: calculate shanten and optionally ukeire
     if shanten_mode {
-        print_header(use_unicode);
-        print_shanten(&counts, ukeire_mode, use_unicode);
-        print_footer(use_unicode);
+        if args.json {
+            print_shanten_json(&counts, ukeire_mode);
+        } else {
+            print_header(use_unicode);
+            print_shanten(&counts, ukeire_mode, use_unicode);
+            print_footer(use_unicode);
+        }
         return;
     }
 
@@ -326,7 +428,76 @@ fn main() {
     // Filter to best interpretation only (unless --all)
     let results_to_show: &[_] = if args.all { &results } else { &results[..1] };
 
-    // Display results
+    // JSON output mode
+    if args.json {
+        let interpretations: Vec<JsonInterpretation> = results_to_show
+            .iter()
+            .map(|(structure, yaku_result, score)| {
+                let yaku_list: Vec<JsonYaku> = yaku_result
+                    .yaku_list
+                    .iter()
+                    .map(|y| JsonYaku {
+                        name: yaku_name(y).to_string(),
+                        han: if context.is_open {
+                            y.han_open().unwrap_or(0)
+                        } else {
+                            y.han()
+                        },
+                        yakuman: y.is_yakuman(),
+                    })
+                    .collect();
+
+                let fu_breakdown = if score.fu.total != 25
+                    && score.fu.total != 20
+                    && score.fu.breakdown.raw_total > 20
+                {
+                    Some(JsonFuBreakdown {
+                        base: 20,
+                        menzen_ron: score.fu.breakdown.menzen_ron,
+                        tsumo: score.fu.breakdown.tsumo,
+                        melds: score.fu.breakdown.melds,
+                        pair: score.fu.breakdown.pair,
+                        wait: score.fu.breakdown.wait,
+                        raw: score.fu.breakdown.raw_total,
+                        rounded: score.fu.total,
+                    })
+                } else {
+                    None
+                };
+
+                JsonInterpretation {
+                    structure: format_structure(structure, false),
+                    yaku: yaku_list,
+                    dora: JsonDora {
+                        regular: yaku_result.regular_dora,
+                        ura: yaku_result.ura_dora,
+                        aka: yaku_result.aka_dora,
+                        total: yaku_result.dora_count,
+                    },
+                    han: score.han,
+                    fu: score.fu.total,
+                    score_level: score.score_level.name().to_string(),
+                    payment: JsonPayment {
+                        total: score.payment.total,
+                        from_discarder: score.payment.from_discarder,
+                        from_dealer: score.payment.from_dealer,
+                        from_non_dealer: score.payment.from_non_dealer,
+                    },
+                    fu_breakdown,
+                }
+            })
+            .collect();
+
+        let output = JsonOutput {
+            hand: args.hand.clone(),
+            interpretations,
+        };
+
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        return;
+    }
+
+    // Display results (human-readable)
     print_header(use_unicode);
 
     for (i, (structure, yaku_result, score)) in results_to_show.iter().enumerate() {
@@ -688,6 +859,51 @@ fn print_shanten(counts: &agari::parse::TileCounts, show_ukeire: bool, use_unico
     } else if show_ukeire && result.shanten == -1 {
         println!("\n   Hand is already complete - no tiles needed.");
     }
+}
+
+fn print_shanten_json(counts: &agari::parse::TileCounts, show_ukeire: bool) {
+    let result = calculate_shanten(counts);
+
+    let shanten_desc = match result.shanten {
+        -1 => "Complete hand (Agari)".to_string(),
+        0 => "Tenpai (ready to win)".to_string(),
+        1 => "Iishanten (1 away from tenpai)".to_string(),
+        2 => "Ryanshanten (2 away from tenpai)".to_string(),
+        n => format!("{}-shanten ({} away from tenpai)", n, n),
+    };
+
+    let type_name = match result.best_type {
+        ShantenType::Standard => "Standard (4 melds + 1 pair)",
+        ShantenType::Chiitoitsu => "Chiitoitsu (7 pairs)",
+        ShantenType::Kokushi => "Kokushi (13 orphans)",
+    };
+
+    let ukeire_data = if show_ukeire && result.shanten >= 0 {
+        let ukeire = calculate_ukeire(counts);
+        Some(JsonUkeire {
+            tile_count: ukeire.tiles.len(),
+            total_available: ukeire.total_count,
+            tiles: ukeire
+                .tiles
+                .iter()
+                .map(|ut| JsonUkeireTile {
+                    tile: format!("{}", ut.tile),
+                    available: ut.available,
+                })
+                .collect(),
+        })
+    } else {
+        None
+    };
+
+    let output = JsonShantenOutput {
+        shanten: result.shanten,
+        description: shanten_desc,
+        best_type: type_name.to_string(),
+        ukeire: ukeire_data,
+    };
+
+    println!("{}", serde_json::to_string_pretty(&output).unwrap());
 }
 
 fn yaku_name(yaku: &Yaku) -> &'static str {

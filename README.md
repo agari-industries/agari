@@ -221,6 +221,7 @@ OPTIONS:
     --ukeire              Show ukeire with shanten
     --ascii               Use ASCII output instead of Unicode
     --all                 Show all possible interpretations
+    --json                Output results as JSON
     -h, --help            Show help message
 ```
 
