@@ -96,6 +96,24 @@ def mjai_tiles_to_agari(tiles: list[str]) -> str:
     return "".join(result)
 
 
+def strip_red_five(tile: str) -> str:
+    """Convert red five notation to regular five.
+
+    When akadora (red fives) are disabled, the MJAI data still marks
+    tiles as red fives based on Tenhou's tile ID encoding. This function
+    strips those markings so Agari doesn't count them as akadora.
+
+    Args:
+        tile: MJAI tile notation (e.g., '5mr', '5pr', '5sr', or regular tiles)
+
+    Returns:
+        Tile with red marking removed (e.g., '5mr' -> '5m')
+    """
+    if tile.endswith("r"):
+        return tile[:-1]  # 5mr -> 5m, 5pr -> 5p, 5sr -> 5s
+    return tile
+
+
 # ============================================================================
 # Yaku ID Mapping (Tenhou IDs -> Names)
 # ============================================================================
@@ -242,6 +260,10 @@ class HoraEvent:
     # False if any tiles were hidden ("?") during tracking
     has_full_visibility: bool = True
 
+    # Whether akadora (red fives) are enabled in this game
+    # When False, red five markings should be ignored
+    aka_flag: bool = True
+
     def is_valid(self) -> bool:
         """Check if this hora event has valid tile counts and full visibility.
 
@@ -299,6 +321,12 @@ class HoraEvent:
         # The -w flag specifies which tile was the winning tile, not an additional tile
         all_tiles = list(self.tehais) + [self.winning_tile]
 
+        # When akadora is disabled, strip red five markings from all tiles
+        # The MJAI converter marks tiles as red based on Tenhou's tile ID encoding,
+        # but if aka_flag is False, these shouldn't be counted as akadora
+        if not self.aka_flag:
+            all_tiles = [strip_red_five(t) for t in all_tiles]
+
         # Track if hand is truly open (has chi/pon/open kan, but not ankan)
         is_open = False
 
@@ -308,6 +336,10 @@ class HoraEvent:
             meld_tiles = meld.get("consumed", [])
             if "pai" in meld:
                 meld_tiles = [meld["pai"]] + meld_tiles
+
+            # Strip red five markings if akadora disabled
+            if not self.aka_flag:
+                meld_tiles = [strip_red_five(t) for t in meld_tiles]
 
             meld_type = meld.get("type", "")
             tiles_str = mjai_tiles_to_agari(meld_tiles)
@@ -331,8 +363,11 @@ class HoraEvent:
 
         args = [hand_str]
 
-        # Winning tile
-        args.extend(["-w", mjai_tile_to_agari(self.winning_tile)])
+        # Winning tile (strip red marking if akadora disabled)
+        winning_tile = self.winning_tile
+        if not self.aka_flag:
+            winning_tile = strip_red_five(winning_tile)
+        args.extend(["-w", mjai_tile_to_agari(winning_tile)])
 
         # Tsumo vs Ron
         if self.is_tsumo:
@@ -428,10 +463,12 @@ class MjsonParser:
     """Parser for mjai format JSON files."""
 
     def __init__(self):
+        # Game-level settings (persist across kyoku)
+        self.aka_flag = True  # Whether akadora (red fives) are enabled
         self.reset()
 
     def reset(self):
-        """Reset parser state for a new game."""
+        """Reset parser state for a new kyoku (round)."""
         self.tehais = [[], [], [], []]  # Hands for each player
         self.melds = [[], [], [], []]  # Called melds for each player
         self.dora_markers = []
@@ -493,6 +530,11 @@ class MjsonParser:
     def process_event(self, event: dict, source_file: str = "") -> Optional[HoraEvent]:
         """Process a single mjai event. Returns HoraEvent if this is a hora."""
         event_type = event.get("type", "")
+
+        if event_type == "start_game":
+            # Track game-level settings
+            self.aka_flag = event.get("aka_flag", True)
+            return None
 
         if event_type == "start_kyoku":
             self.reset()
@@ -780,6 +822,7 @@ class MjsonParser:
             tenhou_points=points_won,
             source_file=source_file,
             has_full_visibility=self.full_visibility[actor],
+            aka_flag=self.aka_flag,
         )
 
         return hora
