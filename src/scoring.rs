@@ -276,10 +276,11 @@ fn meld_fu_with_context(meld: &Meld, all_melds: &[Meld], context: &GameContext) 
                 context.win_type == WinType::Ron && context.winning_tile == Some(*tile);
 
             // Only treat as "open" if it's a TRUE shanpon wait.
-            // If the winning tile also appears in a sequence (nobetan pattern),
+            // If the winning tile also appears in a CLOSED sequence (nobetan pattern),
             // then the triplet remains closed for fu purposes.
+            // Open/called sequences don't count - they were already complete before the wait.
             let is_true_shanpon =
-                is_ron_on_this_tile && !winning_tile_in_sequence(*tile, all_melds);
+                is_ron_on_this_tile && !winning_tile_in_closed_sequence(*tile, all_melds);
 
             if *is_meld_open || is_true_shanpon {
                 base // Open fu
@@ -303,10 +304,14 @@ fn meld_fu_with_context(meld: &Meld, all_melds: &[Meld], context: &GameContext) 
     }
 }
 
-/// Check if a tile appears in any sequence in the hand.
+/// Check if a tile appears in any CLOSED sequence in the hand.
 /// Used to detect nobetan patterns where the winning tile could complete
 /// either a triplet or a sequence.
-fn winning_tile_in_sequence(tile: Tile, melds: &[Meld]) -> bool {
+///
+/// Only closed sequences count because open/called sequences were already
+/// complete before the wait - they don't represent alternative interpretations
+/// of the waiting shape.
+fn winning_tile_in_closed_sequence(tile: Tile, melds: &[Meld]) -> bool {
     // Honor tiles can never be in sequences
     let (suit, value) = match tile {
         Tile::Suited { suit, value } => (suit, value),
@@ -314,7 +319,11 @@ fn winning_tile_in_sequence(tile: Tile, melds: &[Meld]) -> bool {
     };
 
     for meld in melds {
-        if let Meld::Shuntsu(start_tile, _) = meld {
+        // Only check CLOSED sequences (is_open = false)
+        if let Meld::Shuntsu(start_tile, is_open) = meld {
+            if *is_open {
+                continue; // Skip open/called sequences
+            }
             if let Tile::Suited {
                 suit: seq_suit,
                 value: start_val,
