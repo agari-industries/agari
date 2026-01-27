@@ -16,7 +16,6 @@ Usage:
 import argparse
 import gzip
 import json
-import os
 import random
 import re
 import subprocess
