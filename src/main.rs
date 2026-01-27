@@ -684,6 +684,7 @@ fn yaku_name(yaku: &Yaku) -> &'static str {
         Yaku::Chiitoitsu => "Chiitoitsu (Seven Pairs)",
         Yaku::Chanta => "Chanta (Outside Hand)",
         Yaku::SanAnkou => "San Ankou (Three Concealed Triplets)",
+        Yaku::SanKantsu => "San Kantsu (Three Kans)",
         Yaku::Honroutou => "Honroutou (All Terminals and Honors)",
         Yaku::Shousangen => "Shousangen (Little Three Dragons)",
         Yaku::Honitsu => "Honitsu (Half Flush)",

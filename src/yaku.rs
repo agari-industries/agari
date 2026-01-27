@@ -32,6 +32,7 @@ pub enum Yaku {
     Chiitoitsu,     // Seven pairs
     Chanta,         // All groups contain terminal or honor
     SanAnkou,       // Three concealed triplets
+    SanKantsu,      // Three kans (quads)
     Honroutou,      // All terminals and honors
     Shousangen,     // Small three dragons (2 dragon triplets + dragon pair)
 
@@ -89,6 +90,7 @@ impl Yaku {
             Yaku::Chiitoitsu => 2,
             Yaku::Chanta => 2,
             Yaku::SanAnkou => 2,
+            Yaku::SanKantsu => 2,
             Yaku::Honroutou => 2,
             Yaku::Shousangen => 2,
 
@@ -159,6 +161,7 @@ impl Yaku {
             Yaku::SanshokuDoukou => Some(2),
             Yaku::Chiitoitsu => Some(2), // Can't actually be open, but logically same
             Yaku::SanAnkou => Some(2),
+            Yaku::SanKantsu => Some(2),
             Yaku::Honroutou => Some(2),
             Yaku::Shousangen => Some(2),
 
@@ -468,6 +471,17 @@ pub fn detect_yaku_with_context(
                     }
                 }
 
+                // San Kantsu (three kans)
+                {
+                    let kan_count = melds
+                        .iter()
+                        .filter(|m| matches!(m, Meld::Kan(_, _)))
+                        .count();
+                    if kan_count == 3 {
+                        yaku_list.push(Yaku::SanKantsu);
+                    }
+                }
+
                 // Honroutou (all terminals and honors)
                 if check_honroutou(melds, *pair) {
                     yaku_list.push(Yaku::Honroutou);
@@ -684,6 +698,12 @@ fn check_chanta(melds: &[Meld], pair: Tile) -> bool {
         return false;
     }
 
+    // Chanta requires at least one sequence (otherwise it's honroutou)
+    let has_sequence = melds.iter().any(|m| matches!(m, Meld::Shuntsu(_, _)));
+    if !has_sequence {
+        return false;
+    }
+
     // All melds must contain terminal or honor
     for meld in melds {
         let has_terminal_or_honor = match meld {
@@ -712,6 +732,12 @@ fn check_junchan(melds: &[Meld], pair: Tile) -> bool {
     };
 
     if !pair_ok {
+        return false;
+    }
+
+    // Junchan requires at least one sequence (otherwise it's chinroutou)
+    let has_sequence = melds.iter().any(|m| matches!(m, Meld::Shuntsu(_, _)));
+    if !has_sequence {
         return false;
     }
 
