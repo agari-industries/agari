@@ -519,7 +519,11 @@ fn main() {
                     },
                     han: score.han,
                     fu: score.fu.total,
-                    score_level: score.score_level.name().to_string(),
+                    score_level: if score.is_counted_yakuman {
+                        "Counted Yakuman".to_string()
+                    } else {
+                        score.score_level.name().to_string()
+                    },
                     payment: JsonPayment {
                         total: score.payment.total,
                         from_discarder: score.payment.from_discarder,
@@ -812,7 +816,12 @@ fn print_score(score: &ScoringResult) {
             ScoreLevel::DoubleYakuman => "👑👑",
             ScoreLevel::Normal => "",
         };
-        println!("   {} {}", level_emoji, score.score_level.name());
+        let level_name = if score.is_counted_yakuman {
+            "Counted Yakuman"
+        } else {
+            score.score_level.name()
+        };
+        println!("   {} {}", level_emoji, level_name);
     }
 
     // Payment box

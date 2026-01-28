@@ -102,6 +102,9 @@ pub struct ScoringResult {
     pub basic_points: u32,
     pub payment: Payment,
     pub is_dealer: bool,
+    /// True when yakuman-level score is reached through accumulated han (13+)
+    /// rather than through actual yakuman yaku patterns
+    pub is_counted_yakuman: bool,
 }
 
 // ============================================================================
@@ -534,6 +537,11 @@ pub fn calculate_score(
     let is_dealer = context.is_dealer();
     let payment = calculate_payment(basic_points, is_dealer, context.win_type);
 
+    // Counted yakuman: reached yakuman level (13+ han) without actual yakuman yaku
+    let is_counted_yakuman = (score_level == ScoreLevel::Yakuman
+        || score_level == ScoreLevel::DoubleYakuman)
+        && !yaku_result.is_yakuman;
+
     ScoringResult {
         fu,
         han,
@@ -541,6 +549,7 @@ pub fn calculate_score(
         basic_points,
         payment,
         is_dealer,
+        is_counted_yakuman,
     }
 }
 
@@ -1337,5 +1346,101 @@ mod tests {
         // Base = 20 fu
         // Total = 32 + 0 + 0 + 0 + 4 + 2 + 20 = 58 -> rounded to 60 fu
         assert_eq!(fu.total, 60);
+    }
+
+    // ========================================================================
+    // Counted Yakuman Tests
+    // ========================================================================
+
+    #[test]
+    fn test_counted_yakuman_chinitsu_ryanpeikou() {
+        // 22334455667799s - Chinitsu + Ryanpeikou + Pinfu + Riichi + Tsumo
+        // This reaches 13+ han without actual yakuman yaku
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .riichi()
+            .with_winning_tile(Tile::suited(Suit::Sou, 2));
+
+        let results = score_hand("22334455667799s", &context);
+        let best = best_score(&results);
+
+        // Riichi(1) + Menzen Tsumo(1) + Pinfu(1) + Ryanpeikou(3) + Chinitsu(6) = 12 han
+        // With ippatsu or dora it would be 13+, but even at 12 han it's sanbaiman
+        // Let's verify the hand structure is correct
+        assert!(best.han >= 12);
+        assert!(!best.is_counted_yakuman); // 12 han is Sanbaiman, not Yakuman
+    }
+
+    #[test]
+    fn test_counted_yakuman_with_dora() {
+        // Same hand but with dora to push it to 13+ han
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .riichi()
+            .ippatsu()
+            .with_winning_tile(Tile::suited(Suit::Sou, 2))
+            .with_dora(vec![Tile::suited(Suit::Sou, 1)]); // 2s is dora
+
+        let results = score_hand("22334455667799s", &context);
+        let best = best_score(&results);
+
+        // Riichi(1) + Ippatsu(1) + Menzen Tsumo(1) + Pinfu(1) + Ryanpeikou(3) + Chinitsu(6) + Dora(2) = 15 han
+        assert!(best.han >= 13);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman);
+        assert!(best.is_counted_yakuman); // Reached yakuman through counting, not yakuman yaku
+    }
+
+    #[test]
+    fn test_true_yakuman_kokushi() {
+        // Kokushi Musou - a true yakuman
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .with_winning_tile(Tile::suited(Suit::Man, 1));
+
+        let results = score_hand("19m19p19s12345677z", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.score_level, ScoreLevel::Yakuman);
+        assert!(!best.is_counted_yakuman); // True yakuman, not counted
+    }
+
+    #[test]
+    fn test_true_yakuman_suuankou() {
+        // Suuankou - four concealed triplets (true yakuman)
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .with_winning_tile(Tile::Honor(Honor::White));
+
+        let results = score_hand("111222333m444p55z", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.score_level, ScoreLevel::Yakuman);
+        assert!(!best.is_counted_yakuman); // True yakuman, not counted
+    }
+
+    #[test]
+    fn test_true_yakuman_tenhou() {
+        // Tenhou - dealer's first draw win (true yakuman)
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .tenhou()
+            .with_winning_tile(Tile::suited(Suit::Man, 4));
+
+        let results = score_hand("234m456p789s11122z", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.score_level, ScoreLevel::Yakuman);
+        assert!(!best.is_counted_yakuman); // True yakuman, not counted
+    }
+
+    #[test]
+    fn test_not_counted_yakuman_below_13_han() {
+        // A high-scoring hand that doesn't reach yakuman level
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .riichi()
+            .with_winning_tile(Tile::suited(Suit::Man, 5));
+
+        // Chinitsu (6) + Riichi (1) + Menzen Tsumo (1) = 8 han = Baiman
+        let results = score_hand("123345567789m55m", &context);
+        let best = best_score(&results);
+
+        assert!(best.han < 13);
+        assert_eq!(best.score_level, ScoreLevel::Baiman);
+        assert!(!best.is_counted_yakuman);
     }
 }
