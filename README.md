@@ -227,6 +227,147 @@ OPTIONS:
 
 ---
 
+## Using as a Library
+
+Agari can be used as a Rust library for building Mahjong applications, bots, or analysis tools.
+
+### Add to Cargo.toml
+
+```toml
+[dependencies]
+agari = { git = "https://github.com/ryblogs/agari" }
+```
+
+### Basic Scoring Example
+
+```rust
+use agari::context::{GameContext, WinType};
+use agari::hand::decompose_hand;
+use agari::parse::{parse_hand, to_counts};
+use agari::scoring::calculate_score;
+use agari::tile::Honor;
+use agari::yaku::detect_yaku_with_context;
+
+fn main() {
+    // Parse the hand
+    let tiles = parse_hand("123m456p789s11122z").unwrap();
+    let counts = to_counts(&tiles);
+
+    // Find all valid hand structures
+    let structures = decompose_hand(&counts);
+
+    // Set up game context
+    let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+        .riichi()
+        .with_winning_tile(tiles[0])
+        .with_dora(vec![tiles[1]]);
+
+    // Score each interpretation and find the best
+    let best = structures
+        .iter()
+        .map(|s| {
+            let yaku = detect_yaku_with_context(s, &counts, &context);
+            let score = calculate_score(s, &yaku, &context);
+            (s, yaku, score)
+        })
+        .max_by(|a, b| {
+            a.2.payment.total.cmp(&b.2.payment.total)
+                .then_with(|| a.2.han.cmp(&b.2.han))
+        })
+        .unwrap();
+
+    println!("Han: {}, Fu: {}", best.2.han, best.2.fu.total);
+    println!("Payment: {} points", best.2.payment.total);
+}
+```
+
+### Scoring with Called Melds
+
+```rust
+use agari::context::{GameContext, WinType};
+use agari::hand::decompose_hand_with_melds;
+use agari::parse::{parse_hand_with_aka, to_counts};
+use agari::scoring::calculate_score;
+use agari::tile::Honor;
+use agari::yaku::detect_yaku_with_context;
+
+fn main() {
+    // Parse hand with called melds: (123p) is an open chi
+    let parsed = parse_hand_with_aka("456m789s11z(123p)(777z)").unwrap();
+    let counts = to_counts(&parsed.tiles);
+
+    // Extract called melds
+    let called_melds: Vec<_> = parsed.called_melds
+        .iter()
+        .map(|cm| cm.meld.clone())
+        .collect();
+
+    // Decompose with pre-declared melds
+    let structures = decompose_hand_with_melds(&counts, &called_melds);
+
+    let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+        .open()  // Mark hand as open
+        .with_winning_tile(parsed.tiles[0]);
+
+    // ... score as above
+}
+```
+
+### Shanten Calculation
+
+```rust
+use agari::parse::{parse_hand, to_counts};
+use agari::shanten::{calculate_shanten, calculate_ukeire};
+
+fn main() {
+    let tiles = parse_hand("123m456p789s1112z").unwrap();
+    let counts = to_counts(&tiles);
+
+    // Calculate shanten (-1 = complete, 0 = tenpai, 1+ = tiles away)
+    let result = calculate_shanten(&counts);
+    println!("Shanten: {}", result.shanten);
+    println!("Best type: {:?}", result.best_type);
+
+    // Calculate ukeire (tile acceptance)
+    let ukeire = calculate_ukeire(&counts);
+    for (tile, count) in &ukeire.tiles {
+        println!("{:?}: {} available", tile, count);
+    }
+}
+```
+
+### Key Types
+
+| Type | Description |
+|------|-------------|
+| `Tile` | A single tile (suited or honor) |
+| `TileCounts` | HashMap of tile → count for a hand |
+| `HandStructure` | Decomposed hand (Standard, Chiitoitsu, or Kokushi) |
+| `Meld` | A group of tiles (Shuntsu, Koutsu, or Kan) |
+| `GameContext` | Win type, winds, dora, riichi status, etc. |
+| `YakuResult` | Detected yaku with han breakdown |
+| `ScoringResult` | Final score with fu, han, payment |
+
+### GameContext Builder
+
+```rust
+let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+    .riichi()                              // Declare riichi
+    .ippatsu()                             // Ippatsu enabled
+    .with_winning_tile(tile)               // Set agari tile
+    .with_dora(vec![indicator1, indicator2]) // Dora indicators
+    .with_ura_dora(vec![ura1])             // Ura dora (with riichi)
+    .with_aka(1)                           // Red five count
+    .open()                                // Hand is open
+    .last_tile()                           // Haitei/Houtei
+    .rinshan()                             // Rinshan kaihou
+    .chankan()                             // Chankan
+    .tenhou()                              // Tenhou (dealer first draw)
+    .chiihou();                            // Chiihou (non-dealer first draw)
+```
+
+---
+
 ## Building & Testing
 
 ```bash
