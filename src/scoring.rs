@@ -637,7 +637,16 @@ mod tests {
     }
 
     fn best_score(results: &[ScoringResult]) -> &ScoringResult {
-        results.iter().max_by_key(|r| r.payment.total).unwrap()
+        results
+            .iter()
+            .max_by(|a, b| {
+                a.payment
+                    .total
+                    .cmp(&b.payment.total)
+                    .then_with(|| a.han.cmp(&b.han))
+                    .then_with(|| b.fu.total.cmp(&a.fu.total))
+            })
+            .unwrap()
     }
 
     // ===== Fu Calculation Tests =====
@@ -916,6 +925,44 @@ mod tests {
         // Base 20 + melds (8+4) = 32 → 40 fu
         assert_eq!(fu.breakdown.melds, 12); // 8 + 4
         assert_eq!(fu.total, 40);
+    }
+
+    #[test]
+    fn test_fu_nobetan_open_sequence_does_not_count() {
+        // When the winning tile appears in an OPEN (called) sequence,
+        // that should NOT trigger the nobetan exception.
+        // Open sequences were completed before the wait was established.
+        //
+        // Hand: 99m 111p 456s 789s (123p) - ron on 1p
+        // The 1p appears in both 111p triplet AND (123p) open chi.
+        // But since (123p) is open, it doesn't count as nobetan.
+        // The 111p triplet should be treated as "opened by ron" (shanpon wait).
+        use crate::hand::decompose_hand_with_melds;
+        use crate::parse::parse_hand_with_aka;
+
+        let parsed = parse_hand_with_aka("99m111p456s789s(123p)").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds: Vec<_> = parsed
+            .called_melds
+            .iter()
+            .map(|cm| cm.meld.clone())
+            .collect();
+        let structures = decompose_hand_with_melds(&counts, &called_melds);
+
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .open()
+            .with_winning_tile(Tile::suited(Suit::Pin, 1));
+
+        let fu = calculate_fu(&structures[0], &context);
+
+        // 111p is a TRUE shanpon (open 123p doesn't count) = 4 fu (open terminal)
+        // (123p) open sequence = 0 fu
+        // 456s closed sequence = 0 fu
+        // 789s closed sequence = 0 fu
+        // 99m pair = 0 fu
+        // Base 20 + melds 4 = 24 → 30 fu
+        assert_eq!(fu.breakdown.melds, 4); // 111p open terminal triplet = 4 fu
+        assert_eq!(fu.total, 30);
     }
 
     #[test]
@@ -1442,5 +1489,63 @@ mod tests {
         assert!(best.han < 13);
         assert_eq!(best.score_level, ScoreLevel::Baiman);
         assert!(!best.is_counted_yakuman);
+    }
+
+    // ========================================================================
+    // Interpretation Preference Tests
+    // ========================================================================
+
+    #[test]
+    fn test_prefer_ryanpeikou_over_chiitoitsu() {
+        // Hand: 22334455667799s can be interpreted as:
+        // - Chiitoitsu (7 pairs): 2 han
+        // - Ryanpeikou + Pinfu (234s 234s 567s 567s + 99s): 4 han
+        //
+        // When both reach the same payment (e.g., both yakuman at 13+ han),
+        // the higher han interpretation should be preferred.
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .riichi()
+            .ippatsu()
+            .with_winning_tile(Tile::suited(Suit::Sou, 2))
+            .with_dora(vec![Tile::suited(Suit::Sou, 1)]); // 2s is dora
+
+        let results = score_hand("22334455667799s", &context);
+        let best = best_score(&results);
+
+        // Should pick Ryanpeikou interpretation (higher han)
+        // Ryanpeikou: Riichi(1) + Ippatsu(1) + Tsumo(1) + Pinfu(1) + Ryanpeikou(3) + Chinitsu(6) + Dora(2) = 15 han
+        // Chiitoitsu: Riichi(1) + Ippatsu(1) + Tsumo(1) + Chiitoitsu(2) + Chinitsu(6) + Dora(2) = 13 han
+        assert!(
+            best.han >= 15,
+            "Expected 15+ han for Ryanpeikou, got {}",
+            best.han
+        );
+
+        // Both are yakuman, but Ryanpeikou has more han
+        assert_eq!(best.score_level, ScoreLevel::Yakuman);
+    }
+
+    #[test]
+    fn test_chiitoitsu_vs_ryanpeikou_different_scores() {
+        // When interpretations have different payment totals,
+        // the higher payment wins regardless of han count.
+        //
+        // Without enough dora/yaku to both reach yakuman,
+        // Ryanpeikou (3 han) + Pinfu (1 han) = 4 han beats Chiitoitsu (2 han)
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 2));
+
+        let results = score_hand("22334455667799s", &context);
+        let best = best_score(&results);
+
+        // Ryanpeikou + Pinfu + Chinitsu + Menzen Tsumo = 3 + 1 + 6 + 1 = 11 han (Sanbaiman)
+        // Chiitoitsu + Chinitsu + Menzen Tsumo = 2 + 6 + 1 = 9 han (Baiman)
+        // Ryanpeikou interpretation should win with higher payment
+        assert!(
+            best.han >= 11,
+            "Expected 11+ han for Ryanpeikou, got {}",
+            best.han
+        );
+        assert_eq!(best.score_level, ScoreLevel::Sanbaiman);
     }
 }

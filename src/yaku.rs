@@ -1681,4 +1681,43 @@ mod tests {
         let results_tanki = get_yaku_with_context(hand_str, &context_tanki);
         assert!(has_yaku(&results_tanki, Yaku::SanAnkou));
     }
+
+    #[test]
+    fn test_san_ankou_ron_with_sequence_alternative() {
+        // When ron tile could complete EITHER a triplet OR a sequence,
+        // the player can declare the sequence win, keeping the triplet concealed.
+        //
+        // Hand: 111m 222p 333s 345s 77z - ron on 3s
+        // The 3s could complete 333s (triplet) OR 345s (sequence).
+        // If interpreted as completing the sequence, all three triplets stay concealed.
+        let hand_str = "111m222p333345s77z";
+        let winning_tile = Tile::suited(Suit::Sou, 3);
+
+        // Ron on 3s - could be shanpon (333s) OR sequence (345s)
+        // Since 345s is a valid sequence containing 3s, the 333s triplet stays concealed
+        let context_ron = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .with_winning_tile(winning_tile);
+        let results_ron = get_yaku_with_context(hand_str, &context_ron);
+
+        // Sanankou should be awarded because the player can declare the 345s sequence win
+        assert!(has_yaku(&results_ron, Yaku::SanAnkou));
+    }
+
+    #[test]
+    fn test_san_ankou_ron_no_sequence_alternative() {
+        // When ron tile can ONLY complete a triplet (no sequence alternative),
+        // that triplet is "opened" and doesn't count as concealed.
+        //
+        // Hand: 111m 222p 333s 678s 77z - ron on 3s
+        // The 3s can only complete 333s (triplet), not 678s.
+        let hand_str = "111m222p333s678s77z";
+        let winning_tile = Tile::suited(Suit::Sou, 3);
+
+        let context_ron = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .with_winning_tile(winning_tile);
+        let results_ron = get_yaku_with_context(hand_str, &context_ron);
+
+        // Sanankou should NOT be awarded - only 2 concealed triplets remain
+        assert!(!has_yaku(&results_ron, Yaku::SanAnkou));
+    }
 }
