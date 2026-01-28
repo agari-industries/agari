@@ -834,7 +834,7 @@ fn check_flush_tiles(tiles: &[Tile]) -> Option<Yaku> {
 
 /// Check for Suuankou (Four Concealed Triplets)
 /// Closed kans count as concealed triplets for suuankou
-fn check_suuankou(melds: &[Meld], pair: Tile, context: &GameContext) -> Option<Yaku> {
+fn check_suuankou(melds: &[Meld], _pair: Tile, context: &GameContext) -> Option<Yaku> {
     // For ron, we need to know the winning tile to determine if suuankou is valid
     // If no winning tile is set for ron, we can't determine suuankou
     if context.win_type == WinType::Ron && context.winning_tile.is_none() {
@@ -877,20 +877,9 @@ fn check_suuankou(melds: &[Meld], pair: Tile, context: &GameContext) -> Option<Y
         return None;
     }
 
-    // For ron, even if waiting on the pair (tanki), it's regular Suuankou (single yakuman).
-    // Suuankou Tanki (double yakuman) is only awarded for tsumo on a tanki wait.
-    // This follows Tenhou/WRC rules where ron "breaks" the concealment for double yakuman purposes.
-    if context.win_type == WinType::Ron {
-        return Some(Yaku::Suuankou);
-    }
-
-    // Tsumo - check for tanki wait (double yakuman)
-    if let Some(winning_tile) = context.winning_tile {
-        if winning_tile == pair {
-            return Some(Yaku::SuuankouTanki);
-        }
-    }
-
+    // Tenhou treats all Suuankou as single yakuman, regardless of wait type or win method.
+    // Some rulesets award double yakuman for Suuankou Tanki (tsumo on pair wait),
+    // but we follow Tenhou's rules for compatibility.
     Some(Yaku::Suuankou)
 }
 

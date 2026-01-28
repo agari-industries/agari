@@ -457,7 +457,16 @@ fn main() {
         .collect();
 
     // Sort by score (highest first)
-    results.sort_by(|a, b| b.2.payment.total.cmp(&a.2.payment.total));
+    // When payment is the same (e.g., both yakuman), prefer:
+    // 1. Higher han (more yaku = better hand)
+    // 2. Lower fu (better technique / cleaner hand)
+    results.sort_by(|a, b| {
+        b.2.payment
+            .total
+            .cmp(&a.2.payment.total)
+            .then_with(|| b.2.han.cmp(&a.2.han))
+            .then_with(|| a.2.fu.total.cmp(&b.2.fu.total))
+    });
 
     // Filter to best interpretation only (unless --all)
     let results_to_show: &[_] = if args.all { &results } else { &results[..1] };
