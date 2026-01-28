@@ -2,6 +2,7 @@
 //!
 //! A command-line tool for calculating the score of a Riichi Mahjong hand.
 
+use std::collections::HashSet;
 use std::process;
 
 use clap::Parser;
@@ -10,12 +11,12 @@ use serde::Serialize;
 use agari::{
     context::{GameContext, WinType},
     display::{format_structure, honor_name, tile_to_unicode},
-    hand::{decompose_hand, decompose_hand_with_melds},
-    parse::{parse_hand_with_aka, to_counts, validate_hand, validate_hand_with_melds},
+    hand::{HandStructure, decompose_hand, decompose_hand_with_melds},
+    parse::{TileCounts, parse_hand_with_aka, to_counts, validate_hand, validate_hand_with_melds},
     scoring::{ScoreLevel, ScoringResult, calculate_score},
     shanten::{ShantenType, calculate_shanten, calculate_ukeire},
     tile::{Honor, Suit, Tile},
-    yaku::{Yaku, detect_yaku_with_context},
+    yaku::{Yaku, YakuResult, detect_yaku_with_context},
 };
 
 const AFTER_HELP: &str = r#"HAND FORMAT:
@@ -256,6 +257,66 @@ struct JsonUkeireTile {
     available: u8,
 }
 
+/// Infer the best winning tile when none is specified.
+/// Tries each unique tile in the hand and returns the results with the context
+/// that produces the highest score.
+fn infer_best_winning_tile(
+    structures: &[HandStructure],
+    all_tiles_counts: &TileCounts,
+    base_context: GameContext,
+    tiles: &[Tile],
+) -> (Vec<(HandStructure, YakuResult, ScoringResult)>, GameContext) {
+    // Get unique tiles in the hand
+    let unique_tiles: HashSet<Tile> = tiles.iter().copied().collect();
+
+    let mut best_results: Vec<(HandStructure, YakuResult, ScoringResult)> = Vec::new();
+    let mut best_context = base_context.clone();
+    let mut best_score: Option<(u32, u8, u8)> = None; // (payment, han, -fu for comparison)
+
+    for winning_tile in unique_tiles {
+        let context = base_context.clone().with_winning_tile(winning_tile);
+
+        for structure in structures {
+            let yaku_result = detect_yaku_with_context(structure, all_tiles_counts, &context);
+            let score = calculate_score(structure, &yaku_result, &context);
+
+            // Compare: prefer higher payment, then higher han, then lower fu
+            let current = (score.payment.total, score.han, 255 - score.fu.total);
+
+            let is_better = match best_score {
+                None => true,
+                Some(best) => current > best,
+            };
+
+            if is_better {
+                best_score = Some(current);
+                best_context = context.clone();
+                best_results.clear();
+            }
+
+            // If this matches the best score, add to results
+            if Some(current) == best_score {
+                best_results.push((structure.clone(), yaku_result, score));
+            }
+        }
+    }
+
+    // If no results found (shouldn't happen), fall back to no winning tile
+    if best_results.is_empty() {
+        let results: Vec<_> = structures
+            .iter()
+            .map(|s| {
+                let yaku_result = detect_yaku_with_context(s, all_tiles_counts, &base_context);
+                let score = calculate_score(s, &yaku_result, &base_context);
+                (s.clone(), yaku_result, score)
+            })
+            .collect();
+        (results, base_context)
+    } else {
+        (best_results, best_context)
+    }
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -362,7 +423,9 @@ fn main() {
         .with_ura_dora(ura_indicators)
         .with_aka(parsed.aka_count);
 
-    if let Some(wt) = winning_tile {
+    // If winning tile is specified, use it; otherwise we'll infer it later
+    let explicit_winning_tile = winning_tile;
+    if let Some(wt) = explicit_winning_tile {
         context = context.with_winning_tile(wt);
     }
 
@@ -447,14 +510,22 @@ fn main() {
     // Score each decomposition
     // Note: We use all_tiles_counts for yaku detection to properly count dora
     // in called melds (pons, chis, kans)
-    let mut results: Vec<_> = structures
-        .iter()
-        .map(|s| {
-            let yaku_result = detect_yaku_with_context(s, &all_tiles_counts, &context);
-            let score = calculate_score(s, &yaku_result, &context);
-            (s, yaku_result, score)
-        })
-        .collect();
+    //
+    // If no winning tile was specified, we need to infer the best one.
+    // Try each unique tile in the hand and pick the one that maximizes score.
+    let (mut results, context) = if explicit_winning_tile.is_none() {
+        infer_best_winning_tile(&structures, &all_tiles_counts, context, &parsed.tiles)
+    } else {
+        let results: Vec<_> = structures
+            .iter()
+            .map(|s| {
+                let yaku_result = detect_yaku_with_context(s, &all_tiles_counts, &context);
+                let score = calculate_score(s, &yaku_result, &context);
+                (s.clone(), yaku_result, score)
+            })
+            .collect();
+        (results, context)
+    };
 
     // Sort by score (highest first)
     // When payment is the same (e.g., both yakuman), prefer:
@@ -469,13 +540,21 @@ fn main() {
     });
 
     // Filter to best interpretation only (unless --all)
-    let results_to_show: &[_] = if args.all { &results } else { &results[..1] };
+    let results_to_show: Vec<_> = if args.all {
+        results.iter().map(|(s, y, sc)| (s, y, sc)).collect()
+    } else {
+        results
+            .iter()
+            .take(1)
+            .map(|(s, y, sc)| (s, y, sc))
+            .collect()
+    };
 
     // JSON output mode
     if args.json {
         let interpretations: Vec<JsonInterpretation> = results_to_show
             .iter()
-            .map(|(structure, yaku_result, score)| {
+            .map(|&(structure, yaku_result, score)| {
                 let yaku_list: Vec<JsonYaku> = yaku_result
                     .yaku_list
                     .iter()
@@ -579,7 +658,7 @@ fn main() {
     // Display results (human-readable)
     print_header(use_unicode);
 
-    for (i, (structure, yaku_result, score)) in results_to_show.iter().enumerate() {
+    for (i, &(structure, yaku_result, score)) in results_to_show.iter().enumerate() {
         if i > 0 {
             println!("\n{}", "─".repeat(50));
         }

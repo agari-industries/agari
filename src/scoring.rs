@@ -1548,4 +1548,607 @@ mod tests {
         );
         assert_eq!(best.score_level, ScoreLevel::Sanbaiman);
     }
+
+    // ===== Winning Tile Inference Tests =====
+    //
+    // These tests verify that choosing different winning tiles affects scoring
+    // correctly, which is the foundation for the winning tile inference feature.
+    // The actual inference logic is in main.rs, but these tests ensure the
+    // scoring module correctly handles different winning tiles.
+
+    #[test]
+    fn test_winning_tile_affects_pinfu_eligibility() {
+        // Hand: 334455m334455p66s (Ryanpeikou shape)
+        // With winning tile on 3m (ryanmen wait): Pinfu applies, 20 fu
+        // With winning tile on 6s (tanki wait): Pinfu does NOT apply, 30 fu
+
+        // Test with ryanmen wait (3m) - should get Pinfu
+        let context_ryanmen = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 3));
+        let results_ryanmen = score_hand("334455m334455p66s", &context_ryanmen);
+        let best_ryanmen = best_score(&results_ryanmen);
+
+        // Pinfu + Menzen Tsumo + Tanyao + Ryanpeikou = 1 + 1 + 1 + 3 = 6 han, 20 fu
+        assert_eq!(
+            best_ryanmen.fu.total, 20,
+            "Ryanmen wait should give 20 fu (Pinfu)"
+        );
+        assert_eq!(best_ryanmen.han, 6, "Should have 6 han with Pinfu");
+
+        // Test with tanki wait (6s) - should NOT get Pinfu
+        let context_tanki = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 6));
+        let results_tanki = score_hand("334455m334455p66s", &context_tanki);
+        let best_tanki = best_score(&results_tanki);
+
+        // Menzen Tsumo + Tanyao + Ryanpeikou = 1 + 1 + 3 = 5 han, 30 fu (no Pinfu)
+        assert_eq!(
+            best_tanki.fu.total, 30,
+            "Tanki wait should give 30 fu (no Pinfu)"
+        );
+        assert_eq!(best_tanki.han, 5, "Should have 5 han without Pinfu");
+    }
+
+    #[test]
+    fn test_winning_tile_affects_payment_with_pinfu() {
+        // Same hand as above, but verify the payment difference
+        // Ryanmen (6 han 20 fu) vs Tanki (5 han 30 fu)
+        //
+        // Valid winning tiles in 334455m334455p66s:
+        // - Ryanmen: 3m, 5m, 3p, 5p (edge of 345 sequences)
+        // - Kanchan: 4m, 4p (middle of sequences)
+        // - Tanki: 6s (pair wait)
+
+        let context_ryanmen = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 3)); // 3m gives ryanmen (2-5 wait on 345)
+        let results_ryanmen = score_hand("334455m334455p66s", &context_ryanmen);
+        let best_ryanmen = best_score(&results_ryanmen);
+
+        let context_tanki = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 6));
+        let results_tanki = score_hand("334455m334455p66s", &context_tanki);
+        let best_tanki = best_score(&results_tanki);
+
+        // 6 han (Haneman) pays more than 5 han (Mangan)
+        assert!(
+            best_ryanmen.payment.total > best_tanki.payment.total,
+            "Ryanmen interpretation ({} points) should pay more than tanki ({} points)",
+            best_ryanmen.payment.total,
+            best_tanki.payment.total
+        );
+
+        // Verify score levels
+        assert_eq!(best_ryanmen.score_level, ScoreLevel::Haneman);
+        assert_eq!(best_tanki.score_level, ScoreLevel::Mangan);
+    }
+
+    #[test]
+    fn test_winning_tile_ryanpeikou_multiple_ryanmen_options() {
+        // Hand: 334455m334455p66s
+        // Valid winning tiles (must be in hand):
+        // - Ryanmen: 3m, 5m, 3p, 5p (give Pinfu)
+        // - Kanchan: 4m, 4p (no Pinfu)
+        // - Tanki: 6s (no Pinfu)
+        //
+        // All ryanmen options should give the same score (Pinfu applies)
+
+        let ryanmen_tiles = [
+            Tile::suited(Suit::Man, 3),
+            Tile::suited(Suit::Man, 5),
+            Tile::suited(Suit::Pin, 3),
+            Tile::suited(Suit::Pin, 5),
+        ];
+
+        let mut ryanmen_scores = Vec::new();
+        for tile in &ryanmen_tiles {
+            let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+                .with_winning_tile(*tile);
+            let results = score_hand("334455m334455p66s", &context);
+            let best = best_score(&results);
+            ryanmen_scores.push((tile, best.han, best.fu.total, best.payment.total));
+        }
+
+        // All ryanmen waits should give the same han and fu
+        let first = &ryanmen_scores[0];
+        for (tile, han, fu, payment) in &ryanmen_scores {
+            assert_eq!(
+                *han, first.1,
+                "Tile {:?} gave {} han, expected {} han",
+                tile, han, first.1
+            );
+            assert_eq!(
+                *fu, first.2,
+                "Tile {:?} gave {} fu, expected {} fu",
+                tile, fu, first.2
+            );
+            assert_eq!(
+                *payment, first.3,
+                "Tile {:?} gave {} payment, expected {} payment",
+                tile, payment, first.3
+            );
+        }
+
+        // All should have Pinfu (20 fu)
+        assert_eq!(first.2, 20, "Ryanmen wait should give 20 fu");
+        // All should have 6 han (Menzen Tsumo + Tanyao + Pinfu + Ryanpeikou)
+        assert_eq!(first.1, 6, "Ryanmen wait should give 6 han");
+    }
+
+    #[test]
+    fn test_winning_tile_inference_chooses_best_for_mahjong_soul_hand() {
+        // This is the exact hand from the MahjongSoul screenshot that prompted
+        // the winning tile inference feature:
+        // Hand: 440566m334405p66s (with red fives represented as 0)
+        // Note: We test with regular 5s since the scoring module doesn't track aka
+        //
+        // The actual hand is: 445566m334455p66s
+        // Valid winning tiles:
+        // - Ryanmen: 4m, 6m, 3p, 5p (give Pinfu)
+        // - Kanchan: 5m, 4p (no Pinfu)
+        // - Tanki: 6s (no Pinfu)
+        //
+        // With winning tile 4m or 6m (ryanmen on 456m): Pinfu applies
+        // With winning tile 6s (tanki): Pinfu does NOT apply
+
+        let context_good = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .riichi()
+            .with_winning_tile(Tile::suited(Suit::Man, 4)); // Ryanmen on 3-6 for 456
+        let results_good = score_hand("445566m334455p66s", &context_good);
+        let best_good = best_score(&results_good);
+
+        let context_bad = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .riichi()
+            .with_winning_tile(Tile::suited(Suit::Sou, 6)); // Tanki
+        let results_bad = score_hand("445566m334455p66s", &context_bad);
+        let best_bad = best_score(&results_bad);
+
+        // Good interpretation: Riichi + Menzen Tsumo + Pinfu + Tanyao + Ryanpeikou
+        // = 1 + 1 + 1 + 1 + 3 = 7 han, 20 fu
+        assert_eq!(best_good.fu.total, 20);
+        assert_eq!(best_good.han, 7);
+        assert_eq!(best_good.score_level, ScoreLevel::Haneman);
+
+        // Bad interpretation: Riichi + Menzen Tsumo + Tanyao + Ryanpeikou (no Pinfu)
+        // = 1 + 1 + 1 + 3 = 6 han, 30 fu
+        assert_eq!(best_bad.fu.total, 30);
+        assert_eq!(best_bad.han, 6);
+        assert_eq!(best_bad.score_level, ScoreLevel::Haneman);
+
+        // Both are Haneman, but 7 han 20 fu pays more than 6 han 30 fu
+        // Actually both pay the same (Haneman flat rate), but han count differs
+        // The inference should still prefer 7 han for display purposes
+        assert!(
+            best_good.han > best_bad.han,
+            "Good inference ({} han) should have more han than bad ({} han)",
+            best_good.han,
+            best_bad.han
+        );
+    }
+
+    #[test]
+    fn test_winning_tile_no_inference_needed_for_explicit_tile() {
+        // When a winning tile is explicitly specified, use it even if
+        // a different tile would give a better score
+
+        // Hand that could be Pinfu with ryanmen or not with tanki
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 6)); // Tanki - suboptimal
+
+        let results = score_hand("334455m334455p66s", &context);
+        let best = best_score(&results);
+
+        // Should use the explicit tanki wait, giving 30 fu (no Pinfu)
+        assert_eq!(best.fu.total, 30);
+        assert_eq!(best.han, 5); // No Pinfu
+    }
+
+    #[test]
+    fn test_winning_tile_affects_wait_fu() {
+        // Test that different waits give different fu values
+        // Hand: 234567m234567p22s
+        // Win on 2s: tanki (pair) wait = 2 fu for wait
+        // Win on 4m: ryanmen wait = 0 fu for wait
+        // Win on 5m: kanchan wait = 2 fu for wait (if 3-5 interpretation)
+
+        // Tanki wait on 2s
+        let context_tanki = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 2));
+        let results_tanki = score_hand("234567m234567p22s", &context_tanki);
+        let best_tanki = best_score(&results_tanki);
+
+        // Ryanmen wait on 7m (completing 567m, waiting on 4-7)
+        let context_ryanmen = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 7));
+        let results_ryanmen = score_hand("234567m234567p22s", &context_ryanmen);
+        let best_ryanmen = best_score(&results_ryanmen);
+
+        // Both should be valid, but tanki has +2 fu for wait
+        // Ryanmen with all sequences and non-yakuhai pair = Pinfu eligible
+        // Tanki = not Pinfu eligible
+
+        // Ryanmen should give Pinfu (lower fu, higher han)
+        assert!(
+            best_ryanmen.han >= best_tanki.han,
+            "Ryanmen should have >= han ({} vs {})",
+            best_ryanmen.han,
+            best_tanki.han
+        );
+    }
+
+    #[test]
+    fn test_winning_tile_chinitsu_ryanpeikou_best_inference() {
+        // Full flush Ryanpeikou: 22334455667788s
+        // Multiple possible winning tiles, but only some give Pinfu
+        // Win on 2s or 8s: ryanmen wait (Pinfu applies)
+        // Win on 5s: could be kanchan or ryanmen depending on interpretation
+
+        // Ryanmen on 8s
+        let context_8s = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 8));
+        let results_8s = score_hand("22334455667788s", &context_8s);
+        let best_8s = best_score(&results_8s);
+
+        // Ryanmen on 2s
+        let context_2s = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 2));
+        let results_2s = score_hand("22334455667788s", &context_2s);
+        let best_2s = best_score(&results_2s);
+
+        // Both should give Pinfu + Ryanpeikou + Chinitsu + Menzen Tsumo + Tanyao
+        // = 1 + 3 + 6 + 1 + 1 = 12 han, 20 fu
+        assert_eq!(best_8s.fu.total, 20, "8s ryanmen should give 20 fu");
+        assert_eq!(best_2s.fu.total, 20, "2s ryanmen should give 20 fu");
+        assert_eq!(best_8s.han, best_2s.han, "Both should have same han");
+
+        // Should be Sanbaiman (11-12 han)
+        assert_eq!(best_8s.score_level, ScoreLevel::Sanbaiman);
+    }
+
+    #[test]
+    fn test_winning_tile_with_no_winning_tile_set() {
+        // When no winning tile is set, Pinfu cannot be determined
+        // This tests the baseline behavior that the inference feature improves upon
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South);
+        // Note: No with_winning_tile call
+
+        let results = score_hand("334455m334455p66s", &context);
+        let best = best_score(&results);
+
+        // Without winning tile, Pinfu cannot be awarded (can't verify ryanmen wait)
+        // Should still get: Menzen Tsumo + Tanyao + Ryanpeikou = 5 han
+        // Fu will include tsumo bonus since Pinfu isn't awarded
+        assert_eq!(
+            best.han, 5,
+            "Without winning tile, should get 5 han (no Pinfu)"
+        );
+        assert_eq!(best.fu.total, 30, "Without winning tile, should get 30 fu");
+    }
+
+    #[test]
+    fn test_winning_tile_inference_with_dora() {
+        // Test that winning tile inference works correctly with dora
+        // The winning tile itself might be dora
+
+        // Hand: 234567m234567p22s
+        // With dora indicator 6m, the dora tile is 7m
+        // 234567m = 234 + 567 sequences, one 7m
+        // Yaku: Menzen Tsumo + Pinfu + Tanyao + Dora 1 = 1 + 1 + 1 + 1 = 4 han
+
+        let context_7m = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 7)) // Ryanmen wait
+            .with_dora(vec![Tile::suited(Suit::Man, 6)]); // 7m is dora
+
+        let results = score_hand("234567m234567p22s", &context_7m);
+        let best = best_score(&results);
+
+        // Should include dora from the 7m tiles
+        // Yaku: Menzen Tsumo (1) + Pinfu (1) + Tanyao (1) + Dora 1 = 4 han
+        assert!(
+            best.han >= 4,
+            "Should have at least 4 han with dora, got {}",
+            best.han
+        );
+        assert_eq!(best.fu.total, 20, "Should have 20 fu with Pinfu");
+    }
+
+    #[test]
+    fn test_winning_tile_shanpon_vs_ryanmen_ambiguous() {
+        // Hand: 111222333m456p77s
+        // This hand has triplets, so Pinfu is impossible regardless of wait
+        // But it tests that winning tile affects other scoring aspects
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 1));
+
+        let results = score_hand("111222333m456p77s", &context);
+        let best = best_score(&results);
+
+        // Has triplets, so no Pinfu
+        // Should have: Menzen Tsumo + Sanankou (possibly) + other yaku
+        assert!(
+            best.fu.total >= 30,
+            "Should have at least 30 fu with triplets"
+        );
+    }
+
+    #[test]
+    fn test_winning_tile_seven_pairs_always_tanki() {
+        // Chiitoitsu (seven pairs) is always tanki wait, so winning tile
+        // doesn't affect whether it's tanki - it's always tanki
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 1));
+
+        let results = score_hand("1133m2255p4477s11z", &context);
+
+        // Find the Chiitoitsu interpretation
+        let chiitoitsu_result = results.iter().find(|r| r.fu.total == 25);
+        assert!(
+            chiitoitsu_result.is_some(),
+            "Should have a Chiitoitsu interpretation with 25 fu"
+        );
+
+        let chii = chiitoitsu_result.unwrap();
+        assert_eq!(chii.fu.total, 25, "Chiitoitsu always has 25 fu");
+    }
+
+    #[test]
+    fn test_winning_tile_inference_prefers_higher_payment() {
+        // When two interpretations tie on han, prefer lower fu (but both rounded same)
+        // When payment is equal, prefer higher han
+
+        // This tests the scoring comparison logic that inference relies on
+        // 3m is a ryanmen wait (Pinfu applies), 6s is a tanki wait (no Pinfu)
+        let context_good = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 3)); // Ryanmen
+        let results_good = score_hand("334455m334455p66s", &context_good);
+        let best_good = best_score(&results_good);
+
+        let context_bad = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 6)); // Tanki
+        let results_bad = score_hand("334455m334455p66s", &context_bad);
+        let best_bad = best_score(&results_bad);
+
+        // The "good" interpretation should be preferred (more han, more payment)
+        // Ryanmen: 6 han 20 fu (Haneman = 12000)
+        // Tanki: 5 han 30 fu (Mangan = 8000)
+        assert!(
+            best_good.payment.total > best_bad.payment.total,
+            "Good interpretation ({} points) should pay more than bad ({} points)",
+            best_good.payment.total,
+            best_bad.payment.total
+        );
+        assert!(
+            best_good.han > best_bad.han,
+            "Good interpretation ({} han) should have more han than bad ({} han)",
+            best_good.han,
+            best_bad.han
+        );
+    }
+
+    #[test]
+    fn test_winning_tile_kanchan_vs_ryanmen() {
+        // Test that kanchan wait (middle tile) doesn't give Pinfu
+        // Hand: 334455m334455p66s
+        // Win on 4m: kanchan wait (waiting for middle of 345)
+        // Win on 3m: ryanmen wait (waiting for 2-5 on 345)
+
+        let context_kanchan = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 4)); // Kanchan
+        let results_kanchan = score_hand("334455m334455p66s", &context_kanchan);
+        let best_kanchan = best_score(&results_kanchan);
+
+        let context_ryanmen = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 3)); // Ryanmen
+        let results_ryanmen = score_hand("334455m334455p66s", &context_ryanmen);
+        let best_ryanmen = best_score(&results_ryanmen);
+
+        // Kanchan should NOT get Pinfu
+        assert_eq!(best_kanchan.fu.total, 30, "Kanchan should give 30 fu");
+        assert_eq!(best_kanchan.han, 5, "Kanchan should give 5 han (no Pinfu)");
+
+        // Ryanmen should get Pinfu
+        assert_eq!(best_ryanmen.fu.total, 20, "Ryanmen should give 20 fu");
+        assert_eq!(
+            best_ryanmen.han, 6,
+            "Ryanmen should give 6 han (with Pinfu)"
+        );
+    }
+
+    #[test]
+    fn test_all_wait_types_for_ryanpeikou_hand() {
+        // Comprehensive test of all valid winning tiles for 334455m334455p66s
+        // This documents which tiles give which wait types
+
+        let hand = "334455m334455p66s";
+
+        // Ryanmen waits (Pinfu applies): 3m, 5m, 3p, 5p
+        for tile in [
+            Tile::suited(Suit::Man, 3),
+            Tile::suited(Suit::Man, 5),
+            Tile::suited(Suit::Pin, 3),
+            Tile::suited(Suit::Pin, 5),
+        ] {
+            let context =
+                GameContext::new(WinType::Tsumo, Honor::East, Honor::South).with_winning_tile(tile);
+            let results = score_hand(hand, &context);
+            let best = best_score(&results);
+            assert_eq!(
+                best.fu.total, 20,
+                "Tile {:?} should be ryanmen (20 fu), got {} fu",
+                tile, best.fu.total
+            );
+            assert_eq!(
+                best.han, 6,
+                "Tile {:?} should give 6 han with Pinfu, got {} han",
+                tile, best.han
+            );
+        }
+
+        // Kanchan waits (no Pinfu): 4m, 4p
+        for tile in [Tile::suited(Suit::Man, 4), Tile::suited(Suit::Pin, 4)] {
+            let context =
+                GameContext::new(WinType::Tsumo, Honor::East, Honor::South).with_winning_tile(tile);
+            let results = score_hand(hand, &context);
+            let best = best_score(&results);
+            assert_eq!(
+                best.fu.total, 30,
+                "Tile {:?} should be kanchan (30 fu), got {} fu",
+                tile, best.fu.total
+            );
+            assert_eq!(
+                best.han, 5,
+                "Tile {:?} should give 5 han without Pinfu, got {} han",
+                tile, best.han
+            );
+        }
+
+        // Tanki wait (no Pinfu): 6s
+        let tile = Tile::suited(Suit::Sou, 6);
+        let context =
+            GameContext::new(WinType::Tsumo, Honor::East, Honor::South).with_winning_tile(tile);
+        let results = score_hand(hand, &context);
+        let best = best_score(&results);
+        assert_eq!(
+            best.fu.total, 30,
+            "Tile {:?} should be tanki (30 fu), got {} fu",
+            tile, best.fu.total
+        );
+        assert_eq!(
+            best.han, 5,
+            "Tile {:?} should give 5 han without Pinfu, got {} han",
+            tile, best.han
+        );
+    }
+
+    #[test]
+    fn test_inference_should_maximize_score_not_just_han() {
+        // Edge case: ensure inference prefers higher payment, not just higher han
+        // In most cases more han = more payment, but verify the logic is correct
+        //
+        // Hand: 234567m234567p22s
+        // All winning tiles (2m, 3m, 4m, 5m, 6m, 7m, 2p, ..., 2s) should be tested
+        // and the one with highest payment should be selected
+
+        // Test that ryanmen wins over tanki when both are valid
+        let context_ryanmen = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 7)); // Ryanmen on 567
+        let results_ryanmen = score_hand("234567m234567p22s", &context_ryanmen);
+        let best_ryanmen = best_score(&results_ryanmen);
+
+        let context_tanki = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 2)); // Tanki on pair
+        let results_tanki = score_hand("234567m234567p22s", &context_tanki);
+        let best_tanki = best_score(&results_tanki);
+
+        // Ryanmen should give Pinfu and thus higher payment
+        assert!(
+            best_ryanmen.payment.total >= best_tanki.payment.total,
+            "Ryanmen ({}) should pay >= tanki ({})",
+            best_ryanmen.payment.total,
+            best_tanki.payment.total
+        );
+    }
+
+    #[test]
+    fn test_inference_handles_hand_with_only_tanki_wait() {
+        // Hand that can ONLY be completed with tanki wait (seven pairs)
+        // Chiitoitsu always has tanki wait, no ryanmen possible
+        //
+        // Hand: 1133m2255p4477s11z
+        // Only valid wait is tanki on one of the pairs
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 1));
+        let results = score_hand("1133m2255p4477s11z", &context);
+
+        // Should find Chiitoitsu interpretation
+        let has_chiitoitsu = results.iter().any(|r| r.fu.total == 25);
+        assert!(has_chiitoitsu, "Should have Chiitoitsu interpretation");
+    }
+
+    #[test]
+    fn test_inference_with_multiple_suits_and_honors() {
+        // More complex hand with honors to test inference doesn't break
+        // Hand: 123m456p789s11122z
+        // Multiple possible winning tiles, but some give yakuhai bonus
+
+        let context_1z = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .with_winning_tile(Tile::honor(Honor::East)); // East wind triplet
+        let results_1z = score_hand("123m456p789s11122z", &context_1z);
+        let best_1z = best_score(&results_1z);
+
+        // Should have double yakuhai (round + seat wind)
+        assert!(
+            best_1z.han >= 3,
+            "Should have at least 3 han with double wind yakuhai"
+        );
+    }
+
+    #[test]
+    fn test_inference_ron_vs_tsumo_different_optimal() {
+        // The optimal winning tile might differ between ron and tsumo
+        // because of menzen tsumo bonus and fu differences
+        //
+        // Hand: 234567m234567p22s
+        // Ron: Pinfu only (no menzen tsumo)
+        // Tsumo: Pinfu + Menzen Tsumo
+
+        let context_ron = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 7)); // Ryanmen
+        let results_ron = score_hand("234567m234567p22s", &context_ron);
+        let best_ron = best_score(&results_ron);
+
+        let context_tsumo = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 7)); // Ryanmen
+        let results_tsumo = score_hand("234567m234567p22s", &context_tsumo);
+        let best_tsumo = best_score(&results_tsumo);
+
+        // Tsumo should have one more han (menzen tsumo)
+        assert_eq!(
+            best_tsumo.han,
+            best_ron.han + 1,
+            "Tsumo ({}) should have 1 more han than ron ({})",
+            best_tsumo.han,
+            best_ron.han
+        );
+    }
+
+    #[test]
+    fn test_inference_preserves_dora_count() {
+        // Verify that inference doesn't affect dora counting
+        // The winning tile might itself be dora
+        //
+        // Hand: 234567m234567p22s with dora indicator 1s (2s is dora)
+        // Winning on 2s adds dora, but 2s is tanki (no Pinfu)
+        // Winning on 7m is ryanmen (Pinfu) but no dora from win tile
+
+        let context_dora_win = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 2))
+            .with_dora(vec![Tile::suited(Suit::Sou, 1)]); // 2s is dora
+        let results_dora = score_hand("234567m234567p22s", &context_dora_win);
+        let best_dora = best_score(&results_dora);
+
+        let context_no_dora_win = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Man, 7))
+            .with_dora(vec![Tile::suited(Suit::Sou, 1)]); // 2s is dora
+        let results_no_dora = score_hand("234567m234567p22s", &context_no_dora_win);
+        let best_no_dora = best_score(&results_no_dora);
+
+        // Both should have 2 dora (the pair 22s)
+        // But the tanki win has +2 fu for wait, no Pinfu
+        // The ryanmen win has Pinfu, 20 fu
+        //
+        // Dora win: Menzen Tsumo (1) + Tanyao (1) + Dora 2 = 4 han, 30 fu
+        // No dora from win: Menzen Tsumo (1) + Pinfu (1) + Tanyao (1) + Dora 2 = 5 han, 20 fu
+        //
+        // The ryanmen (no dora from win tile) should be better overall
+        assert!(
+            best_no_dora.payment.total >= best_dora.payment.total,
+            "Ryanmen+Pinfu ({}) should pay >= tanki+dora ({}) due to higher han",
+            best_no_dora.payment.total,
+            best_dora.payment.total
+        );
+    }
 }
