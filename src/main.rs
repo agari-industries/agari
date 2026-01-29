@@ -1424,7 +1424,7 @@ fn yaku_name(yaku: &Yaku) -> &'static str {
         Yaku::ChuurenPoutou => "Chuuren Poutou (Nine Gates)",
 
         // Double Yakuman
-        Yaku::Kokushi13Wait => "Kokushi Musou 13-wait",
+        Yaku::Kokushi13Wait => "Kokushi Juusanmen (Kokushi Musou 13-wait)",
         Yaku::SuuankouTanki => "Suuankou Tanki",
         Yaku::JunseiChuurenPoutou => "Junsei Chuuren Poutou",
     }
