@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use std::process;
 
 use clap::Parser;
+use colored::Colorize;
 use serde::Serialize;
 
 use agari::{
@@ -135,6 +136,10 @@ struct Args {
     /// Output results as JSON
     #[arg(long)]
     json: bool,
+
+    /// Disable colored output
+    #[arg(long)]
+    no_color: bool,
 }
 
 // JSON output structures
@@ -327,6 +332,12 @@ fn infer_best_winning_tile(
 fn main() {
     let args = Args::parse();
 
+    // Configure color output
+    // Respects NO_COLOR env var automatically, but --no-color flag overrides
+    if args.no_color {
+        colored::control::set_override(false);
+    }
+
     // Extract arguments
     let shanten_mode = args.shanten || args.ukeire;
     let ukeire_mode = args.ukeire;
@@ -336,7 +347,7 @@ fn main() {
     let parsed = match parse_hand_with_aka(&args.hand) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("❌ Error parsing hand: {}", e);
+            eprintln!("{} {}", "❌ Error parsing hand:".red().bold(), e);
             process::exit(1);
         }
     };
@@ -350,12 +361,12 @@ fn main() {
         // Validate hand size for scoring
         if has_called_melds {
             if let Err(e) = validate_hand_with_melds(&parsed) {
-                eprintln!("❌ Invalid hand: {}", e);
+                eprintln!("{} {}", "❌ Invalid hand:".red().bold(), e);
                 process::exit(1);
             }
         } else {
             if let Err(e) = validate_hand(&parsed.tiles) {
-                eprintln!("❌ Invalid hand: {}", e);
+                eprintln!("{} {}", "❌ Invalid hand:".red().bold(), e);
                 process::exit(1);
             }
         }
@@ -363,7 +374,11 @@ fn main() {
         // For shanten, allow 1-14 tiles (not counting melds)
         let tile_count = parsed.tiles.len();
         if tile_count < 1 || tile_count > 14 {
-            eprintln!("❌ Invalid hand: expected 1-14 tiles, got {}", tile_count);
+            eprintln!(
+                "{} expected 1-14 tiles, got {}",
+                "❌ Invalid hand:".red().bold(),
+                tile_count
+            );
             process::exit(1);
         }
     }
@@ -375,7 +390,7 @@ fn main() {
     let round_wind = match parse_wind(&args.round) {
         Ok(w) => w,
         Err(e) => {
-            eprintln!("❌ {}", e);
+            eprintln!("{} {}", "❌".red().bold(), e);
             process::exit(1);
         }
     };
@@ -383,7 +398,7 @@ fn main() {
     let seat_wind = match parse_wind(&args.seat) {
         Ok(w) => w,
         Err(e) => {
-            eprintln!("❌ {}", e);
+            eprintln!("{} {}", "❌".red().bold(), e);
             process::exit(1);
         }
     };
@@ -392,7 +407,7 @@ fn main() {
     let dora_indicators = match args.dora.as_ref().map(|s| parse_tile_list(s)).transpose() {
         Ok(d) => d.unwrap_or_default(),
         Err(e) => {
-            eprintln!("❌ Error parsing dora: {}", e);
+            eprintln!("{} {}", "❌ Error parsing dora:".red().bold(), e);
             process::exit(1);
         }
     };
@@ -400,7 +415,7 @@ fn main() {
     let ura_indicators = match args.ura.as_ref().map(|s| parse_tile_list(s)).transpose() {
         Ok(u) => u.unwrap_or_default(),
         Err(e) => {
-            eprintln!("❌ Error parsing ura dora: {}", e);
+            eprintln!("{} {}", "❌ Error parsing ura dora:".red().bold(), e);
             process::exit(1);
         }
     };
@@ -413,7 +428,7 @@ fn main() {
         has_open_melds,
         args.open,
     ) {
-        eprintln!("⚠️  Warning: {}", warning);
+        eprintln!("{} {}", "⚠️  Warning:".yellow().bold(), warning);
     }
 
     // Parse winning tile
@@ -425,7 +440,7 @@ fn main() {
     {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("❌ Error parsing winning tile: {}", e);
+            eprintln!("{} {}", "❌ Error parsing winning tile:".red().bold(), e);
             process::exit(1);
         }
     };
@@ -521,7 +536,10 @@ fn main() {
     };
 
     if structures.is_empty() {
-        eprintln!("❌ This hand has no valid winning structure.");
+        eprintln!(
+            "{}",
+            "❌ This hand has no valid winning structure.".red().bold()
+        );
         process::exit(1);
     }
 
@@ -902,59 +920,107 @@ fn parse_tile_list(s: &str) -> Result<Vec<Tile>, String> {
 
 fn print_header(use_unicode: bool) {
     if use_unicode {
-        println!("\n╔══════════════════════════════════════════════════════════╗");
-        println!("║            AGARI - Mahjong Score Calculator              ║");
-        println!("╚══════════════════════════════════════════════════════════╝");
+        println!(
+            "\n{}",
+            "╔══════════════════════════════════════════════════════════╗".cyan()
+        );
+        println!(
+            "{}",
+            "║            AGARI - Mahjong Score Calculator              ║"
+                .cyan()
+                .bold()
+        );
+        println!(
+            "{}",
+            "╚══════════════════════════════════════════════════════════╝".cyan()
+        );
     } else {
-        println!("\n============================================================");
-        println!("             AGARI - Mahjong Score Calculator");
-        println!("============================================================");
+        println!(
+            "\n{}",
+            "============================================================".cyan()
+        );
+        println!(
+            "{}",
+            "             AGARI - Mahjong Score Calculator"
+                .cyan()
+                .bold()
+        );
+        println!(
+            "{}",
+            "============================================================".cyan()
+        );
     }
 }
 
 fn print_footer(use_unicode: bool) {
     if use_unicode {
-        println!("\n══════════════════════════════════════════════════════════════\n");
+        println!(
+            "\n{}\n",
+            "══════════════════════════════════════════════════════════════".cyan()
+        );
     } else {
-        println!("\n============================================================\n");
+        println!(
+            "\n{}\n",
+            "============================================================".cyan()
+        );
     }
 }
 
-fn print_hand(structure: &agari::hand::HandStructure, use_unicode: bool) {
-    println!("\n📋 Hand Structure:");
+fn print_hand(structure: &HandStructure, use_unicode: bool) {
+    println!("\n{}", "📋 Hand Structure:".yellow().bold());
     println!("   {}", format_structure(structure, use_unicode));
 }
 
 fn print_context(context: &GameContext, parsed: &agari::parse::ParsedHand) {
-    println!("\n🎮 Game Context:");
+    println!("\n{}", "🎮 Game Context:".yellow().bold());
 
     let win_str = match context.win_type {
-        WinType::Tsumo => "Tsumo (self-draw)",
-        WinType::Ron => "Ron (discard)",
+        WinType::Tsumo => "Tsumo (self-draw)".green(),
+        WinType::Ron => "Ron (discard)".blue(),
     };
-    println!("   Win Type: {}", win_str);
+    println!("   {}: {}", "Win Type".dimmed(), win_str);
 
-    println!("   Round Wind: {}", honor_name(&context.round_wind));
-    println!("   Seat Wind: {}", honor_name(&context.seat_wind));
+    println!(
+        "   {}: {}",
+        "Round Wind".dimmed(),
+        honor_name(&context.round_wind)
+    );
+    println!(
+        "   {}: {}",
+        "Seat Wind".dimmed(),
+        honor_name(&context.seat_wind)
+    );
 
     if context.is_dealer() {
-        println!("   Position: Dealer (Oya)");
+        println!("   {}: {}", "Position".dimmed(), "Dealer (Oya)".magenta());
     }
 
     if context.is_open {
-        println!("   Hand State: Open (called tiles)");
+        println!(
+            "   {}: {}",
+            "Hand State".dimmed(),
+            "Open (called tiles)".yellow()
+        );
     } else {
-        println!("   Hand State: Closed (Menzen)");
+        println!(
+            "   {}: {}",
+            "Hand State".dimmed(),
+            "Closed (Menzen)".green()
+        );
     }
 
     if context.is_riichi {
         if context.is_double_riichi {
-            println!("   Riichi: Double Riichi ⚡⚡");
+            println!(
+                "   {}: {}",
+                "Riichi".dimmed(),
+                "Double Riichi ⚡⚡".cyan().bold()
+            );
         } else {
-            println!("   Riichi: Yes ⚡");
+            println!("   {}: {}", "Riichi".dimmed(), "Yes ⚡".cyan().bold());
         }
         if context.is_ippatsu {
-            println!("   Ippatsu: Yes 💫");
+            println!("   {}: {}", "Ippatsu".dimmed(), "Yes 💫".cyan());
         }
     }
 
@@ -962,34 +1028,38 @@ fn print_context(context: &GameContext, parsed: &agari::parse::ParsedHand) {
         let dora_str: String = context
             .dora_indicators
             .iter()
-            .map(|t| format!("{} ", tile_to_unicode(t)))
+            .map(|t| tile_to_unicode(t))
             .collect();
-        println!("   Dora Indicators: {}", dora_str.trim());
+        println!("   {}: {}", "Dora Indicators".dimmed(), dora_str.trim());
     }
 
     if context.is_riichi && !context.ura_dora_indicators.is_empty() {
         let ura_str: String = context
             .ura_dora_indicators
             .iter()
-            .map(|t| format!("{} ", tile_to_unicode(t)))
+            .map(|t| tile_to_unicode(t))
             .collect();
-        println!("   Ura Dora: {}", ura_str.trim());
+        println!("   {}: {}", "Ura Dora".dimmed(), ura_str.trim());
     }
 
     if parsed.aka_count > 0 {
-        println!("   Red Fives (Akadora): {}", parsed.aka_count);
+        println!(
+            "   {}: {}",
+            "Red Fives (Akadora)".dimmed(),
+            parsed.aka_count.to_string().red().bold()
+        );
     }
 
     if let Some(wt) = context.winning_tile {
-        println!("   Winning Tile: {}", tile_to_unicode(&wt));
+        println!("   {}: {}", "Winning Tile".dimmed(), tile_to_unicode(&wt));
     }
 }
 
 fn print_yaku(yaku_result: &agari::yaku::YakuResult, context: &GameContext) {
-    println!("\n🏆 Yaku:");
+    println!("\n{}", "🏆 Yaku:".yellow().bold());
 
     if yaku_result.yaku_list.is_empty() {
-        println!("   ⚠️  No yaku! This hand cannot win.");
+        println!("   {}", "⚠️  No yaku! This hand cannot win.".red().bold());
         return;
     }
 
@@ -1001,28 +1071,59 @@ fn print_yaku(yaku_result: &agari::yaku::YakuResult, context: &GameContext) {
         };
 
         let name = yaku_name(yaku);
-        let yakuman_marker = if yaku.is_yakuman() { " 🌟" } else { "" };
+        let han_str = format!("({} han)", han);
 
-        println!("   • {} ({} han){}", name, han, yakuman_marker);
+        if yaku.is_yakuman() {
+            println!(
+                "   {} {} {} {}",
+                "•".green(),
+                name.green().bold(),
+                han_str.green(),
+                "🌟".to_string()
+            );
+        } else {
+            println!("   {} {} {}", "•".white(), name.white(), han_str.dimmed());
+        }
     }
 
     // Display dora breakdown
     if yaku_result.regular_dora > 0 {
-        println!("   • Dora ({} han)", yaku_result.regular_dora);
+        println!(
+            "   {} {} {}",
+            "•".white(),
+            "Dora".white(),
+            format!("({} han)", yaku_result.regular_dora).dimmed()
+        );
     }
     if yaku_result.ura_dora > 0 {
-        println!("   • Ura Dora ({} han)", yaku_result.ura_dora);
+        println!(
+            "   {} {} {}",
+            "•".white(),
+            "Ura Dora".white(),
+            format!("({} han)", yaku_result.ura_dora).dimmed()
+        );
     }
     if yaku_result.aka_dora > 0 {
-        println!("   • Red Fives (Akadora) ({} han)", yaku_result.aka_dora);
+        println!(
+            "   {} {} {}",
+            "•".white(),
+            "Red Fives (Akadora)".white(),
+            format!("({} han)", yaku_result.aka_dora).dimmed()
+        );
     }
 }
 
 fn print_score(score: &ScoringResult) {
-    println!("\n💰 Score:");
+    println!("\n{}", "💰 Score:".yellow().bold());
 
     // Han and Fu
-    println!("   {} han / {} fu", score.han, score.fu.total);
+    println!(
+        "   {} {} / {} {}",
+        score.han.to_string().bright_white().bold(),
+        "han".dimmed(),
+        score.fu.total.to_string().bright_white().bold(),
+        "fu".dimmed()
+    );
 
     // Score level
     if score.score_level != ScoreLevel::Normal {
@@ -1040,55 +1141,100 @@ fn print_score(score: &ScoringResult) {
         } else {
             score.score_level.name()
         };
-        println!("   {} {}", level_emoji, level_name);
+        let colored_level = match score.score_level {
+            ScoreLevel::Mangan => level_name.yellow().bold(),
+            ScoreLevel::Haneman => level_name.yellow().bold(),
+            ScoreLevel::Baiman => level_name.bright_yellow().bold(),
+            ScoreLevel::Sanbaiman => level_name.magenta().bold(),
+            ScoreLevel::Yakuman | ScoreLevel::DoubleYakuman => level_name.bright_magenta().bold(),
+            ScoreLevel::Normal => level_name.normal(),
+        };
+        println!("   {} {}", level_emoji, colored_level);
     }
 
     // Payment box
     println!();
-    println!("   ┌─────────────────────────────────────┐");
+    println!("   {}", "┌─────────────────────────────────────┐".green());
     println!(
-        "   │  TOTAL: {:>6} points               │",
-        score.payment.total
+        "   {}  {}: {:>6} {}               {}",
+        "│".green(),
+        "TOTAL".green().bold(),
+        score.payment.total.to_string().bright_white().bold(),
+        "points".green(),
+        "│".green()
     );
-    println!("   └─────────────────────────────────────┘");
+    println!("   {}", "└─────────────────────────────────────┘".green());
 
     if let Some(from_discarder) = score.payment.from_discarder {
-        println!("   Ron: {} from discarder", from_discarder);
+        println!(
+            "   {}: {} from discarder",
+            "Ron".blue(),
+            from_discarder.to_string().bright_white()
+        );
     } else if score.is_dealer {
         if let Some(from_each) = score.payment.from_non_dealer {
-            println!("   Tsumo: {} all (×3 players)", from_each);
+            println!(
+                "   {}: {} all (×3 players)",
+                "Tsumo".green(),
+                from_each.to_string().bright_white()
+            );
         }
     } else if let (Some(from_dealer), Some(from_non_dealer)) =
         (score.payment.from_dealer, score.payment.from_non_dealer)
     {
         println!(
-            "   Tsumo: {} / {} (dealer / non-dealer)",
-            from_dealer, from_non_dealer
+            "   {}: {} / {} (dealer / non-dealer)",
+            "Tsumo".green(),
+            from_dealer.to_string().bright_white(),
+            from_non_dealer.to_string().bright_white()
         );
     }
 
     // Fu breakdown (only if interesting)
     if score.fu.total != 25 && score.fu.total != 20 && score.fu.breakdown.raw_total > 20 {
-        println!("\n   Fu breakdown:");
-        println!("     Base: 20");
+        println!("\n   {}:", "Fu breakdown".dimmed());
+        println!("     {}: {}", "Base".dimmed(), "20");
         if score.fu.breakdown.menzen_ron > 0 {
-            println!("     Menzen Ron: +{}", score.fu.breakdown.menzen_ron);
+            println!(
+                "     {}: {}",
+                "Menzen Ron".dimmed(),
+                format!("+{}", score.fu.breakdown.menzen_ron)
+            );
         }
         if score.fu.breakdown.tsumo > 0 {
-            println!("     Tsumo: +{}", score.fu.breakdown.tsumo);
+            println!(
+                "     {}: {}",
+                "Tsumo".dimmed(),
+                format!("+{}", score.fu.breakdown.tsumo)
+            );
         }
         if score.fu.breakdown.melds > 0 {
-            println!("     Melds: +{}", score.fu.breakdown.melds);
+            println!(
+                "     {}: {}",
+                "Melds".dimmed(),
+                format!("+{}", score.fu.breakdown.melds)
+            );
         }
         if score.fu.breakdown.pair > 0 {
-            println!("     Pair: +{}", score.fu.breakdown.pair);
+            println!(
+                "     {}: {}",
+                "Pair".dimmed(),
+                format!("+{}", score.fu.breakdown.pair)
+            );
         }
         if score.fu.breakdown.wait > 0 {
-            println!("     Wait: +{}", score.fu.breakdown.wait);
+            println!(
+                "     {}: {}",
+                "Wait".dimmed(),
+                format!("+{}", score.fu.breakdown.wait)
+            );
         }
         println!(
-            "     Raw: {} → Rounded: {}",
-            score.fu.breakdown.raw_total, score.fu.total
+            "     {}: {} → {}: {}",
+            "Raw".dimmed(),
+            score.fu.breakdown.raw_total,
+            "Rounded".dimmed(),
+            score.fu.total
         );
     }
 }
@@ -1096,7 +1242,7 @@ fn print_score(score: &ScoringResult) {
 fn print_shanten(counts: &agari::parse::TileCounts, show_ukeire: bool, use_unicode: bool) {
     let result = calculate_shanten(counts);
 
-    println!("\n📊 Shanten Analysis:");
+    println!("\n{}", "📊 Shanten Analysis:".yellow().bold());
 
     // Shanten value with description
     let shanten_desc = match result.shanten {
@@ -1114,9 +1260,19 @@ fn print_shanten(counts: &agari::parse::TileCounts, show_ukeire: bool, use_unico
         _ => "📊",
     };
 
+    let colored_shanten = match result.shanten {
+        -1 => result.shanten.to_string().green().bold(),
+        0 => result.shanten.to_string().cyan().bold(),
+        1 => result.shanten.to_string().yellow().bold(),
+        _ => result.shanten.to_string().white().bold(),
+    };
+
     println!(
-        "   {} Shanten: {} - {}",
-        shanten_emoji, result.shanten, shanten_desc
+        "   {} {}: {} - {}",
+        shanten_emoji,
+        "Shanten".dimmed(),
+        colored_shanten,
+        shanten_desc
     );
 
     // Best hand type
@@ -1125,21 +1281,21 @@ fn print_shanten(counts: &agari::parse::TileCounts, show_ukeire: bool, use_unico
         ShantenType::Chiitoitsu => "Chiitoitsu (7 pairs)",
         ShantenType::Kokushi => "Kokushi (13 orphans)",
     };
-    println!("   Best shape: {}", type_name);
+    println!("   {}: {}", "Best shape".dimmed(), type_name);
 
     // Ukeire (tile acceptance)
     if show_ukeire && result.shanten >= 0 {
         let ukeire = calculate_ukeire(counts);
 
-        println!("\n🀄 Ukeire (Tile Acceptance):");
+        println!("\n{}", "🀄 Ukeire (Tile Acceptance):".yellow().bold());
 
         if ukeire.tiles.is_empty() {
-            println!("   No tiles improve this hand.");
+            println!("   {}", "No tiles improve this hand.".dimmed());
         } else {
             println!(
                 "   {} tiles improve the hand ({} total):",
-                ukeire.tiles.len(),
-                ukeire.total_count
+                ukeire.tiles.len().to_string().bright_white().bold(),
+                ukeire.total_count.to_string().bright_white().bold()
             );
             println!();
 
@@ -1147,11 +1303,15 @@ fn print_shanten(counts: &agari::parse::TileCounts, show_ukeire: bool, use_unico
             let mut tile_strs: Vec<String> = Vec::new();
             for ut in &ukeire.tiles {
                 let tile_str = if use_unicode {
-                    format!("{} ", tile_to_unicode(&ut.tile))
+                    tile_to_unicode(&ut.tile)
                 } else {
                     format!("{}", ut.tile)
                 };
-                tile_strs.push(format!("{}×{}", tile_str.trim(), ut.available));
+                tile_strs.push(format!(
+                    "{}×{}",
+                    tile_str.trim(),
+                    ut.available.to_string().dimmed()
+                ));
             }
 
             // Print in rows of ~8 tiles
