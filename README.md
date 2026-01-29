@@ -247,6 +247,7 @@ OPTIONS:
     --shanten             Calculate shanten instead of score
     --ukeire              Show ukeire with shanten
     --ascii               Use ASCII output instead of Unicode
+    --no-color            Disable colored output
     --all                 Show all possible interpretations
     --json                Output results as JSON
     -h, --help            Show help message
