@@ -2,7 +2,8 @@
 //!
 //! Supports both Unicode mahjong characters (🀇🀈🀉...) and ASCII fallback.
 
-use crate::hand::{HandStructure, Meld};
+use crate::hand::{HandStructure, KanType, Meld};
+use crate::parse::ParsedHand;
 use crate::tile::{Honor, KOKUSHI_TILES, Suit, Tile};
 
 /// Get the Unicode character for a tile with a trailing space for better rendering.
@@ -134,6 +135,127 @@ pub fn tiles_to_ascii(tiles: &[Tile]) -> String {
     }
 
     result
+}
+
+/// Format a ParsedHand to normalized notation string (standard numeric notation)
+/// This produces machine-readable output suitable for JSON, using notation like "123m456p789s11144z"
+pub fn format_hand_normalized(parsed: &ParsedHand) -> String {
+    let mut result = String::new();
+
+    // Format called melds first (they appear at the start in the original notation)
+    for called in &parsed.called_melds {
+        let bracket = match &called.meld {
+            Meld::Kan(_, KanType::Closed) => ('[', ']'),
+            _ => ('(', ')'),
+        };
+
+        result.push(bracket.0);
+        result.push_str(&tiles_to_ascii(&called.tiles));
+        result.push(bracket.1);
+    }
+
+    // Then format the hand tiles
+    result.push_str(&tiles_to_ascii(&parsed.tiles));
+
+    result
+}
+
+/// Format a tile to compact notation (e.g., "1m", "5z")
+fn tile_to_notation(tile: &Tile) -> (String, char) {
+    match tile {
+        Tile::Suited { suit, value } => {
+            let suit_char = match suit {
+                Suit::Man => 'm',
+                Suit::Pin => 'p',
+                Suit::Sou => 's',
+            };
+            (value.to_string(), suit_char)
+        }
+        Tile::Honor(honor) => {
+            let value = match honor {
+                Honor::East => '1',
+                Honor::South => '2',
+                Honor::West => '3',
+                Honor::North => '4',
+                Honor::White => '5',
+                Honor::Green => '6',
+                Honor::Red => '7',
+            };
+            (value.to_string(), 'z')
+        }
+    }
+}
+
+/// Format a meld using standard numeric notation (e.g., [123m], [111z])
+/// This is used for machine-readable JSON output
+fn format_meld_normalized(meld: &Meld) -> String {
+    match meld {
+        Meld::Shuntsu(start, _is_open) => {
+            if let Tile::Suited { suit, value } = start {
+                let suit_char = match suit {
+                    Suit::Man => 'm',
+                    Suit::Pin => 'p',
+                    Suit::Sou => 's',
+                };
+                format!("[{}{}{}{}]", value, value + 1, value + 2, suit_char)
+            } else {
+                "???".to_string()
+            }
+        }
+        Meld::Koutsu(tile, _is_open) => {
+            let (val, suit) = tile_to_notation(tile);
+            format!("[{}{}{}{}]", val, val, val, suit)
+        }
+        Meld::Kan(tile, _kan_type) => {
+            let (val, suit) = tile_to_notation(tile);
+            format!("[{}{}{}{}{}]", val, val, val, val, suit)
+        }
+    }
+}
+
+/// Format a hand structure using standard numeric notation
+/// This produces machine-readable output suitable for JSON, e.g., "[123m] [456p] [789s] [111z] [44z]"
+pub fn format_structure_normalized(structure: &HandStructure) -> String {
+    match structure {
+        HandStructure::Chiitoitsu { pairs } => {
+            let mut sorted_pairs = pairs.clone();
+            sorted_pairs.sort();
+
+            sorted_pairs
+                .iter()
+                .map(|t| {
+                    let (val, suit) = tile_to_notation(t);
+                    format!("[{}{}{}]", val, val, suit)
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        }
+        HandStructure::Kokushi { pair } => {
+            let mut tiles: Vec<Tile> = KOKUSHI_TILES.to_vec();
+            tiles.sort();
+
+            let tile_strs: Vec<String> = tiles
+                .iter()
+                .map(|t| {
+                    let (val, suit) = tile_to_notation(t);
+                    if t == pair {
+                        format!("[{}{}{}]", val, val, suit)
+                    } else {
+                        format!("[{}{}]", val, suit)
+                    }
+                })
+                .collect();
+            tile_strs.join(" ")
+        }
+        HandStructure::Standard { melds, pair } => {
+            let mut parts: Vec<String> = melds.iter().map(|m| format_meld_normalized(m)).collect();
+
+            let (val, suit) = tile_to_notation(pair);
+            parts.push(format!("[{}{}{}]", val, val, suit));
+
+            parts.join(" ")
+        }
+    }
 }
 
 /// Format a meld for display

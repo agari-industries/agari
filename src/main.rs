@@ -11,7 +11,10 @@ use serde::Serialize;
 
 use agari::{
     context::{GameContext, WinType},
-    display::{format_structure, honor_name, tile_to_ascii, tile_to_unicode},
+    display::{
+        format_hand_normalized, format_structure, format_structure_normalized, honor_name,
+        tile_to_ascii, tile_to_unicode,
+    },
     hand::{HandStructure, decompose_hand, decompose_hand_with_melds},
     parse::{TileCounts, parse_hand_with_aka, to_counts, validate_hand, validate_hand_with_melds},
     scoring::{ScoreLevel, ScoringResult, calculate_score},
@@ -624,7 +627,7 @@ fn main() {
                 };
 
                 JsonInterpretation {
-                    structure: format_structure(structure, false),
+                    structure: format_structure_normalized(structure),
                     yaku: yaku_list,
                     dora: JsonDora {
                         regular: yaku_result.regular_dora,
@@ -682,7 +685,7 @@ fn main() {
         };
 
         let output = JsonOutput {
-            hand: args.hand.clone(),
+            hand: format_hand_normalized(&parsed),
             context: json_context,
             interpretations,
         };
