@@ -405,6 +405,11 @@ fn main() {
         }
     };
 
+    // Check for riichi-dependent options used without riichi
+    for warning in validate_riichi_dependencies(riichi, !ura_indicators.is_empty(), args.ippatsu) {
+        eprintln!("⚠️  Warning: {}", warning);
+    }
+
     // Parse winning tile
     let winning_tile = match args
         .winning_tile
@@ -691,6 +696,26 @@ fn parse_wind(s: &str) -> Result<Honor, String> {
         "n" | "north" | "4" => Ok(Honor::North),
         _ => Err(format!("Invalid wind: {}. Use e/s/w/n", s)),
     }
+}
+
+/// Validate that riichi-dependent options are used with riichi.
+/// Returns a list of warning messages for any invalid combinations.
+fn validate_riichi_dependencies(riichi: bool, has_ura_dora: bool, ippatsu: bool) -> Vec<String> {
+    let mut warnings = Vec::new();
+
+    if has_ura_dora && !riichi {
+        warnings.push(
+            "Ura dora (--ura) specified without riichi. Ura dora only apply when winning with riichi.".to_string()
+        );
+    }
+
+    if ippatsu && !riichi {
+        warnings.push(
+            "Ippatsu (--ippatsu) specified without riichi. Ippatsu only applies when winning within one turn of riichi.".to_string()
+        );
+    }
+
+    warnings
 }
 
 fn parse_single_tile(s: &str) -> Result<Tile, String> {
@@ -1452,5 +1477,50 @@ mod tests {
         assert_eq!(tiles[0], Tile::suited(Suit::Man, 1));
         assert_eq!(tiles[1], Tile::suited(Suit::Man, 9));
         assert_eq!(tiles[2], Tile::honor(Honor::Red));
+    }
+
+    // ===== validate_riichi_dependencies tests =====
+
+    #[test]
+    fn test_validate_riichi_deps_no_warnings_when_valid() {
+        // With riichi, ura dora and ippatsu are fine
+        let warnings = validate_riichi_dependencies(true, true, true);
+        assert!(warnings.is_empty());
+
+        // Without riichi but also without ura/ippatsu is fine
+        let warnings = validate_riichi_dependencies(false, false, false);
+        assert!(warnings.is_empty());
+
+        // Riichi with only ura dora
+        let warnings = validate_riichi_dependencies(true, true, false);
+        assert!(warnings.is_empty());
+
+        // Riichi with only ippatsu
+        let warnings = validate_riichi_dependencies(true, false, true);
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn test_validate_riichi_deps_warns_ura_without_riichi() {
+        let warnings = validate_riichi_dependencies(false, true, false);
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("Ura dora"));
+        assert!(warnings[0].contains("without riichi"));
+    }
+
+    #[test]
+    fn test_validate_riichi_deps_warns_ippatsu_without_riichi() {
+        let warnings = validate_riichi_dependencies(false, false, true);
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("Ippatsu"));
+        assert!(warnings[0].contains("without riichi"));
+    }
+
+    #[test]
+    fn test_validate_riichi_deps_warns_both_without_riichi() {
+        let warnings = validate_riichi_dependencies(false, true, true);
+        assert_eq!(warnings.len(), 2);
+        assert!(warnings.iter().any(|w| w.contains("Ura dora")));
+        assert!(warnings.iter().any(|w| w.contains("Ippatsu")));
     }
 }
