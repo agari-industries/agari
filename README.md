@@ -4,6 +4,34 @@ Agari is a comprehensive Riichi Mahjong scoring engine written in idiomatic, mod
 
 ---
 
+## Installation
+
+### Homebrew (macOS and Linux)
+
+```bash
+brew install ryblogs/tap/agari
+```
+
+### Shell Script (macOS and Linux)
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ryblogs/agari/releases/latest/download/agari-installer.sh | sh
+```
+
+### PowerShell (Windows)
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://github.com/ryblogs/agari/releases/latest/download/agari-installer.ps1 | iex"
+```
+
+### From Source
+
+```bash
+cargo install --git https://github.com/ryblogs/agari
+```
+
+---
+
 ## Core Architecture & Module Breakdown
 
 The system is designed as a pipeline, moving from string parsing to recursive decomposition, and finally to mathematical scoring.
