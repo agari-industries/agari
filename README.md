@@ -44,6 +44,33 @@ Use `0` instead of `5` to indicate a red five:
 - `0p` = Red 5-pin
 - `0s` = Red 5-sou
 
+### Ergonomic Honor Tile Notation
+
+You can use intuitive letter-based notation for honor tiles instead of the numeric `z` notation. This works both in the CLI and when using the library's `parse_hand` and `parse_hand_with_aka` functions.
+
+**Winds:**
+- `e` = East (1z)
+- `s` = South (2z)
+- `w` = West (3z)
+- `n` = North (4z)
+
+**Dragons:**
+- `wh` = White Dragon (5z)
+- `g` = Green Dragon (6z)
+- `r` = Red Dragon (7z)
+
+This notation works everywhere—hand strings, called melds, winning tile, dora, and ura dora:
+
+```bash
+# Before (numeric z notation)
+agari "123m456p789s11144z" -w 1z -d 35z
+
+# After (letter notation)
+agari "123m456p789seeenn" -w e -d wwh
+```
+
+The parser handles ambiguous sequences like `wwhwwwh` correctly (West, White, West, West, White).
+
 ### Called Melds (Kans, Pons, Chis)
 
 Bracket notation for declaring melds:
