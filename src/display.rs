@@ -3,7 +3,7 @@
 //! Supports both Unicode mahjong characters (🀇🀈🀉...) and ASCII fallback.
 
 use crate::hand::{HandStructure, Meld};
-use crate::tile::{Honor, Suit, Tile};
+use crate::tile::{Honor, KOKUSHI_TILES, Suit, Tile};
 
 /// Get the Unicode character for a tile with a trailing space for better rendering.
 pub fn tile_to_unicode(tile: &Tile) -> String {
@@ -214,15 +214,36 @@ pub fn format_structure(structure: &HandStructure, use_unicode: bool) -> String 
             }
         }
         HandStructure::Kokushi { pair } => {
+            // Display all 13 kokushi tiles, with the pair tile shown twice
+            let mut tiles: Vec<Tile> = KOKUSHI_TILES.to_vec();
+            tiles.sort();
+
             if use_unicode {
-                format!(
-                    "Kokushi (pair: {}{})",
-                    tile_to_unicode(pair),
-                    tile_to_unicode(pair)
-                )
+                let tile_strs: Vec<String> = tiles
+                    .iter()
+                    .map(|t| {
+                        if t == pair {
+                            // Show pair tile twice
+                            format!("{}{}", tile_to_unicode(t), tile_to_unicode(t))
+                        } else {
+                            tile_to_unicode(t)
+                        }
+                    })
+                    .collect();
+                tile_strs.join(" ")
             } else {
-                let ascii = tile_to_ascii(pair);
-                format!("Kokushi (pair: [{ascii}{ascii}])")
+                let tile_strs: Vec<String> = tiles
+                    .iter()
+                    .map(|t| {
+                        let ascii = tile_to_ascii(t);
+                        if t == pair {
+                            format!("[{ascii}{ascii}]")
+                        } else {
+                            format!("[{ascii}]")
+                        }
+                    })
+                    .collect();
+                tile_strs.join(" ")
             }
         }
         HandStructure::Standard { melds, pair } => {

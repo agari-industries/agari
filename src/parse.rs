@@ -40,6 +40,34 @@ pub fn parse_hand(input: &str) -> Result<Vec<Tile>, String> {
 /// - Open kan (daiminkan/shouminkan): (1111m) or (5555z)
 /// - Open triplet (pon): (111m) or (555z)
 /// - Open sequence (chi): (123m)
+/// Try to parse an honor tile from letter notation at the given position.
+/// Returns Some((Honor, chars_consumed)) if successful, None otherwise.
+/// Supports: e/E (east), s/S (south), w/W (west), n/N (north)
+///           wh/Wh/WH (white), g/G (green), r/R (red)
+fn try_parse_honor_letter(chars: &[char], pos: usize) -> Option<(Honor, usize)> {
+    if pos >= chars.len() {
+        return None;
+    }
+
+    let ch = chars[pos].to_ascii_lowercase();
+
+    // Check for two-character "wh" (white dragon) first to avoid conflict with "w" (west)
+    if ch == 'w' && pos + 1 < chars.len() && chars[pos + 1].to_ascii_lowercase() == 'h' {
+        return Some((Honor::White, 2));
+    }
+
+    // Single letter honors
+    match ch {
+        'e' => Some((Honor::East, 1)),
+        's' => Some((Honor::South, 1)),
+        'w' => Some((Honor::West, 1)),
+        'n' => Some((Honor::North, 1)),
+        'g' => Some((Honor::Green, 1)),
+        'r' => Some((Honor::Red, 1)),
+        _ => None,
+    }
+}
+
 pub fn parse_hand_with_aka(input: &str) -> Result<ParsedHand, String> {
     let mut tiles = Vec::new();
     let mut aka_count = 0u8;
@@ -109,7 +137,7 @@ pub fn parse_hand_with_aka(input: &str) -> Result<ParsedHand, String> {
                 }
                 pending.clear();
             }
-            'p' => {
+            'p' if !pending.is_empty() => {
                 for &(n, is_red) in &pending {
                     tiles.push(Tile::suited(Suit::Pin, n));
                     if is_red {
@@ -118,7 +146,7 @@ pub fn parse_hand_with_aka(input: &str) -> Result<ParsedHand, String> {
                 }
                 pending.clear();
             }
-            's' => {
+            's' if !pending.is_empty() => {
                 for &(n, is_red) in &pending {
                     tiles.push(Tile::suited(Suit::Sou, n));
                     if is_red {
@@ -150,7 +178,25 @@ pub fn parse_hand_with_aka(input: &str) -> Result<ParsedHand, String> {
 
             ' ' | '\t' | '\n' => {}
 
-            _ => return Err(format!("Unexpected character: {}", ch)),
+            // Try honor letter notation (e, s, w, n, wh, g, r)
+            _ => {
+                // First, check if there are pending digits - they need a suit
+                if !pending.is_empty() {
+                    return Err(format!(
+                        "Unexpected character '{}' - pending digits need a suit (m/p/s/z)",
+                        ch
+                    ));
+                }
+
+                // Try to parse as honor letter
+                if let Some((honor, consumed)) = try_parse_honor_letter(&chars, i) {
+                    tiles.push(Tile::honor(honor));
+                    i += consumed;
+                    continue;
+                }
+
+                return Err(format!("Unexpected character: {}", ch));
+            }
         }
         i += 1;
     }
@@ -168,6 +214,7 @@ pub fn parse_hand_with_aka(input: &str) -> Result<ParsedHand, String> {
 
 /// Parse a meld string (contents inside brackets)
 /// Returns (Meld, tiles, aka_count)
+/// Supports both numeric notation (e.g., "111z") and letter notation for honors (e.g., "eee")
 fn parse_meld(meld_str: &str, is_closed: bool) -> Result<(Meld, Vec<Tile>, u8), String> {
     let chars: Vec<char> = meld_str.chars().collect();
 
@@ -175,6 +222,62 @@ fn parse_meld(meld_str: &str, is_closed: bool) -> Result<(Meld, Vec<Tile>, u8), 
         return Err("Empty meld".to_string());
     }
 
+    // First, try to parse as honor letter notation (e.g., "eee", "rrr", "wwww")
+    // This is detected by checking if all characters are honor letters
+    let mut honor_tiles: Vec<Honor> = Vec::new();
+    let mut i = 0;
+    let mut is_honor_notation = true;
+
+    while i < chars.len() && is_honor_notation {
+        if let Some((honor, consumed)) = try_parse_honor_letter(&chars, i) {
+            honor_tiles.push(honor);
+            i += consumed;
+        } else {
+            is_honor_notation = false;
+        }
+    }
+
+    // If we consumed all characters as honors, use honor notation
+    if is_honor_notation && i == chars.len() && !honor_tiles.is_empty() {
+        let tiles: Vec<Tile> = honor_tiles.iter().map(|&h| Tile::honor(h)).collect();
+        let tile_count = tiles.len();
+
+        // Determine the meld type
+        let meld = match tile_count {
+            4 => {
+                let first = tiles[0];
+                if !tiles.iter().all(|&t| t == first) {
+                    return Err("Kan must have 4 identical tiles".to_string());
+                }
+                let kan_type = if is_closed {
+                    KanType::Closed
+                } else {
+                    KanType::Open
+                };
+                Meld::Kan(first, kan_type)
+            }
+            3 => {
+                let first = tiles[0];
+                if tiles.iter().all(|&t| t == first) {
+                    if is_closed {
+                        Meld::koutsu(first)
+                    } else {
+                        Meld::koutsu_open(first)
+                    }
+                } else {
+                    return Err(
+                        "Honor meld must have 3 identical tiles (no sequences with honors)"
+                            .to_string(),
+                    );
+                }
+            }
+            _ => return Err(format!("Meld must have 3 or 4 tiles, got {}", tile_count)),
+        };
+
+        return Ok((meld, tiles, 0)); // No aka dora for honors
+    }
+
+    // Fall back to standard numeric notation (e.g., "111z", "123m")
     // Find the suit character (last character)
     let suit_char = chars[chars.len() - 1];
     let suit = match suit_char {
@@ -564,6 +667,140 @@ mod tests {
     #[test]
     fn invalid_unclosed_bracket() {
         let result = parse_hand_with_aka("[1111m");
+        assert!(result.is_err());
+    }
+
+    // ===== Honor Letter Notation Tests =====
+
+    #[test]
+    fn parse_honor_letter_winds() {
+        // Test all wind letter notations: e, s, w, n
+        let result = parse_hand_with_aka("eswn").unwrap();
+        assert_eq!(result.tiles.len(), 4);
+        assert_eq!(result.tiles[0], Tile::honor(Honor::East));
+        assert_eq!(result.tiles[1], Tile::honor(Honor::South));
+        assert_eq!(result.tiles[2], Tile::honor(Honor::West));
+        assert_eq!(result.tiles[3], Tile::honor(Honor::North));
+    }
+
+    #[test]
+    fn parse_honor_letter_dragons() {
+        // Test dragon letter notations: wh, g, r
+        let result = parse_hand_with_aka("whgr").unwrap();
+        assert_eq!(result.tiles.len(), 3);
+        assert_eq!(result.tiles[0], Tile::honor(Honor::White));
+        assert_eq!(result.tiles[1], Tile::honor(Honor::Green));
+        assert_eq!(result.tiles[2], Tile::honor(Honor::Red));
+    }
+
+    #[test]
+    fn parse_honor_letter_mixed_with_suits() {
+        // Mix letter honors with suited tiles
+        let result = parse_hand_with_aka("123meee").unwrap();
+        assert_eq!(result.tiles.len(), 6);
+        assert_eq!(result.tiles[0], Tile::suited(Suit::Man, 1));
+        assert_eq!(result.tiles[3], Tile::honor(Honor::East));
+        assert_eq!(result.tiles[4], Tile::honor(Honor::East));
+        assert_eq!(result.tiles[5], Tile::honor(Honor::East));
+    }
+
+    #[test]
+    fn parse_honor_letter_full_hand() {
+        // Full hand using letter notation: 123m456p789seeenn
+        let result = parse_hand_with_aka("123m456p789seeenn").unwrap();
+        assert_eq!(result.tiles.len(), 14);
+        // Check East tiles
+        assert_eq!(result.tiles[9], Tile::honor(Honor::East));
+        assert_eq!(result.tiles[10], Tile::honor(Honor::East));
+        assert_eq!(result.tiles[11], Tile::honor(Honor::East));
+        // Check North tiles
+        assert_eq!(result.tiles[12], Tile::honor(Honor::North));
+        assert_eq!(result.tiles[13], Tile::honor(Honor::North));
+    }
+
+    #[test]
+    fn parse_honor_letter_white_dragon_disambiguation() {
+        // Test that "wh" parses as White, not West + something
+        let result = parse_hand_with_aka("whwhwh").unwrap();
+        assert_eq!(result.tiles.len(), 3);
+        assert!(result.tiles.iter().all(|&t| t == Tile::honor(Honor::White)));
+    }
+
+    #[test]
+    fn parse_honor_letter_west_vs_white() {
+        // w = West, wh = White - ensure disambiguation works
+        let result = parse_hand_with_aka("wwwwhwh").unwrap();
+        assert_eq!(result.tiles.len(), 5);
+        assert_eq!(result.tiles[0], Tile::honor(Honor::West));
+        assert_eq!(result.tiles[1], Tile::honor(Honor::West));
+        assert_eq!(result.tiles[2], Tile::honor(Honor::West));
+        assert_eq!(result.tiles[3], Tile::honor(Honor::White));
+        assert_eq!(result.tiles[4], Tile::honor(Honor::White));
+    }
+
+    #[test]
+    fn parse_honor_letter_uppercase() {
+        // Test that uppercase letters also work
+        let result = parse_hand_with_aka("ESWN").unwrap();
+        assert_eq!(result.tiles.len(), 4);
+        assert_eq!(result.tiles[0], Tile::honor(Honor::East));
+        assert_eq!(result.tiles[1], Tile::honor(Honor::South));
+        assert_eq!(result.tiles[2], Tile::honor(Honor::West));
+        assert_eq!(result.tiles[3], Tile::honor(Honor::North));
+    }
+
+    #[test]
+    fn parse_honor_letter_meld_pon() {
+        // Test honor letter notation in called melds: (eee) = pon of East
+        let result = parse_hand_with_aka("(eee)").unwrap();
+        assert_eq!(result.called_melds.len(), 1);
+        let meld = &result.called_melds[0];
+        assert_eq!(meld.tiles.len(), 3);
+        assert!(meld.tiles.iter().all(|&t| t == Tile::honor(Honor::East)));
+        assert!(matches!(meld.meld, Meld::Koutsu(_, true))); // open = true
+    }
+
+    #[test]
+    fn parse_honor_letter_meld_kan() {
+        // Test honor letter notation in kans: [rrrr] = closed kan of Red dragon
+        let result = parse_hand_with_aka("[rrrr]").unwrap();
+        assert_eq!(result.called_melds.len(), 1);
+        let meld = &result.called_melds[0];
+        assert_eq!(meld.tiles.len(), 4);
+        assert!(meld.tiles.iter().all(|&t| t == Tile::honor(Honor::Red)));
+        assert!(matches!(meld.meld, Meld::Kan(_, KanType::Closed)));
+    }
+
+    #[test]
+    fn parse_honor_letter_meld_white_dragon() {
+        // Test white dragon kan with letter notation: [whwhwhwh]
+        let result = parse_hand_with_aka("[whwhwhwh]").unwrap();
+        assert_eq!(result.called_melds.len(), 1);
+        let meld = &result.called_melds[0];
+        assert_eq!(meld.tiles.len(), 4);
+        assert!(meld.tiles.iter().all(|&t| t == Tile::honor(Honor::White)));
+    }
+
+    #[test]
+    fn parse_honor_letter_hand_with_meld() {
+        // Full hand with letter notation meld: 123m456p789s(rrr)whwh
+        let result = parse_hand_with_aka("123m456p789s(rrr)whwh").unwrap();
+        assert_eq!(result.tiles.len(), 11); // 9 suited + 2 white
+        assert_eq!(result.called_melds.len(), 1);
+
+        // Check white dragon pair
+        assert_eq!(result.tiles[9], Tile::honor(Honor::White));
+        assert_eq!(result.tiles[10], Tile::honor(Honor::White));
+
+        // Check red dragon pon
+        let meld = &result.called_melds[0];
+        assert!(meld.tiles.iter().all(|&t| t == Tile::honor(Honor::Red)));
+    }
+
+    #[test]
+    fn parse_honor_letter_invalid_after_digits() {
+        // Digits followed by honor letter should fail (digits need a suit)
+        let result = parse_hand_with_aka("123e");
         assert!(result.is_err());
     }
 }

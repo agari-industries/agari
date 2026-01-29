@@ -22,7 +22,8 @@ use agari::{
 const AFTER_HELP: &str = r#"HAND FORMAT:
     Standard notation: numbers followed by suit letter
     m = Man (Characters), p = Pin (Dots), s = Sou (Bamboo), z = Honors
-    Honors: 1z=East, 2z=South, 3z=West, 4z=North, 5z=White, 6z=Green, 7z=Red
+    Honors (numeric): 1z=East, 2z=South, 3z=West, 4z=North, 5z=White, 6z=Green, 7z=Red
+    Honors (letters): e=East, s=South, w=West, n=North, wh=White, g=Green, r=Red
     Red fives: Use 0 instead of 5 (e.g., 0m = red 5-man)
 
     Called melds (kans, pons, chis):
@@ -30,16 +31,22 @@ const AFTER_HELP: &str = r#"HAND FORMAT:
     (1111m)  = Open kan (daiminkan) of 1-man
     (111m)   = Open triplet (pon) of 1-man
     (123m)   = Open sequence (chi) of 1-2-3 man
+    (eee)    = Open triplet (pon) of East wind
+    [rrrr]   = Closed kan of Red dragon
 
 EXAMPLES:
     agari 123m456p789s11122z              Basic hand
+    agari 123m456p789seeenn               Same hand with letter notation for honors
     agari 123m456p789s11122z -t           Tsumo win
     agari 123m456p789s11122z -r           With riichi
     agari 123m456p789s11122z -w 2m -t     Won on 2-man by tsumo
+    agari 123m456p789seeenn -w e -t       Won on East by tsumo (letter notation)
     agari 123m456p789s11122z -d 1m        With dora indicator 1m (2m is dora)
+    agari 123m456p789seeenn -d e,n        Dora indicators with letter notation
     agari 234567m234567p22s -w 5p -t      Pinfu tanyao
     agari "[1111m]222333m555p11z" -t      Hand with closed kan (15 tiles)
-    agari "[1111m](2222p)345678s11z" -t   Hand with closed + open kan (16 tiles)"#;
+    agari "[1111m](2222p)345678s11z" -t   Hand with closed + open kan (16 tiles)
+    agari "123m456p789s(rrr)whwh" -w wh   Open pon of Red dragon, White pair"#;
 
 #[derive(Parser)]
 #[command(name = "agari")]
@@ -687,9 +694,32 @@ fn parse_wind(s: &str) -> Result<Honor, String> {
 }
 
 fn parse_single_tile(s: &str) -> Result<Tile, String> {
-    let s = s.trim();
+    let s = s.trim().to_lowercase();
+
+    // Check for honor tile letter notation first
+    // Winds: e, s, w, n (east, south, west, north)
+    // Dragons: wh (white), g (green), r (red)
+    match s.as_str() {
+        "e" | "east" => return Ok(Tile::honor(Honor::East)),
+        "s" | "south" => return Ok(Tile::honor(Honor::South)),
+        "w" | "west" => return Ok(Tile::honor(Honor::West)),
+        "n" | "north" => return Ok(Tile::honor(Honor::North)),
+        "wh" | "white" | "haku" => return Ok(Tile::honor(Honor::White)),
+        "g" | "green" | "hatsu" => return Ok(Tile::honor(Honor::Green)),
+        "r" | "red" | "chun" => return Ok(Tile::honor(Honor::Red)),
+        _ => {}
+    }
+
+    // Standard notation: digit + suit (e.g., "5m", "1z")
+    // Must be exactly 2 characters
     if s.len() < 2 {
         return Err(format!("Tile notation too short: {}", s));
+    }
+    if s.len() > 2 {
+        return Err(format!(
+            "Expected a single tile, got '{}'. Use -d/--dora for multiple tiles.",
+            s
+        ));
     }
 
     let value_char = s.chars().next().unwrap();
@@ -722,6 +752,34 @@ fn parse_single_tile(s: &str) -> Result<Tile, String> {
     }
 }
 
+/// Try to parse an honor tile from letter notation at the given position.
+/// Returns Some((Honor, chars_consumed)) if successful, None otherwise.
+/// Supports: e/E (east), s/S (south), w/W (west), n/N (north)
+///           wh/Wh/WH (white), g/G (green), r/R (red)
+fn try_parse_honor_letter(chars: &[char], pos: usize) -> Option<(Honor, usize)> {
+    if pos >= chars.len() {
+        return None;
+    }
+
+    let ch = chars[pos].to_ascii_lowercase();
+
+    // Check for two-character "wh" (white dragon) first to avoid conflict with "w" (west)
+    if ch == 'w' && pos + 1 < chars.len() && chars[pos + 1].to_ascii_lowercase() == 'h' {
+        return Some((Honor::White, 2));
+    }
+
+    // Single letter honors
+    match ch {
+        'e' => Some((Honor::East, 1)),
+        's' => Some((Honor::South, 1)),
+        'w' => Some((Honor::West, 1)),
+        'n' => Some((Honor::North, 1)),
+        'g' => Some((Honor::Green, 1)),
+        'r' => Some((Honor::Red, 1)),
+        _ => None,
+    }
+}
+
 fn parse_tile_list(s: &str) -> Result<Vec<Tile>, String> {
     if s.is_empty() {
         return Ok(vec![]);
@@ -736,25 +794,56 @@ fn parse_tile_list(s: &str) -> Result<Vec<Tile>, String> {
             continue;
         }
 
-        // Check if this looks like grouped notation (e.g., "58m", "29p")
-        // Grouped notation: multiple digits followed by a single suit letter
+        // Parse the part character by character, handling mixed notation like "2pg" (2p + green)
         let chars: Vec<char> = part.chars().collect();
-        if chars.len() >= 2 {
-            let last_char = chars[chars.len() - 1];
-            let all_digits_before = chars[..chars.len() - 1].iter().all(|c| c.is_ascii_digit());
+        let mut pos = 0;
 
-            if all_digits_before && "mpsz".contains(last_char) {
-                // Parse as grouped notation: "58m" -> 5m, 8m
-                for digit in &chars[..chars.len() - 1] {
-                    let single = format!("{}{}", digit, last_char);
-                    tiles.push(parse_single_tile(&single)?);
-                }
+        while pos < chars.len() {
+            // Try to parse as honor letter first (e.g., "e", "wh", "g", "r")
+            if let Some((honor, consumed)) = try_parse_honor_letter(&chars, pos) {
+                tiles.push(Tile::honor(honor));
+                pos += consumed;
                 continue;
             }
-        }
 
-        // Fall back to single tile parsing (e.g., "5m")
-        tiles.push(parse_single_tile(part)?);
+            // Try to parse as numeric tile notation (digits followed by suit)
+            // Collect consecutive digits
+            let digit_start = pos;
+            while pos < chars.len() && chars[pos].is_ascii_digit() {
+                pos += 1;
+            }
+
+            if pos > digit_start && pos < chars.len() {
+                let suit_char = chars[pos].to_ascii_lowercase();
+                if "mpsz".contains(suit_char) {
+                    // Parse digits with this suit
+                    for i in digit_start..pos {
+                        let single = format!("{}{}", chars[i], suit_char);
+                        tiles.push(parse_single_tile(&single)?);
+                    }
+                    pos += 1; // consume the suit character
+                    continue;
+                } else {
+                    // Digits followed by non-suit character - error
+                    return Err(format!(
+                        "Invalid tile notation: digits not followed by suit (m/p/s/z) in '{}'",
+                        part
+                    ));
+                }
+            } else if pos > digit_start {
+                // Digits at end of string without suit
+                return Err(format!(
+                    "Invalid tile notation: trailing digits without suit in '{}'",
+                    part
+                ));
+            }
+
+            // Unknown character
+            return Err(format!(
+                "Invalid character '{}' in tile list '{}'",
+                chars[pos], part
+            ));
+        }
     }
 
     Ok(tiles)
@@ -1123,5 +1212,245 @@ fn yaku_name(yaku: &Yaku) -> &'static str {
         Yaku::Kokushi13Wait => "Kokushi Musou 13-wait",
         Yaku::SuuankouTanki => "Suuankou Tanki",
         Yaku::JunseiChuurenPoutou => "Junsei Chuuren Poutou",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ===== parse_single_tile tests =====
+
+    #[test]
+    fn test_parse_single_tile_standard_notation() {
+        // Standard numeric notation still works
+        assert_eq!(parse_single_tile("1m").unwrap(), Tile::suited(Suit::Man, 1));
+        assert_eq!(parse_single_tile("5p").unwrap(), Tile::suited(Suit::Pin, 5));
+        assert_eq!(parse_single_tile("9s").unwrap(), Tile::suited(Suit::Sou, 9));
+        assert_eq!(parse_single_tile("1z").unwrap(), Tile::honor(Honor::East));
+        assert_eq!(parse_single_tile("7z").unwrap(), Tile::honor(Honor::Red));
+    }
+
+    #[test]
+    fn test_parse_single_tile_rejects_multiple_tiles() {
+        // Should reject input that looks like multiple tiles
+        assert!(parse_single_tile("1m2m").is_err());
+        assert!(parse_single_tile("123m").is_err());
+        assert!(parse_single_tile("1m5p").is_err());
+    }
+
+    #[test]
+    fn test_parse_single_tile_wind_letters() {
+        assert_eq!(parse_single_tile("e").unwrap(), Tile::honor(Honor::East));
+        assert_eq!(parse_single_tile("s").unwrap(), Tile::honor(Honor::South));
+        assert_eq!(parse_single_tile("w").unwrap(), Tile::honor(Honor::West));
+        assert_eq!(parse_single_tile("n").unwrap(), Tile::honor(Honor::North));
+    }
+
+    #[test]
+    fn test_parse_single_tile_wind_letters_uppercase() {
+        assert_eq!(parse_single_tile("E").unwrap(), Tile::honor(Honor::East));
+        assert_eq!(parse_single_tile("S").unwrap(), Tile::honor(Honor::South));
+        assert_eq!(parse_single_tile("W").unwrap(), Tile::honor(Honor::West));
+        assert_eq!(parse_single_tile("N").unwrap(), Tile::honor(Honor::North));
+    }
+
+    #[test]
+    fn test_parse_single_tile_dragon_letters() {
+        assert_eq!(parse_single_tile("wh").unwrap(), Tile::honor(Honor::White));
+        assert_eq!(parse_single_tile("g").unwrap(), Tile::honor(Honor::Green));
+        assert_eq!(parse_single_tile("r").unwrap(), Tile::honor(Honor::Red));
+    }
+
+    #[test]
+    fn test_parse_single_tile_dragon_letters_uppercase() {
+        assert_eq!(parse_single_tile("WH").unwrap(), Tile::honor(Honor::White));
+        assert_eq!(parse_single_tile("Wh").unwrap(), Tile::honor(Honor::White));
+        assert_eq!(parse_single_tile("G").unwrap(), Tile::honor(Honor::Green));
+        assert_eq!(parse_single_tile("R").unwrap(), Tile::honor(Honor::Red));
+    }
+
+    #[test]
+    fn test_parse_single_tile_verbose_names() {
+        assert_eq!(parse_single_tile("east").unwrap(), Tile::honor(Honor::East));
+        assert_eq!(
+            parse_single_tile("south").unwrap(),
+            Tile::honor(Honor::South)
+        );
+        assert_eq!(parse_single_tile("west").unwrap(), Tile::honor(Honor::West));
+        assert_eq!(
+            parse_single_tile("north").unwrap(),
+            Tile::honor(Honor::North)
+        );
+        assert_eq!(
+            parse_single_tile("white").unwrap(),
+            Tile::honor(Honor::White)
+        );
+        assert_eq!(
+            parse_single_tile("green").unwrap(),
+            Tile::honor(Honor::Green)
+        );
+        assert_eq!(parse_single_tile("red").unwrap(), Tile::honor(Honor::Red));
+        assert_eq!(
+            parse_single_tile("haku").unwrap(),
+            Tile::honor(Honor::White)
+        );
+        assert_eq!(
+            parse_single_tile("hatsu").unwrap(),
+            Tile::honor(Honor::Green)
+        );
+        assert_eq!(parse_single_tile("chun").unwrap(), Tile::honor(Honor::Red));
+    }
+
+    // ===== parse_tile_list tests =====
+
+    #[test]
+    fn test_parse_tile_list_standard_notation() {
+        // Standard grouped notation
+        let tiles = parse_tile_list("35z").unwrap();
+        assert_eq!(tiles.len(), 2);
+        assert_eq!(tiles[0], Tile::honor(Honor::West));
+        assert_eq!(tiles[1], Tile::honor(Honor::White));
+    }
+
+    #[test]
+    fn test_parse_tile_list_comma_separated() {
+        let tiles = parse_tile_list("1m,5p,9s").unwrap();
+        assert_eq!(tiles.len(), 3);
+        assert_eq!(tiles[0], Tile::suited(Suit::Man, 1));
+        assert_eq!(tiles[1], Tile::suited(Suit::Pin, 5));
+        assert_eq!(tiles[2], Tile::suited(Suit::Sou, 9));
+    }
+
+    #[test]
+    fn test_parse_tile_list_honor_letter_sequence() {
+        // Honor letter sequence without commas: "wwh" -> West, White
+        let tiles = parse_tile_list("wwh").unwrap();
+        assert_eq!(tiles.len(), 2);
+        assert_eq!(tiles[0], Tile::honor(Honor::West));
+        assert_eq!(tiles[1], Tile::honor(Honor::White));
+    }
+
+    #[test]
+    fn test_parse_tile_list_honor_letter_sequence_whe() {
+        // "whe" -> White, East
+        let tiles = parse_tile_list("whe").unwrap();
+        assert_eq!(tiles.len(), 2);
+        assert_eq!(tiles[0], Tile::honor(Honor::White));
+        assert_eq!(tiles[1], Tile::honor(Honor::East));
+    }
+
+    #[test]
+    fn test_parse_tile_list_all_winds() {
+        let tiles = parse_tile_list("eswn").unwrap();
+        assert_eq!(tiles.len(), 4);
+        assert_eq!(tiles[0], Tile::honor(Honor::East));
+        assert_eq!(tiles[1], Tile::honor(Honor::South));
+        assert_eq!(tiles[2], Tile::honor(Honor::West));
+        assert_eq!(tiles[3], Tile::honor(Honor::North));
+    }
+
+    #[test]
+    fn test_parse_tile_list_all_dragons() {
+        let tiles = parse_tile_list("whgr").unwrap();
+        assert_eq!(tiles.len(), 3);
+        assert_eq!(tiles[0], Tile::honor(Honor::White));
+        assert_eq!(tiles[1], Tile::honor(Honor::Green));
+        assert_eq!(tiles[2], Tile::honor(Honor::Red));
+    }
+
+    #[test]
+    fn test_parse_tile_list_complex_west_white_sequence() {
+        // "wwwwhwh" -> West, West, West, White, White
+        let tiles = parse_tile_list("wwwwhwh").unwrap();
+        assert_eq!(tiles.len(), 5);
+        assert_eq!(tiles[0], Tile::honor(Honor::West));
+        assert_eq!(tiles[1], Tile::honor(Honor::West));
+        assert_eq!(tiles[2], Tile::honor(Honor::West));
+        assert_eq!(tiles[3], Tile::honor(Honor::White));
+        assert_eq!(tiles[4], Tile::honor(Honor::White));
+    }
+
+    #[test]
+    fn test_parse_tile_list_wwhwwwh() {
+        // "wwhwwwh" -> West, White, West, West, White
+        let tiles = parse_tile_list("wwhwwwh").unwrap();
+        assert_eq!(tiles.len(), 5);
+        assert_eq!(tiles[0], Tile::honor(Honor::West));
+        assert_eq!(tiles[1], Tile::honor(Honor::White));
+        assert_eq!(tiles[2], Tile::honor(Honor::West));
+        assert_eq!(tiles[3], Tile::honor(Honor::West));
+        assert_eq!(tiles[4], Tile::honor(Honor::White));
+    }
+
+    #[test]
+    fn test_parse_tile_list_mixed_comma_and_letter() {
+        // Can mix comma-separated with letter notation
+        let tiles = parse_tile_list("e,wh,1m").unwrap();
+        assert_eq!(tiles.len(), 3);
+        assert_eq!(tiles[0], Tile::honor(Honor::East));
+        assert_eq!(tiles[1], Tile::honor(Honor::White));
+        assert_eq!(tiles[2], Tile::suited(Suit::Man, 1));
+    }
+
+    #[test]
+    fn test_parse_tile_list_empty() {
+        let tiles = parse_tile_list("").unwrap();
+        assert!(tiles.is_empty());
+    }
+
+    #[test]
+    fn test_parse_tile_list_single_honor_letter() {
+        let tiles = parse_tile_list("e").unwrap();
+        assert_eq!(tiles.len(), 1);
+        assert_eq!(tiles[0], Tile::honor(Honor::East));
+    }
+
+    #[test]
+    fn test_parse_tile_list_uppercase_honors() {
+        let tiles = parse_tile_list("ESWN").unwrap();
+        assert_eq!(tiles.len(), 4);
+        assert_eq!(tiles[0], Tile::honor(Honor::East));
+        assert_eq!(tiles[1], Tile::honor(Honor::South));
+        assert_eq!(tiles[2], Tile::honor(Honor::West));
+        assert_eq!(tiles[3], Tile::honor(Honor::North));
+    }
+
+    #[test]
+    fn test_parse_tile_list_mixed_suited_and_honor() {
+        // "2pg" -> 2-pin + green dragon
+        let tiles = parse_tile_list("2pg").unwrap();
+        assert_eq!(tiles.len(), 2);
+        assert_eq!(tiles[0], Tile::suited(Suit::Pin, 2));
+        assert_eq!(tiles[1], Tile::honor(Honor::Green));
+    }
+
+    #[test]
+    fn test_parse_tile_list_mixed_honor_and_suited() {
+        // "e5m" -> east + 5-man
+        let tiles = parse_tile_list("e5m").unwrap();
+        assert_eq!(tiles.len(), 2);
+        assert_eq!(tiles[0], Tile::honor(Honor::East));
+        assert_eq!(tiles[1], Tile::suited(Suit::Man, 5));
+    }
+
+    #[test]
+    fn test_parse_tile_list_complex_mixed() {
+        // "1mwh9s" -> 1-man + white + 9-sou
+        let tiles = parse_tile_list("1mwh9s").unwrap();
+        assert_eq!(tiles.len(), 3);
+        assert_eq!(tiles[0], Tile::suited(Suit::Man, 1));
+        assert_eq!(tiles[1], Tile::honor(Honor::White));
+        assert_eq!(tiles[2], Tile::suited(Suit::Sou, 9));
+    }
+
+    #[test]
+    fn test_parse_tile_list_multiple_suited_then_honor() {
+        // "19mr" -> 1-man, 9-man + red dragon
+        let tiles = parse_tile_list("19mr").unwrap();
+        assert_eq!(tiles.len(), 3);
+        assert_eq!(tiles[0], Tile::suited(Suit::Man, 1));
+        assert_eq!(tiles[1], Tile::suited(Suit::Man, 9));
+        assert_eq!(tiles[2], Tile::honor(Honor::Red));
     }
 }
