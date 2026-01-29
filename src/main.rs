@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use agari::{
     context::{GameContext, WinType},
-    display::{format_structure, honor_name, tile_to_unicode},
+    display::{format_structure, honor_name, tile_to_ascii, tile_to_unicode},
     hand::{HandStructure, decompose_hand, decompose_hand_with_melds},
     parse::{TileCounts, parse_hand_with_aka, to_counts, validate_hand, validate_hand_with_melds},
     scoring::{ScoreLevel, ScoringResult, calculate_score},
@@ -704,7 +704,7 @@ fn main() {
         }
 
         print_hand(structure, use_unicode);
-        print_context(&context, &parsed);
+        print_context(&context, &parsed, use_unicode);
         print_yaku(yaku_result, &context);
         print_score(score);
     }
@@ -971,7 +971,15 @@ fn print_hand(structure: &HandStructure, use_unicode: bool) {
     println!("   {}", format_structure(structure, use_unicode));
 }
 
-fn print_context(context: &GameContext, parsed: &agari::parse::ParsedHand) {
+fn print_context(context: &GameContext, parsed: &agari::parse::ParsedHand, use_unicode: bool) {
+    let format_tile = |t: &Tile| -> String {
+        if use_unicode {
+            tile_to_unicode(t)
+        } else {
+            format!("{} ", tile_to_ascii(t))
+        }
+    };
+
     println!("\n{}", "🎮 Game Context:".yellow().bold());
 
     let win_str = match context.win_type {
@@ -1025,11 +1033,7 @@ fn print_context(context: &GameContext, parsed: &agari::parse::ParsedHand) {
     }
 
     if !context.dora_indicators.is_empty() {
-        let dora_str: String = context
-            .dora_indicators
-            .iter()
-            .map(|t| tile_to_unicode(t))
-            .collect();
+        let dora_str: String = context.dora_indicators.iter().map(format_tile).collect();
         println!("   {}: {}", "Dora Indicators".dimmed(), dora_str.trim());
     }
 
@@ -1037,7 +1041,7 @@ fn print_context(context: &GameContext, parsed: &agari::parse::ParsedHand) {
         let ura_str: String = context
             .ura_dora_indicators
             .iter()
-            .map(|t| tile_to_unicode(t))
+            .map(format_tile)
             .collect();
         println!("   {}: {}", "Ura Dora".dimmed(), ura_str.trim());
     }
@@ -1051,7 +1055,7 @@ fn print_context(context: &GameContext, parsed: &agari::parse::ParsedHand) {
     }
 
     if let Some(wt) = context.winning_tile {
-        println!("   {}: {}", "Winning Tile".dimmed(), tile_to_unicode(&wt));
+        println!("   {}: {}", "Winning Tile".dimmed(), format_tile(&wt));
     }
 }
 
