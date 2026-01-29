@@ -405,8 +405,14 @@ fn main() {
         }
     };
 
-    // Check for riichi-dependent options used without riichi
-    for warning in validate_riichi_dependencies(riichi, !ura_indicators.is_empty(), args.ippatsu) {
+    // Check for riichi-dependent options used without riichi, and riichi with open hands
+    for warning in validate_riichi_dependencies(
+        riichi,
+        !ura_indicators.is_empty(),
+        args.ippatsu,
+        has_open_melds,
+        args.open,
+    ) {
         eprintln!("⚠️  Warning: {}", warning);
     }
 
@@ -698,9 +704,16 @@ fn parse_wind(s: &str) -> Result<Honor, String> {
     }
 }
 
-/// Validate that riichi-dependent options are used with riichi.
+/// Validate that riichi-dependent options are used with riichi,
+/// and that riichi is not used with open hands.
 /// Returns a list of warning messages for any invalid combinations.
-fn validate_riichi_dependencies(riichi: bool, has_ura_dora: bool, ippatsu: bool) -> Vec<String> {
+fn validate_riichi_dependencies(
+    riichi: bool,
+    has_ura_dora: bool,
+    ippatsu: bool,
+    has_open_melds: bool,
+    open_flag: bool,
+) -> Vec<String> {
     let mut warnings = Vec::new();
 
     if has_ura_dora && !riichi {
@@ -712,6 +725,19 @@ fn validate_riichi_dependencies(riichi: bool, has_ura_dora: bool, ippatsu: bool)
     if ippatsu && !riichi {
         warnings.push(
             "Ippatsu (--ippatsu) specified without riichi. Ippatsu only applies when winning within one turn of riichi.".to_string()
+        );
+    }
+
+    if riichi && has_open_melds {
+        warnings.push(
+            "Riichi specified but hand has open melds. Riichi requires a closed hand (menzen). Use [...] for closed kans instead of (...).".to_string()
+        );
+    }
+
+    if riichi && open_flag {
+        warnings.push(
+            "Both --riichi and --open specified. Riichi requires a closed hand (menzen)."
+                .to_string(),
         );
     }
 
@@ -1483,26 +1509,26 @@ mod tests {
 
     #[test]
     fn test_validate_riichi_deps_no_warnings_when_valid() {
-        // With riichi, ura dora and ippatsu are fine
-        let warnings = validate_riichi_dependencies(true, true, true);
+        // With riichi, ura dora and ippatsu are fine (closed hand)
+        let warnings = validate_riichi_dependencies(true, true, true, false, false);
         assert!(warnings.is_empty());
 
         // Without riichi but also without ura/ippatsu is fine
-        let warnings = validate_riichi_dependencies(false, false, false);
+        let warnings = validate_riichi_dependencies(false, false, false, false, false);
         assert!(warnings.is_empty());
 
         // Riichi with only ura dora
-        let warnings = validate_riichi_dependencies(true, true, false);
+        let warnings = validate_riichi_dependencies(true, true, false, false, false);
         assert!(warnings.is_empty());
 
         // Riichi with only ippatsu
-        let warnings = validate_riichi_dependencies(true, false, true);
+        let warnings = validate_riichi_dependencies(true, false, true, false, false);
         assert!(warnings.is_empty());
     }
 
     #[test]
     fn test_validate_riichi_deps_warns_ura_without_riichi() {
-        let warnings = validate_riichi_dependencies(false, true, false);
+        let warnings = validate_riichi_dependencies(false, true, false, false, false);
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("Ura dora"));
         assert!(warnings[0].contains("without riichi"));
@@ -1510,7 +1536,7 @@ mod tests {
 
     #[test]
     fn test_validate_riichi_deps_warns_ippatsu_without_riichi() {
-        let warnings = validate_riichi_dependencies(false, false, true);
+        let warnings = validate_riichi_dependencies(false, false, true, false, false);
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("Ippatsu"));
         assert!(warnings[0].contains("without riichi"));
@@ -1518,9 +1544,44 @@ mod tests {
 
     #[test]
     fn test_validate_riichi_deps_warns_both_without_riichi() {
-        let warnings = validate_riichi_dependencies(false, true, true);
+        let warnings = validate_riichi_dependencies(false, true, true, false, false);
         assert_eq!(warnings.len(), 2);
         assert!(warnings.iter().any(|w| w.contains("Ura dora")));
         assert!(warnings.iter().any(|w| w.contains("Ippatsu")));
+    }
+
+    #[test]
+    fn test_validate_riichi_deps_warns_riichi_with_open_melds() {
+        let warnings = validate_riichi_dependencies(true, false, false, true, false);
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("open melds"));
+        assert!(warnings[0].contains("closed hand"));
+    }
+
+    #[test]
+    fn test_validate_riichi_deps_warns_riichi_with_open_flag() {
+        let warnings = validate_riichi_dependencies(true, false, false, false, true);
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("--riichi"));
+        assert!(warnings[0].contains("--open"));
+    }
+
+    #[test]
+    fn test_validate_riichi_deps_warns_riichi_with_both_open() {
+        // Both open melds and --open flag
+        let warnings = validate_riichi_dependencies(true, false, false, true, true);
+        assert_eq!(warnings.len(), 2);
+        assert!(warnings.iter().any(|w| w.contains("open melds")));
+        assert!(warnings.iter().any(|w| w.contains("--open")));
+    }
+
+    #[test]
+    fn test_validate_riichi_deps_no_warning_open_without_riichi() {
+        // Open hand without riichi is perfectly valid
+        let warnings = validate_riichi_dependencies(false, false, false, true, false);
+        assert!(warnings.is_empty());
+
+        let warnings = validate_riichi_dependencies(false, false, false, false, true);
+        assert!(warnings.is_empty());
     }
 }
