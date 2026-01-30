@@ -27,7 +27,12 @@
   const honorTiles = ALL_TILES.filter((t) => t.endsWith('z'));
 
   // Get count for a tile (default 4 if not tracked)
-  const getCount = (tile: string): number => {
+  const getCount = (tile: string, isRed: boolean = false): number => {
+    // For red fives, use the separate red5 counts (max 1 each)
+    if (isRed) {
+      const redKey = `red${tile}` as keyof typeof tileCounts;
+      return tileCounts[redKey] ?? 1;
+    }
     return tileCounts[tile] ?? 4;
   };
 
@@ -64,9 +69,9 @@
           tile="5m"
           size="md"
           red={true}
-          disabled={isDisabled('5m')}
+          disabled={getCount('5m', true) <= 0}
           showCount={true}
-          count={getCount('5m')}
+          count={getCount('5m', true)}
           onclick={() => handleClick('5m', true)}
         />
       {/if}
@@ -92,9 +97,9 @@
           tile="5p"
           size="md"
           red={true}
-          disabled={isDisabled('5p')}
+          disabled={getCount('5p', true) <= 0}
           showCount={true}
-          count={getCount('5p')}
+          count={getCount('5p', true)}
           onclick={() => handleClick('5p', true)}
         />
       {/if}
@@ -120,9 +125,9 @@
           tile="5s"
           size="md"
           red={true}
-          disabled={isDisabled('5s')}
+          disabled={getCount('5s', true) <= 0}
           showCount={true}
-          count={getCount('5s')}
+          count={getCount('5s', true)}
           onclick={() => handleClick('5s', true)}
         />
       {/if}

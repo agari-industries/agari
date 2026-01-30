@@ -88,10 +88,31 @@
     for (const tile of ALL_TILES) {
       counts[tile] = 4;
     }
+    // Red fives: only 1 of each exists (they come from the pool of 4 regular 5s)
+    // We track red fives separately - when a red 5 is used, it reduces both
+    // the red 5 count (max 1) AND the regular 5 count (since it's one of the 4 fives)
+    const redFiveCounts: Record<string, number> = { '5m': 1, '5p': 1, '5s': 1 };
+
     // Subtract hand tiles
     for (const entry of handTiles) {
       if (counts[entry.tile] !== undefined) {
         counts[entry.tile]--;
+      }
+      // Track red five usage
+      if (entry.isRed && redFiveCounts[entry.tile] !== undefined) {
+        redFiveCounts[entry.tile]--;
+      }
+    }
+    // Subtract meld tiles
+    for (const meld of melds) {
+      for (const entry of meld.tiles) {
+        if (counts[entry.tile] !== undefined) {
+          counts[entry.tile]--;
+        }
+        // Track red five usage
+        if (entry.isRed && redFiveCounts[entry.tile] !== undefined) {
+          redFiveCounts[entry.tile]--;
+        }
       }
     }
     // Subtract dora indicators
@@ -106,7 +127,9 @@
         counts[entry.tile]--;
       }
     }
-    return counts;
+
+    // Add red five counts to the return object (keyed as "red5m", "red5p", "red5s")
+    return { ...counts, red5m: redFiveCounts['5m'], red5p: redFiveCounts['5p'], red5s: redFiveCounts['5s'] };
   });
 
   // Build hand string
