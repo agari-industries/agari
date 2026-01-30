@@ -2,6 +2,8 @@
 
 Agari is a comprehensive Riichi Mahjong scoring engine written in idiomatic, modern Rust. It transforms raw hand notations into detailed scoring results, handling the complex interplay between hand decomposition, wait patterns, situational yaku, and minipoint (fu) calculation.
 
+**[🎮 Live Demo](https://ryblogs.github.io/agari/)** — Try the web interface for agari-core
+
 ---
 
 ## Installation

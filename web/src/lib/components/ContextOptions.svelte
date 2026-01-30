@@ -24,6 +24,8 @@
     isTenhou: boolean;
     /** Whether chiihou */
     isChiihou: boolean;
+    /** Whether hand has open melds (chi, pon, open kan) */
+    hasOpenMelds?: boolean;
     /** Callback for any option change */
     onChange: () => void;
   }
@@ -40,8 +42,18 @@
     isChankan = $bindable(),
     isTenhou = $bindable(),
     isChiihou = $bindable(),
+    hasOpenMelds = false,
     onChange,
   }: Props = $props();
+
+  // When hand becomes open, uncheck riichi-related options
+  $effect(() => {
+    if (hasOpenMelds) {
+      if (isRiichi) isRiichi = false;
+      if (isDoubleRiichi) isDoubleRiichi = false;
+      if (isIppatsu) isIppatsu = false;
+    }
+  });
 
   const winds = ['east', 'south', 'west', 'north'] as const;
   const windSymbols = { east: '東', south: '南', west: '西', north: '北' };
@@ -138,31 +150,37 @@
   <!-- Riichi Options -->
   <div class="option-section">
     <h3 class="section-title">Riichi</h3>
+    {#if hasOpenMelds}
+      <div class="open-hand-notice">
+        🔓 Open hand — Riichi not available
+      </div>
+    {/if}
     <div class="checkbox-group">
-      <label class="checkbox-item">
+      <label class="checkbox-item" class:disabled={hasOpenMelds}>
         <input
           type="checkbox"
           bind:checked={isRiichi}
+          disabled={hasOpenMelds}
           onchange={handleRiichiChange}
         />
         <span class="checkbox-label">Riichi</span>
         <span class="han-indicator">+1 han</span>
       </label>
-      <label class="checkbox-item" class:disabled={!isRiichi}>
+      <label class="checkbox-item" class:disabled={hasOpenMelds || !isRiichi}>
         <input
           type="checkbox"
           bind:checked={isDoubleRiichi}
-          disabled={!isRiichi}
+          disabled={hasOpenMelds || !isRiichi}
           onchange={handleDoubleRiichiChange}
         />
         <span class="checkbox-label">Double Riichi</span>
         <span class="han-indicator">+1 han</span>
       </label>
-      <label class="checkbox-item" class:disabled={!isRiichi}>
+      <label class="checkbox-item" class:disabled={hasOpenMelds || !isRiichi}>
         <input
           type="checkbox"
           bind:checked={isIppatsu}
-          disabled={!isRiichi}
+          disabled={hasOpenMelds || !isRiichi}
           onchange={onChange}
         />
         <span class="checkbox-label">Ippatsu</span>
@@ -410,6 +428,16 @@
   .han-indicator.yakuman {
     background: linear-gradient(135deg, #ffd700, #ff8c00);
     color: var(--bg-primary);
+  }
+
+  .open-hand-notice {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    background: rgba(255, 193, 7, 0.15);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
   }
 
   @media (max-width: 768px) {
