@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.0]
+
+### Fixed
+
+- **Red Five Duplicate in Meld Builder**: Fixed bug where users could add multiple red fives (aka dora) of the same suit in pon/chi/kan meld builder (e.g., 0p, 0p, 0p)
+  - Meld builder tiles now included in `tileCounts` so the palette updates in real-time
+  - Properly checks red five availability using separate `red5m`/`red5p`/`red5s` count tracking
+- **Invalid Chi Meld Sequences**: Fixed bug where chi meld builder allowed non-consecutive tiles (e.g., 5p5p5p or 2m4m6m)
+  - Added sequence validation that only allows tiles forming valid 3-consecutive runs
+  - Invalid tiles are now visually grayed out and unclickable in the palette
+
+### Changed
+
+- **Improved Meld Builder UX**: For pon/kan/ankan melds, after selecting the first tile, all other tile types are now visually disabled in the palette (previously only enforced in code)
+
 ## [0.11.0]
 
 ### Added
