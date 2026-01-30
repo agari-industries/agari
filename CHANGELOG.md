@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.0]
+
+### Fixed
+
+- **Riichi Options for Open Hands**: Riichi, Double Riichi, and Ippatsu options are now disabled when the hand has open melds (chi, pon, or open kan)
+  - Options are automatically unchecked if they were selected before adding an open meld
+  - Shows notice: "🔓 Open hand — Riichi not available"
+
+### Added
+
+- **Live Demo Link**: Added prominent link to the web interface at the top of README.md
+
 ## [0.12.0]
 
 ### Fixed
