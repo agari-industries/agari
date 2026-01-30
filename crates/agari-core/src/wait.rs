@@ -3,12 +3,14 @@
 //! The "wait" describes what shape the hand was in before the winning tile
 //! completed it. This affects fu calculation and Pinfu eligibility.
 
+use serde::{Deserialize, Serialize};
+
 use crate::context::GameContext;
 use crate::hand::{HandStructure, Meld};
 use crate::tile::{Honor, Tile};
 
 /// The type of wait that led to the winning hand
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum WaitType {
     /// Two-sided sequence wait (e.g., 23 waiting on 1 or 4)
     /// 0 fu

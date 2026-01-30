@@ -6,12 +6,14 @@
 //! - Shanten = 1: Iishanten (two tiles away)
 //! - etc.
 
+use serde::{Deserialize, Serialize};
+
 use crate::parse::TileCounts;
-use crate::tile::{Honor, KOKUSHI_TILES, Suit, Tile};
+use crate::tile::{Honor, Suit, Tile, KOKUSHI_TILES};
 use std::cmp::min;
 
 /// Result of shanten calculation
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ShantenResult {
     /// The shanten value (-1 = complete, 0 = tenpai, 1+ = tiles needed)
     pub shanten: i8,
@@ -20,7 +22,7 @@ pub struct ShantenResult {
 }
 
 /// Type of hand structure for shanten calculation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ShantenType {
     /// Standard 4 melds + 1 pair
     Standard,
@@ -414,7 +416,7 @@ pub fn calculate_ukeire(counts: &TileCounts) -> UkeireResult {
 }
 
 /// Result of ukeire calculation
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UkeireResult {
     /// Current shanten value
     pub shanten: i8,
@@ -425,7 +427,7 @@ pub struct UkeireResult {
 }
 
 /// A single tile that improves the hand
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UkeireTile {
     /// The tile
     pub tile: Tile,

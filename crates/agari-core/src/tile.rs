@@ -1,13 +1,14 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Suit {
     Man, // Manzu
     Pin, // Pinzu
     Sou, // Souzu
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Honor {
     // Winds
     East,
@@ -20,7 +21,7 @@ pub enum Honor {
     Red,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Tile {
     Suited { suit: Suit, value: u8 }, // value will be 1..9
     Honor(Honor),
@@ -52,7 +53,7 @@ impl Tile {
             Tile::Honor(_) => true,
         }
     }
-    
+
     /// Is this a terminal (1 or 9, not honors)?
     pub fn is_terminal(&self) -> bool {
         match self {
@@ -60,32 +61,38 @@ impl Tile {
             Tile::Honor(_) => false,
         }
     }
-    
+
     /// Is this an honor tile?
     pub fn is_honor(&self) -> bool {
         matches!(self, Tile::Honor(_))
     }
-    
+
     /// Is this a dragon?
     pub fn is_dragon(&self) -> bool {
         matches!(self, Tile::Honor(Honor::White | Honor::Green | Honor::Red))
     }
-    
+
     /// Is this a wind?
     pub fn is_wind(&self) -> bool {
-        matches!(self, Tile::Honor(Honor::East | Honor::South | Honor::West | Honor::North))
+        matches!(
+            self,
+            Tile::Honor(Honor::East | Honor::South | Honor::West | Honor::North)
+        )
     }
-    
+
     /// Is this a "green" tile? (for Ryuuiisou)
     /// Green tiles: 2s, 3s, 4s, 6s, 8s, Green Dragon
     pub fn is_green(&self) -> bool {
         match self {
-            Tile::Suited { suit: Suit::Sou, value } => matches!(value, 2 | 3 | 4 | 6 | 8),
+            Tile::Suited {
+                suit: Suit::Sou,
+                value,
+            } => matches!(value, 2 | 3 | 4 | 6 | 8),
             Tile::Honor(Honor::Green) => true,
             _ => false,
         }
     }
-    
+
     /// Get the suit if this is a suited tile
     pub fn suit(&self) -> Option<Suit> {
         match self {
@@ -93,7 +100,7 @@ impl Tile {
             Tile::Honor(_) => None,
         }
     }
-    
+
     /// Get the value if this is a suited tile
     pub fn value(&self) -> Option<u8> {
         match self {
@@ -105,12 +112,30 @@ impl Tile {
 
 /// All 13 terminal and honor tiles (for Kokushi)
 pub const KOKUSHI_TILES: [Tile; 13] = [
-    Tile::Suited { suit: Suit::Man, value: 1 },
-    Tile::Suited { suit: Suit::Man, value: 9 },
-    Tile::Suited { suit: Suit::Pin, value: 1 },
-    Tile::Suited { suit: Suit::Pin, value: 9 },
-    Tile::Suited { suit: Suit::Sou, value: 1 },
-    Tile::Suited { suit: Suit::Sou, value: 9 },
+    Tile::Suited {
+        suit: Suit::Man,
+        value: 1,
+    },
+    Tile::Suited {
+        suit: Suit::Man,
+        value: 9,
+    },
+    Tile::Suited {
+        suit: Suit::Pin,
+        value: 1,
+    },
+    Tile::Suited {
+        suit: Suit::Pin,
+        value: 9,
+    },
+    Tile::Suited {
+        suit: Suit::Sou,
+        value: 1,
+    },
+    Tile::Suited {
+        suit: Suit::Sou,
+        value: 9,
+    },
     Tile::Honor(Honor::East),
     Tile::Honor(Honor::South),
     Tile::Honor(Honor::West),

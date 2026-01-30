@@ -2,6 +2,12 @@
 .DS_Store
 *.json
 
+# Web frontend
+web/node_modules/
+web/dist/
+
+# WASM build output (kept in git for convenience, but can be rebuilt)
+# web/src/lib/wasm/
 
 ## Python
 

@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 use crate::parse::TileCounts;
-use crate::tile::{KOKUSHI_TILES, Tile};
+use crate::tile::{Tile, KOKUSHI_TILES};
 
 /// Type of kan (quad) meld
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum KanType {
     /// Closed kan (ankan) - all 4 tiles drawn from wall
     /// Concealed for scoring purposes
@@ -26,7 +28,7 @@ impl KanType {
 }
 
 /// A single meld (group of 3 or 4 tiles)
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Meld {
     /// Sequence (e.g., 123m) - stores the lowest tile
     /// Second field indicates if the meld is open (called via chi)
@@ -100,7 +102,7 @@ impl Meld {
 }
 
 /// A complete hand decomposition
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HandStructure {
     /// Standard hand: 4 melds + 1 pair
     Standard { melds: Vec<Meld>, pair: Tile },
