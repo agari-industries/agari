@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use std::process;
 
 use clap::Parser;
+use clap::builder::styling::{AnsiColor, Effects, Styles};
 use colored::Colorize;
 use serde::Serialize;
 
@@ -52,9 +53,18 @@ EXAMPLES:
     agari "[1111m](2222p)345678s11z" -t   Hand with closed + open kan (16 tiles)
     agari "123m456p789s(rrr)whwh" -w wh   Open pon of Red dragon, White pair"#;
 
+fn styles() -> Styles {
+    Styles::styled()
+        .header(AnsiColor::Yellow.on_default() | Effects::BOLD)
+        .usage(AnsiColor::Yellow.on_default() | Effects::BOLD)
+        .literal(AnsiColor::Green.on_default() | Effects::BOLD)
+        .placeholder(AnsiColor::Cyan.on_default())
+}
+
 #[derive(Parser)]
 #[command(name = "agari")]
 #[command(version)]
+#[command(styles = styles())]
 #[command(about = "Riichi Mahjong Hand Scoring Calculator")]
 #[command(after_help = AFTER_HELP)]
 struct Args {
