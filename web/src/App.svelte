@@ -406,9 +406,19 @@
               </div>
             {/if}
           </div>
+
+          <!-- Results (moved from right column) -->
+          <div class="card results-card">
+            <h2 class="card-title">Results</h2>
+            <ScoreResult
+              result={scoreResult}
+              error={scoreError}
+              loading={isCalculating}
+            />
+          </div>
         </div>
 
-        <!-- Right Column: Options & Results -->
+        <!-- Right Column: Options & Calculate -->
         <div class="options-section">
           <!-- Context Options -->
           <div class="card">
@@ -441,16 +451,6 @@
               Calculate Score
             {/if}
           </button>
-
-          <!-- Results -->
-          <div class="card results-card">
-            <h2 class="card-title">Results</h2>
-            <ScoreResult
-              result={scoreResult}
-              error={scoreError}
-              loading={isCalculating}
-            />
-          </div>
         </div>
       </div>
     {/if}
@@ -737,8 +737,7 @@
 
   /* Results Card */
   .results-card {
-    flex: 1;
-    min-height: 300px;
+    min-height: 200px;
   }
 
   /* Footer */
