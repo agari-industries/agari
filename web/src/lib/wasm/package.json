@@ -2,7 +2,7 @@
   "name": "agari-wasm",
   "type": "module",
   "description": "WebAssembly bindings for Agari Riichi Mahjong scoring engine",
-  "version": "0.7.0",
+  "version": "0.1.0",
   "license": "MIT",
   "files": [
     "agari_wasm_bg.wasm",

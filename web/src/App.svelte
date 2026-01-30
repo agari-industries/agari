@@ -26,28 +26,12 @@
     id: number;
   }
 
-  interface Meld {
-    type: 'chi' | 'pon' | 'kan' | 'ankan';
-    tiles: TileEntry[];
-    id: number;
-  }
-
   let wasmLoaded = $state(false);
   let wasmError = $state<string | null>(null);
 
   // Hand state
   let handTiles = $state<TileEntry[]>([]);
   let nextTileId = $state(0);
-
-  // Winning tile selection
-  let selectedWinningTileIndex = $state<number | null>(null);
-
-  // Melds (called tiles)
-  let melds = $state<Meld[]>([]);
-  let nextMeldId = $state(0);
-  let showMeldBuilder = $state(false);
-  let meldBuilderType = $state<'chi' | 'pon' | 'kan' | 'ankan'>('pon');
-  let meldBuilderTiles = $state<TileEntry[]>([]);
 
   // Dora state
   let doraIndicators = $state<TileEntry[]>([]);
@@ -133,39 +117,16 @@
     return result;
   });
 
-  // Count red fives (in hand and melds)
-  const akaCount = $derived(() => {
-    const handAka = handTiles.filter(t => t.isRed).length;
-    const meldAka = melds.reduce((acc, m) => acc + m.tiles.filter(t => t.isRed).length, 0);
-    return handAka + meldAka;
-  });
+  // Count red fives
+  const akaCount = $derived(handTiles.filter(t => t.isRed).length);
 
-  // Count tiles in melds
-  const tilesInMelds = $derived(melds.reduce((acc, m) => acc + m.tiles.length, 0));
-
-  // Max tiles in hand based on mode and melds
-  // A complete hand is 14 tiles. Each meld is 3 tiles (or 4 for kan), so hand tiles = 14 - meld tiles
-  const maxHandTiles = $derived(mode === 'score' ? 14 - tilesInMelds : 13 - tilesInMelds);
-
-  // Selected winning tile
-  const winningTile = $derived(() => {
-    if (selectedWinningTileIndex !== null && handTiles[selectedWinningTileIndex]) {
-      const entry = handTiles[selectedWinningTileIndex];
-      return entry.isRed ? '0' + entry.tile[1] : entry.tile;
-    }
-    return undefined;
-  });
-
-  // Check if hand has open melds
-  const hasOpenMelds = $derived(melds.some(m => m.type !== 'ankan'));
-
-  // Total tiles (hand + melds)
-  const totalTiles = $derived(handTiles.length + tilesInMelds);
+  // Max tiles based on mode
+  const maxTiles = $derived(mode === 'score' ? 14 : 13);
 
   // Can calculate score
   const canCalculate = $derived(
     wasmLoaded &&
-    totalTiles >= (mode === 'score' ? 14 : 1)
+    handTiles.length >= (mode === 'score' ? 14 : 1)
   );
 
   // ============================================================================
@@ -174,7 +135,7 @@
 
   // Add tile to hand
   function addTile(tile: string, isRed: boolean = false) {
-    if (handTiles.length >= maxHandTiles) return;
+    if (handTiles.length >= maxTiles) return;
     if (tileCounts[tile] <= 0) return;
 
     handTiles = [...handTiles, { tile, isRed, id: nextTileId++ }];
@@ -183,83 +144,7 @@
 
   // Remove tile from hand
   function removeTile(index: number) {
-    // If we're removing the winning tile, clear the selection
-    if (selectedWinningTileIndex === index) {
-      selectedWinningTileIndex = null;
-    } else if (selectedWinningTileIndex !== null && index < selectedWinningTileIndex) {
-      // Adjust index if removing a tile before the winning tile
-      selectedWinningTileIndex--;
-    }
     handTiles = handTiles.filter((_, i) => i !== index);
-    recalculateShanten();
-  }
-
-  // Select winning tile
-  function selectWinningTile(index: number) {
-    if (selectedWinningTileIndex === index) {
-      selectedWinningTileIndex = null; // Deselect if clicking the same tile
-    } else {
-      selectedWinningTileIndex = index;
-    }
-  }
-
-  // Meld builder functions
-  function startMeldBuilder(type: 'chi' | 'pon' | 'kan' | 'ankan') {
-    meldBuilderType = type;
-    meldBuilderTiles = [];
-    showMeldBuilder = true;
-  }
-
-  function addTileToMeldBuilder(tile: string, isRed: boolean = false) {
-    const maxTiles = meldBuilderType === 'kan' || meldBuilderType === 'ankan' ? 4 : 3;
-    if (meldBuilderTiles.length >= maxTiles) return;
-    if (tileCounts[tile] <= 0) return;
-
-    // For chi, tiles must be sequential in the same suit
-    if (meldBuilderType === 'chi' && meldBuilderTiles.length > 0) {
-      const suit = meldBuilderTiles[0].tile[1];
-      if (tile[1] !== suit || tile[1] === 'z') return; // Must be same suit, no honors
-    }
-
-    // For pon/kan, tiles must be the same
-    if ((meldBuilderType === 'pon' || meldBuilderType === 'kan' || meldBuilderType === 'ankan') && meldBuilderTiles.length > 0) {
-      const baseTile = meldBuilderTiles[0].tile;
-      if (tile !== baseTile) return;
-    }
-
-    meldBuilderTiles = [...meldBuilderTiles, { tile, isRed, id: nextTileId++ }];
-  }
-
-  function removeTileFromMeldBuilder(index: number) {
-    meldBuilderTiles = meldBuilderTiles.filter((_, i) => i !== index);
-  }
-
-  function confirmMeld() {
-    const requiredTiles = meldBuilderType === 'kan' || meldBuilderType === 'ankan' ? 4 : 3;
-    if (meldBuilderTiles.length !== requiredTiles) return;
-
-    // For chi, sort tiles
-    if (meldBuilderType === 'chi') {
-      meldBuilderTiles.sort((a, b) => {
-        const valA = a.isRed ? 5 : parseInt(a.tile[0]);
-        const valB = b.isRed ? 5 : parseInt(b.tile[0]);
-        return valA - valB;
-      });
-    }
-
-    melds = [...melds, { type: meldBuilderType, tiles: [...meldBuilderTiles], id: nextMeldId++ }];
-    showMeldBuilder = false;
-    meldBuilderTiles = [];
-    recalculateShanten();
-  }
-
-  function cancelMeldBuilder() {
-    showMeldBuilder = false;
-    meldBuilderTiles = [];
-  }
-
-  function removeMeld(index: number) {
-    melds = melds.filter((_, i) => i !== index);
     recalculateShanten();
   }
 
@@ -290,36 +175,21 @@
   // Clear hand
   function clearHand() {
     handTiles = [];
-    melds = [];
     doraIndicators = [];
     uraDoraIndicators = [];
-    selectedWinningTileIndex = null;
     scoreResult = null;
     scoreError = null;
     shantenResult = null;
   }
 
-  // Build meld notation string for backend
-  function buildMeldNotation(): string {
-    let meldStr = '';
-    for (const meld of melds) {
-      const tiles = meld.tiles.map(t => t.isRed ? '0' : t.tile[0]).join('');
-      const suit = meld.tiles[0].tile[1];
-      const openMarker = meld.type === 'ankan' ? '' : "'"; // Open melds marked with '
-      meldStr += `(${tiles}${suit}${openMarker})`;
-    }
-    return meldStr;
-  }
-
   // Calculate shanten in real-time
   function recalculateShanten() {
-    if (!wasmLoaded || (handTiles.length === 0 && melds.length === 0)) {
+    if (!wasmLoaded || handTiles.length === 0) {
       shantenResult = null;
       return;
     }
 
-    const fullHand = handString + buildMeldNotation();
-    const result = calculateShanten(fullHand);
+    const result = calculateShanten(handString);
     shantenResult = result;
   }
 
@@ -332,14 +202,12 @@
     scoreResult = null;
 
     try {
-      const fullHand = handString + buildMeldNotation();
       const request: ScoreRequest = {
-        hand: fullHand,
-        winning_tile: winningTile,
+        hand: handString,
         is_tsumo: isTsumo,
-        is_riichi: hasOpenMelds ? false : isRiichi, // Can't riichi with open hand
-        is_double_riichi: hasOpenMelds ? false : isDoubleRiichi,
-        is_ippatsu: hasOpenMelds ? false : isIppatsu,
+        is_riichi: isRiichi,
+        is_double_riichi: isDoubleRiichi,
+        is_ippatsu: isIppatsu,
         round_wind: roundWind,
         seat_wind: seatWind,
         dora_indicators: doraIndicators.map(d => d.tile),
@@ -422,115 +290,20 @@
 
             <!-- Tile Palette -->
             <TilePalette
-              onSelect={showMeldBuilder ? addTileToMeldBuilder : addTile}
+              onSelect={addTile}
               tileCounts={tileCounts}
               showRedFives={true}
             />
-
-            <!-- Meld Builder Buttons -->
-            <div class="meld-buttons">
-              <span class="meld-label">Add Meld:</span>
-              <button class="btn btn-sm" onclick={() => startMeldBuilder('chi')} disabled={showMeldBuilder}>Chi</button>
-              <button class="btn btn-sm" onclick={() => startMeldBuilder('pon')} disabled={showMeldBuilder}>Pon</button>
-              <button class="btn btn-sm" onclick={() => startMeldBuilder('kan')} disabled={showMeldBuilder}>Open Kan</button>
-              <button class="btn btn-sm" onclick={() => startMeldBuilder('ankan')} disabled={showMeldBuilder}>Closed Kan</button>
-            </div>
-
-            <!-- Meld Builder Panel -->
-            {#if showMeldBuilder}
-              <div class="meld-builder">
-                <div class="meld-builder-header">
-                  <span>Building {meldBuilderType === 'ankan' ? 'Closed Kan' : meldBuilderType === 'kan' ? 'Open Kan' : meldBuilderType.charAt(0).toUpperCase() + meldBuilderType.slice(1)}</span>
-                  <span class="meld-builder-hint">
-                    {#if meldBuilderType === 'chi'}
-                      (select 3 sequential tiles of the same suit)
-                    {:else if meldBuilderType === 'pon'}
-                      (select 3 of the same tile)
-                    {:else}
-                      (select 4 of the same tile)
-                    {/if}
-                  </span>
-                </div>
-                <div class="meld-builder-tiles">
-                  {#each meldBuilderTiles as entry, index (entry.id)}
-                    <Tile
-                      tile={entry.tile}
-                      isRed={entry.isRed}
-                      size="md"
-                      onclick={() => removeTileFromMeldBuilder(index)}
-                    />
-                  {/each}
-                  {#each Array((meldBuilderType === 'kan' || meldBuilderType === 'ankan' ? 4 : 3) - meldBuilderTiles.length) as _}
-                    <div class="meld-placeholder"></div>
-                  {/each}
-                </div>
-                <div class="meld-builder-actions">
-                  <button class="btn btn-sm btn-secondary" onclick={cancelMeldBuilder}>Cancel</button>
-                  <button
-                    class="btn btn-sm btn-primary"
-                    onclick={confirmMeld}
-                    disabled={meldBuilderTiles.length !== (meldBuilderType === 'kan' || meldBuilderType === 'ankan' ? 4 : 3)}
-                  >
-                    Add Meld
-                  </button>
-                </div>
-              </div>
-            {/if}
           </div>
-
-          <!-- Melds Display -->
-          {#if melds.length > 0}
-            <div class="card">
-              <div class="melds-display">
-                <h3 class="melds-title">Called Melds</h3>
-                <div class="melds-list">
-                  {#each melds as meld, index (meld.id)}
-                    <div class="meld-group">
-                      <span class="meld-type-badge" class:open={meld.type !== 'ankan'}>
-                        {meld.type === 'ankan' ? '🔒' : '📢'} {meld.type}
-                      </span>
-                      <div class="meld-tiles">
-                        {#each meld.tiles as entry (entry.id)}
-                          <Tile tile={entry.tile} isRed={entry.isRed} size="sm" />
-                        {/each}
-                      </div>
-                      <button class="btn-remove-meld" onclick={() => removeMeld(index)}>×</button>
-                    </div>
-                  {/each}
-                </div>
-              </div>
-            </div>
-          {/if}
 
           <!-- Hand Display -->
           <div class="card">
-            <div class="hand-header">
-              <h3>Your Hand</h3>
-              {#if handTiles.length > 0}
-                <span class="winning-tile-hint">Click a tile to select it as winning tile</span>
-              {/if}
-            </div>
-            <div class="hand-tiles-selectable">
-              {#each handTiles as entry, index (entry.id)}
-                <div
-                  class="tile-wrapper"
-                  class:selected={selectedWinningTileIndex === index}
-                  onclick={() => selectWinningTile(index)}
-                  oncontextmenu={(e) => { e.preventDefault(); removeTile(index); }}
-                >
-                  <Tile tile={entry.tile} isRed={entry.isRed} size="md" />
-                  {#if selectedWinningTileIndex === index}
-                    <div class="winning-badge">WIN</div>
-                  {/if}
-                </div>
-              {/each}
-              {#each Array(Math.max(0, maxHandTiles - handTiles.length)) as _}
-                <div class="tile-placeholder"></div>
-              {/each}
-            </div>
-            {#if handTiles.length > 0}
-              <p class="hand-hint">Right-click to remove a tile</p>
-            {/if}
+            <HandDisplay
+              tiles={handTiles}
+              onRemove={removeTile}
+              maxTiles={maxTiles}
+              label="Your Hand"
+            />
 
             <!-- Shanten Display -->
             {#if shantenResult && shantenResult.success && handTiles.length > 0}
@@ -912,199 +685,6 @@
 
   .toggle-arrow.open {
     transform: rotate(180deg);
-  }
-
-  /* Meld buttons */
-  .meld-buttons {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    flex-wrap: wrap;
-  }
-
-  .meld-label {
-    font-size: 0.875rem;
-    color: rgba(255, 255, 255, 0.7);
-  }
-
-  .btn-sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8rem;
-  }
-
-  /* Meld builder */
-  .meld-builder {
-    margin-top: 1rem;
-    padding: 1rem;
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: 0.5rem;
-  }
-
-  .meld-builder-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
-    font-weight: 500;
-  }
-
-  .meld-builder-hint {
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.5);
-  }
-
-  .meld-builder-tiles {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .meld-placeholder {
-    width: 40px;
-    height: 56px;
-    border: 2px dashed rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-  }
-
-  .meld-builder-actions {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
-  }
-
-  /* Melds display */
-  .melds-display {
-    padding: 0.5rem 0;
-  }
-
-  .melds-title {
-    font-size: 0.875rem;
-    font-weight: 500;
-    margin-bottom: 0.75rem;
-    color: rgba(255, 255, 255, 0.8);
-  }
-
-  .melds-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .meld-group {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 0.5rem;
-  }
-
-  .meld-type-badge {
-    font-size: 0.7rem;
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
-    background: rgba(34, 197, 94, 0.2);
-    color: #22c55e;
-    text-transform: uppercase;
-  }
-
-  .meld-type-badge.open {
-    background: rgba(249, 115, 22, 0.2);
-    color: #f97316;
-  }
-
-  .meld-tiles {
-    display: flex;
-    gap: 0.125rem;
-  }
-
-  .btn-remove-meld {
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: 50%;
-    border: none;
-    background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
-    cursor: pointer;
-    font-size: 1rem;
-    line-height: 1;
-    transition: background 0.2s;
-  }
-
-  .btn-remove-meld:hover {
-    background: rgba(239, 68, 68, 0.4);
-  }
-
-  /* Hand tiles selectable */
-  .hand-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
-  }
-
-  .hand-header h3 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 500;
-  }
-
-  .winning-tile-hint {
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.5);
-  }
-
-  .hand-tiles-selectable {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-  }
-
-  .tile-wrapper {
-    position: relative;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: transform 0.15s, box-shadow 0.15s;
-  }
-
-  .tile-wrapper:hover {
-    transform: translateY(-2px);
-  }
-
-  .tile-wrapper.selected {
-    box-shadow: 0 0 0 3px #22c55e, 0 4px 12px rgba(34, 197, 94, 0.4);
-    transform: translateY(-4px);
-  }
-
-  .winning-badge {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    background: #22c55e;
-    color: white;
-    font-size: 0.6rem;
-    font-weight: 700;
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.25rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  }
-
-  .tile-placeholder {
-    width: 40px;
-    height: 56px;
-    border: 2px dashed rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
-  }
-
-  .hand-hint {
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.4);
-    margin-top: 0.5rem;
-    margin-bottom: 0;
   }
 
   .dora-content {

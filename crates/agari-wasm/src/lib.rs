@@ -3,17 +3,15 @@
 //! This crate provides JavaScript-friendly wrappers around the core Agari library,
 //! allowing it to be used in web applications via WebAssembly.
 
-use std::collections::HashSet;
-
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use agari::context::{GameContext, WinType};
 use agari::hand::{HandStructure, decompose_hand, decompose_hand_with_melds};
-use agari::parse::{TileCounts, parse_hand_with_aka, to_counts};
+use agari::parse::{parse_hand_with_aka, to_counts};
 use agari::scoring::{ScoringResult, calculate_score};
 use agari::shanten::{ShantenResult, UkeireResult, calculate_shanten, calculate_ukeire};
-use agari::tile::{Honor, Tile};
+use agari::tile::Honor;
 use agari::yaku::{Yaku, YakuResult, detect_yaku_with_context};
 
 /// Initialize panic hook for better error messages in the browser console
@@ -336,14 +334,11 @@ fn score_hand_internal(request: &ScoreRequest) -> Result<ScoringOutput, String> 
     context = context.with_ura_dora(ura_dora_indicators);
     context = context.with_aka(parsed.aka_count);
 
-    // Parse winning tile if provided, otherwise we'll infer it
-    let explicit_winning_tile = if let Some(ref wt) = request.winning_tile {
+    // Parse winning tile if provided
+    if let Some(ref wt) = request.winning_tile {
         let tile = parse_single_tile(wt)?;
         context = context.with_winning_tile(tile);
-        true
-    } else {
-        false
-    };
+    }
 
     // Decompose the hand
     let structures = if parsed.called_melds.is_empty() {
@@ -361,39 +356,32 @@ fn score_hand_internal(request: &ScoreRequest) -> Result<ScoringOutput, String> 
         return Err("No valid hand structure found".to_string());
     }
 
-    // If no winning tile was specified, infer the best one
-    let (best, context) = if explicit_winning_tile {
-        // Use the specified winning tile
-        let mut best: Option<(HandStructure, YakuResult, ScoringResult)> = None;
+    // Score each interpretation and find the best
+    let mut best: Option<(HandStructure, YakuResult, ScoringResult)> = None;
 
-        for structure in &structures {
-            let yaku = detect_yaku_with_context(structure, &counts, &context);
+    for structure in structures {
+        let yaku = detect_yaku_with_context(&structure, &counts, &context);
 
-            // Skip interpretations with no yaku
-            if yaku.yaku_list.is_empty() {
-                continue;
-            }
-
-            let score = calculate_score(structure, &yaku, &context);
-
-            let is_better = match &best {
-                None => true,
-                Some((_, _, best_score)) => {
-                    score.payment.total > best_score.payment.total
-                        || (score.payment.total == best_score.payment.total
-                            && score.han > best_score.han)
-                }
-            };
-
-            if is_better {
-                best = Some((structure.clone(), yaku, score));
-            }
+        // Skip interpretations with no yaku
+        if yaku.yaku_list.is_empty() {
+            continue;
         }
-        (best, context)
-    } else {
-        // Infer the best winning tile by trying all unique tiles in the hand
-        infer_best_winning_tile(&structures, &counts, context, &parsed.tiles)
-    };
+
+        let score = calculate_score(&structure, &yaku, &context);
+
+        let is_better = match &best {
+            None => true,
+            Some((_, _, best_score)) => {
+                score.payment.total > best_score.payment.total
+                    || (score.payment.total == best_score.payment.total
+                        && score.han > best_score.han)
+            }
+        };
+
+        if is_better {
+            best = Some((structure, yaku, score));
+        }
+    }
 
     let (structure, yaku, score) = best.ok_or("No valid yaku found for this hand")?;
 
@@ -483,57 +471,9 @@ fn parse_wind(s: &str) -> Result<Honor, String> {
     }
 }
 
-fn parse_single_tile(s: &str) -> Result<Tile, String> {
+fn parse_single_tile(s: &str) -> Result<agari::tile::Tile, String> {
+    use agari::tile::Tile;
     Tile::try_from(s)
-}
-
-/// Infer the best winning tile by trying all unique tiles in the hand
-fn infer_best_winning_tile(
-    structures: &[HandStructure],
-    all_tiles_counts: &TileCounts,
-    base_context: GameContext,
-    tiles: &[Tile],
-) -> (
-    Option<(HandStructure, YakuResult, ScoringResult)>,
-    GameContext,
-) {
-    // Get unique tiles in the hand
-    let unique_tiles: HashSet<Tile> = tiles.iter().copied().collect();
-
-    let mut best: Option<(HandStructure, YakuResult, ScoringResult)> = None;
-    let mut best_context = base_context.clone();
-    let mut best_score: Option<(u32, u8, u8)> = None; // (payment, han, 255-fu for comparison)
-
-    for winning_tile in unique_tiles {
-        let context = base_context.clone().with_winning_tile(winning_tile);
-
-        for structure in structures {
-            let yaku_result = detect_yaku_with_context(structure, all_tiles_counts, &context);
-
-            // Skip interpretations with no yaku
-            if yaku_result.yaku_list.is_empty() {
-                continue;
-            }
-
-            let score = calculate_score(structure, &yaku_result, &context);
-
-            // Compare: prefer higher payment, then higher han, then lower fu
-            let current = (score.payment.total, score.han, 255 - score.fu.total);
-
-            let is_better = match best_score {
-                None => true,
-                Some(best) => current > best,
-            };
-
-            if is_better {
-                best_score = Some(current);
-                best_context = context.clone();
-                best = Some((structure.clone(), yaku_result, score));
-            }
-        }
-    }
-
-    (best, best_context)
 }
 
 fn parse_tile_list(tiles: &[String]) -> Result<Vec<agari::tile::Tile>, String> {
