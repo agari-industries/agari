@@ -283,6 +283,15 @@ fn score_hand_internal(request: &ScoreRequest) -> Result<ScoringOutput, String> 
     let parsed = parse_hand_with_aka(&request.hand).map_err(|e| e.to_string())?;
     let counts = to_counts(&parsed.tiles);
 
+    // For dora counting, we need ALL tiles including those in called melds
+    let all_tiles_counts = {
+        let mut all_tiles = parsed.tiles.clone();
+        for called_meld in &parsed.called_melds {
+            all_tiles.extend(&called_meld.tiles);
+        }
+        to_counts(&all_tiles)
+    };
+
     // Parse winds
     let round_wind = parse_wind(&request.round_wind)?;
     let seat_wind = parse_wind(&request.seat_wind)?;
@@ -368,7 +377,7 @@ fn score_hand_internal(request: &ScoreRequest) -> Result<ScoringOutput, String> 
         let mut best: Option<(HandStructure, YakuResult, ScoringResult)> = None;
 
         for structure in &structures {
-            let yaku = detect_yaku_with_context(structure, &counts, &context);
+            let yaku = detect_yaku_with_context(structure, &all_tiles_counts, &context);
 
             // Skip interpretations with no yaku
             if yaku.yaku_list.is_empty() {
@@ -393,7 +402,7 @@ fn score_hand_internal(request: &ScoreRequest) -> Result<ScoringOutput, String> 
         (best, context)
     } else {
         // Infer the best winning tile by trying all unique tiles in the hand
-        infer_best_winning_tile(&structures, &counts, context, &parsed.tiles)
+        infer_best_winning_tile(&structures, &all_tiles_counts, context, &parsed.tiles)
     };
 
     let (structure, yaku, score) = best.ok_or("No valid yaku found for this hand")?;

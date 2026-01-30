@@ -9,6 +9,7 @@
     type ScoringOutput,
     type ShantenResponse,
     ALL_TILES,
+    ALL_TILES_WITH_RED,
   } from './lib/agari';
   import TilePalette from './lib/components/TilePalette.svelte';
   import HandDisplay from './lib/components/HandDisplay.svelte';
@@ -601,10 +602,8 @@
                         }}
                       >
                         <option value="">+ Add</option>
-                        {#each ALL_TILES as tile}
-                          {#if tileCounts[tile] > 0}
-                            <option value={tile}>{tile}</option>
-                          {/if}
+                        {#each ALL_TILES_WITH_RED as tile}
+                          <option value={tile}>{tile}</option>
                         {/each}
                       </select>
                     {/if}
@@ -634,10 +633,8 @@
                           }}
                         >
                           <option value="">+ Add</option>
-                          {#each ALL_TILES as tile}
-                            {#if tileCounts[tile] > 0}
-                              <option value={tile}>{tile}</option>
-                            {/if}
+                          {#each ALL_TILES_WITH_RED as tile}
+                            <option value={tile}>{tile}</option>
                           {/each}
                         </select>
                       {/if}

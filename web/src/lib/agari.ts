@@ -3,7 +3,7 @@
  */
 
 // WASM module will be loaded dynamically
-let wasmModule: typeof import('./wasm/agari_wasm') | null = null;
+let wasmModule: typeof import("./wasm/agari_wasm") | null = null;
 let initPromise: Promise<void> | null = null;
 
 /**
@@ -15,7 +15,7 @@ export async function initAgari(): Promise<void> {
 
   if (!initPromise) {
     initPromise = (async () => {
-      const wasm = await import('./wasm/agari_wasm');
+      const wasm = await import("./wasm/agari_wasm");
       await wasm.default();
       wasmModule = wasm;
     })();
@@ -42,8 +42,8 @@ export interface ScoreRequest {
   is_riichi: boolean;
   is_double_riichi: boolean;
   is_ippatsu: boolean;
-  round_wind: 'east' | 'south' | 'west' | 'north';
-  seat_wind: 'east' | 'south' | 'west' | 'north';
+  round_wind: "east" | "south" | "west" | "north";
+  seat_wind: "east" | "south" | "west" | "north";
   dora_indicators: string[];
   ura_dora_indicators: string[];
   is_last_tile: boolean;
@@ -139,7 +139,10 @@ export interface ValidationResult {
  */
 export function scoreHand(request: ScoreRequest): ScoreResponse {
   if (!wasmModule) {
-    return { success: false, error: 'WASM module not loaded. Call initAgari() first.' };
+    return {
+      success: false,
+      error: "WASM module not loaded. Call initAgari() first.",
+    };
   }
   return wasmModule.score_hand(request) as ScoreResponse;
 }
@@ -149,7 +152,10 @@ export function scoreHand(request: ScoreRequest): ScoreResponse {
  */
 export function calculateShanten(hand: string): ShantenResponse {
   if (!wasmModule) {
-    return { success: false, error: 'WASM module not loaded. Call initAgari() first.' };
+    return {
+      success: false,
+      error: "WASM module not loaded. Call initAgari() first.",
+    };
   }
   return wasmModule.calculate_shanten_js(hand) as ShantenResponse;
 }
@@ -159,7 +165,10 @@ export function calculateShanten(hand: string): ShantenResponse {
  */
 export function calculateUkeire(hand: string): UkeireResponse {
   if (!wasmModule) {
-    return { success: false, error: 'WASM module not loaded. Call initAgari() first.' };
+    return {
+      success: false,
+      error: "WASM module not loaded. Call initAgari() first.",
+    };
   }
   return wasmModule.calculate_ukeire_js(hand) as UkeireResponse;
 }
@@ -169,7 +178,10 @@ export function calculateUkeire(hand: string): UkeireResponse {
  */
 export function validateHand(hand: string): ValidationResult {
   if (!wasmModule) {
-    return { valid: false, error: 'WASM module not loaded. Call initAgari() first.' };
+    return {
+      valid: false,
+      error: "WASM module not loaded. Call initAgari() first.",
+    };
   }
   return wasmModule.validate_hand(hand) as ValidationResult;
 }
@@ -188,8 +200,8 @@ export function createDefaultRequest(hand: string): ScoreRequest {
     is_riichi: false,
     is_double_riichi: false,
     is_ippatsu: false,
-    round_wind: 'east',
-    seat_wind: 'east',
+    round_wind: "east",
+    seat_wind: "east",
     dora_indicators: [],
     ura_dora_indicators: [],
     is_last_tile: false,
@@ -220,9 +232,11 @@ export function tileToUnicode(tile: string): string {
     const value = parseInt(match[1]);
     const suit = match[2];
     const baseCode =
-      suit === 'm' ? 0x1f007 : // Man
-      suit === 'p' ? 0x1f019 : // Pin
-      0x1f010; // Sou
+      suit === "m"
+        ? 0x1f007 // Man
+        : suit === "p"
+          ? 0x1f019 // Pin
+          : 0x1f010; // Sou
     return String.fromCodePoint(baseCode + value - 1);
   } else if (match[3]) {
     // Honor tile
@@ -244,36 +258,114 @@ export function tileToUnicode(tile: string): string {
  */
 export const ALL_TILES = [
   // Man (Characters)
-  '1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m',
+  "1m",
+  "2m",
+  "3m",
+  "4m",
+  "5m",
+  "6m",
+  "7m",
+  "8m",
+  "9m",
   // Pin (Dots)
-  '1p', '2p', '3p', '4p', '5p', '6p', '7p', '8p', '9p',
+  "1p",
+  "2p",
+  "3p",
+  "4p",
+  "5p",
+  "6p",
+  "7p",
+  "8p",
+  "9p",
   // Sou (Bamboo)
-  '1s', '2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s',
+  "1s",
+  "2s",
+  "3s",
+  "4s",
+  "5s",
+  "6s",
+  "7s",
+  "8s",
+  "9s",
   // Honors: Winds (East, South, West, North) + Dragons (White, Green, Red)
-  '1z', '2z', '3z', '4z', '5z', '6z', '7z',
+  "1z",
+  "2z",
+  "3z",
+  "4z",
+  "5z",
+  "6z",
+  "7z",
 ] as const;
 
-export type TileCode = typeof ALL_TILES[number];
+/**
+ * All tiles including red fives (for dora indicator selection)
+ * Red fives use '0' notation (0m, 0p, 0s)
+ */
+export const ALL_TILES_WITH_RED = [
+  // Man (Characters) - including red 5
+  "1m",
+  "2m",
+  "3m",
+  "4m",
+  "0m",
+  "5m",
+  "6m",
+  "7m",
+  "8m",
+  "9m",
+  // Pin (Dots) - including red 5
+  "1p",
+  "2p",
+  "3p",
+  "4p",
+  "0p",
+  "5p",
+  "6p",
+  "7p",
+  "8p",
+  "9p",
+  // Sou (Bamboo) - including red 5
+  "1s",
+  "2s",
+  "3s",
+  "4s",
+  "0s",
+  "5s",
+  "6s",
+  "7s",
+  "8s",
+  "9s",
+  // Honors: Winds (East, South, West, North) + Dragons (White, Green, Red)
+  "1z",
+  "2z",
+  "3z",
+  "4z",
+  "5z",
+  "6z",
+  "7z",
+] as const;
+
+export type TileCode = (typeof ALL_TILES)[number];
 
 /**
  * Tile display names
  */
 export const TILE_NAMES: Record<string, string> = {
-  '1z': 'East',
-  '2z': 'South',
-  '3z': 'West',
-  '4z': 'North',
-  '5z': 'White',
-  '6z': 'Green',
-  '7z': 'Red',
+  "1z": "East",
+  "2z": "South",
+  "3z": "West",
+  "4z": "North",
+  "5z": "White",
+  "6z": "Green",
+  "7z": "Red",
 };
 
 /**
  * Wind names for display
  */
 export const WIND_NAMES = {
-  east: '東 East',
-  south: '南 South',
-  west: '西 West',
-  north: '北 North',
+  east: "東 East",
+  south: "南 South",
+  west: "西 West",
+  north: "北 North",
 } as const;
