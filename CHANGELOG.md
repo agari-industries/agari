@@ -2,7 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.10.0] - 2026-01-30
+## [0.11.0]
+
+### Added
+
+- **Inferred Winning Tile Display**: When scoring a hand without explicitly selecting a winning tile, the frontend now shows which tile was automatically inferred and highlights it in the hand
+  - Yellow info banner: "💡 Winning tile inferred as [tile]. Click a tile in your hand to select explicitly."
+  - Auto-selects the inferred tile in the hand display with the "WIN" badge
+  - Handles red five matching (inferred "5m" correctly matches red "0m")
+- **WASM Test Suite**: Added 27 focused tests for `agari-wasm` covering the WASM binding layer
+  - Request/response integration tests
+  - Inferred winning tile functionality
+  - Shanten and ukeire API wrappers
+  - Helper functions (`parse_wind`, `yaku_name`, `format_structure`)
+
+### Changed
+
+- `ScoringOutput` in WASM bindings now includes optional `inferred_winning_tile` field
+
+## [0.10.0]
 
 ### Added
 
