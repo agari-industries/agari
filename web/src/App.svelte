@@ -118,6 +118,16 @@
         }
       }
     }
+    // Subtract meld builder tiles (tiles currently being added to a meld)
+    for (const entry of meldBuilderTiles) {
+      if (counts[entry.tile] !== undefined) {
+        counts[entry.tile]--;
+      }
+      // Track red five usage
+      if (entry.isRed && redFiveCounts[entry.tile] !== undefined) {
+        redFiveCounts[entry.tile]--;
+      }
+    }
     // Subtract dora indicators
     for (const entry of doraIndicators) {
       // Red fives use 0m/0p/0s notation - map to 5m/5p/5s for count tracking
@@ -213,6 +223,37 @@
     totalTiles >= (mode === 'score' ? 14 : 1)
   );
 
+  // Compute disabled tiles for meld builder (for chi validation)
+  const meldBuilderDisabledTiles: Set<string> = $derived.by(() => {
+    if (!showMeldBuilder) return new Set();
+
+    // For pon/kan, after first tile is selected, only that tile is allowed
+    if ((meldBuilderType === 'pon' || meldBuilderType === 'kan' || meldBuilderType === 'ankan') && meldBuilderTiles.length > 0) {
+      const allowedTile = meldBuilderTiles[0].tile;
+      const disabled = new Set<string>();
+      for (const tile of ALL_TILES) {
+        if (tile !== allowedTile) {
+          disabled.add(tile);
+        }
+      }
+      return disabled;
+    }
+
+    // For chi, compute which tiles can form a valid sequence
+    if (meldBuilderType === 'chi') {
+      const allowed = getChiAllowedTiles();
+      const disabled = new Set<string>();
+      for (const tile of ALL_TILES) {
+        if (!allowed.has(tile)) {
+          disabled.add(tile);
+        }
+      }
+      return disabled;
+    }
+
+    return new Set();
+  });
+
   // ============================================================================
   // Functions
   // ============================================================================
@@ -255,15 +296,101 @@
     showMeldBuilder = true;
   }
 
+  // Get the numeric value of a tile (handles red fives)
+  function getTileValue(tile: string, isRed: boolean = false): number {
+    if (isRed) return 5;
+    return parseInt(tile[0]);
+  }
+
+  // Compute allowed tiles for chi meld builder based on current selection
+  function getChiAllowedTiles(): Set<string> {
+    const allowed = new Set<string>();
+
+    if (meldBuilderTiles.length === 0) {
+      // Any non-honor tile is allowed as the first tile
+      for (const suit of ['m', 'p', 's']) {
+        for (let i = 1; i <= 9; i++) {
+          allowed.add(`${i}${suit}`);
+        }
+      }
+      return allowed;
+    }
+
+    const suit = meldBuilderTiles[0].tile[1];
+
+    if (meldBuilderTiles.length === 1) {
+      // Second tile: must be same suit and able to form a sequence with first tile
+      const v1 = getTileValue(meldBuilderTiles[0].tile, meldBuilderTiles[0].isRed);
+      // Possible second tiles: v1-2, v1-1, v1+1, v1+2 (that could still form a valid sequence)
+      for (let delta = -2; delta <= 2; delta++) {
+        if (delta === 0) continue;
+        const v2 = v1 + delta;
+        if (v2 >= 1 && v2 <= 9) {
+          // Check if v1 and v2 can form part of a valid sequence (3 consecutive tiles exist)
+          const min = Math.min(v1, v2);
+          const max = Math.max(v1, v2);
+          // A valid sequence needs 3 consecutive tiles
+          // If we have 2 tiles, the third must complete the sequence
+          // Possible: min-1 (if >= 1), or max+1 (if <= 9)
+          if (max - min <= 2) { // tiles are close enough to form a sequence
+            // Check if third tile would be valid
+            if (max - min === 1) {
+              // Consecutive: need min-1 or max+1
+              if (min - 1 >= 1 || max + 1 <= 9) {
+                allowed.add(`${v2}${suit}`);
+              }
+            } else if (max - min === 2) {
+              // Gap of 1: middle tile completes it
+              allowed.add(`${v2}${suit}`);
+            }
+          }
+        }
+      }
+      return allowed;
+    }
+
+    if (meldBuilderTiles.length === 2) {
+      // Third tile: must complete the sequence
+      const v1 = getTileValue(meldBuilderTiles[0].tile, meldBuilderTiles[0].isRed);
+      const v2 = getTileValue(meldBuilderTiles[1].tile, meldBuilderTiles[1].isRed);
+      const min = Math.min(v1, v2);
+      const max = Math.max(v1, v2);
+
+      if (max - min === 1) {
+        // Consecutive tiles, need either end
+        if (min - 1 >= 1) allowed.add(`${min - 1}${suit}`);
+        if (max + 1 <= 9) allowed.add(`${max + 1}${suit}`);
+      } else if (max - min === 2) {
+        // Gap of 1, need middle tile
+        allowed.add(`${min + 1}${suit}`);
+      }
+      // If gap > 2, no valid third tile exists
+      return allowed;
+    }
+
+    return allowed;
+  }
+
   function addTileToMeldBuilder(tile: string, isRed: boolean = false) {
     const maxTiles = meldBuilderType === 'kan' || meldBuilderType === 'ankan' ? 4 : 3;
     if (meldBuilderTiles.length >= maxTiles) return;
+
+    // Check regular tile count
     if (tileCounts[tile] <= 0) return;
 
-    // For chi, tiles must be sequential in the same suit
-    if (meldBuilderType === 'chi' && meldBuilderTiles.length > 0) {
-      const suit = meldBuilderTiles[0].tile[1];
-      if (tile[1] !== suit || tile[1] === 'z') return; // Must be same suit, no honors
+    // For red fives, also check the red five count
+    if (isRed) {
+      const redKey = `red${tile}` as keyof typeof tileCounts;
+      if (tileCounts[redKey] <= 0) return;
+    }
+
+    // For chi, validate that tile can form a valid sequence
+    if (meldBuilderType === 'chi') {
+      // Honor tiles cannot be in chi
+      if (tile[1] === 'z') return;
+
+      const allowedTiles = getChiAllowedTiles();
+      if (!allowedTiles.has(tile)) return;
     }
 
     // For pon/kan, tiles must be the same
@@ -512,6 +639,7 @@
               onSelect={showMeldBuilder ? addTileToMeldBuilder : addTile}
               tileCounts={tileCounts}
               showRedFives={true}
+              disabledTiles={meldBuilderDisabledTiles}
             />
 
             <!-- Meld Builder Buttons -->
