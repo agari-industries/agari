@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="tileGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fff8e7"/>
+      <stop offset="100%" style="stop-color:#f5f0e6"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e94560"/>
+      <stop offset="100%" style="stop-color:#ff6b6b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="url(#accentGrad)"/>
+
+  <!-- Mahjong tile -->
+  <rect x="22" y="15" width="56" height="70" rx="8" fill="url(#tileGrad)" stroke="#8b7355" stroke-width="3"/>
+
+  <!-- Inner border -->
+  <rect x="26" y="19" width="48" height="62" rx="6" fill="none" stroke="#d4c4a8" stroke-width="1.5"/>
+
+  <!-- Character 中 (Chun - Red Dragon) -->
+  <text x="50" y="58" text-anchor="middle" dominant-baseline="middle" fill="#c41e3a" font-size="36" font-weight="bold" font-family="serif">中</text>
+</svg>

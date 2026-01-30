@@ -1,0 +1,22 @@
+[package]
+name = "agari"
+version = "0.6.2"
+edition = "2024"
+repository = "https://github.com/ryblogs/agari"
+homepage = "https://github.com/ryblogs/agari"
+description = "A Riichi Mahjong hand calculator and scoring engine"
+license = "MIT"
+
+[lib]
+name = "agari"
+path = "src/lib.rs"
+
+[[bin]]
+name = "agari"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+colored = "3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

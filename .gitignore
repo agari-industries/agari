@@ -1,7 +1,15 @@
 /target
 .DS_Store
-*.json
 
+# JSON files for mismatches tracking (but not package.json)
+mismatches*.json
+
+# Web frontend
+web/node_modules/
+web/dist/
+
+# WASM build output (kept in git for convenience, but can be rebuilt)
+# web/src/lib/wasm/
 
 ## Python
 

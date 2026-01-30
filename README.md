@@ -283,6 +283,48 @@ OPTIONS:
 
 ---
 
+## Web Frontend (Optional)
+
+Agari includes an optional web-based calculator UI built with Svelte and WebAssembly. The core library is compiled to WASM, giving you instant client-side scoring with no server required.
+
+### Running Locally
+
+```bash
+# Install dependencies and build WASM
+cd web
+npm install
+
+# Start development server
+npm run dev
+```
+
+Then open http://localhost:5173 in your browser.
+
+### Building for Production
+
+```bash
+# Build WASM and web assets
+./scripts/build-web.sh
+
+# Or manually:
+wasm-pack build crates/agari-wasm --target web --out-dir ../../web/src/lib/wasm
+cd web && npm run build
+```
+
+Production files are output to `web/dist/` and can be deployed to any static hosting service (GitHub Pages, Netlify, Vercel, etc.).
+
+### Features
+
+- **Tile palette** — Click to build your hand visually
+- **Real-time shanten** — See how far from tenpai as you add tiles
+- **Dora indicators** — Add dora and ura dora
+- **Full context options** — Riichi, tsumo/ron, winds, ippatsu, etc.
+- **Detailed results** — Yaku breakdown, fu calculation, and payment
+
+The web frontend is entirely optional—Agari remains a CLI-first, library-first project. The WASM/web code lives in separate crates (`crates/agari-wasm`) and doesn't affect the core library.
+
+---
+
 ## Using as a Library
 
 Agari can be used as a Rust library for building Mahjong applications, bots, or analysis tools.

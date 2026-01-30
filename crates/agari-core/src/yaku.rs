@@ -1,6 +1,8 @@
 //! Yaku (scoring pattern) detection for Riichi Mahjong hands.
 
-use crate::context::{GameContext, WinType, count_dora_detailed};
+use serde::{Deserialize, Serialize};
+
+use crate::context::{count_dora_detailed, GameContext, WinType};
 use crate::hand::{HandStructure, Meld};
 use crate::parse::TileCounts;
 use crate::tile::{Honor, Suit, Tile};
@@ -8,7 +10,7 @@ use crate::wait::is_pinfu;
 use std::collections::HashMap;
 
 /// Represents a scoring pattern (yaku)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Yaku {
     // === 1 han ===
     Riichi,         // Declared riichi (closed only)
@@ -203,7 +205,7 @@ impl Yaku {
 }
 
 /// Result of yaku detection
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YakuResult {
     pub yaku_list: Vec<Yaku>,
     pub total_han: u8,

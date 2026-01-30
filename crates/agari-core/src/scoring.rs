@@ -6,6 +6,8 @@
 //! 3. Whether the winner is dealer or not
 //! 4. Whether the win was by tsumo or ron
 
+use serde::{Deserialize, Serialize};
+
 use crate::context::{GameContext, WinType};
 use crate::hand::{HandStructure, Meld};
 use crate::tile::{Honor, Tile};
@@ -13,7 +15,7 @@ use crate::wait::{best_wait_type_for_scoring, is_pinfu};
 use crate::yaku::YakuResult;
 
 /// Score limit levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ScoreLevel {
     /// Below mangan - use fu calculation
     Normal,
@@ -60,7 +62,7 @@ impl ScoreLevel {
 }
 
 /// Result of fu calculation
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FuResult {
     /// Total fu (rounded up to nearest 10, except 25 for chiitoitsu)
     pub total: u8,
@@ -69,7 +71,7 @@ pub struct FuResult {
 }
 
 /// Detailed breakdown of fu components
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FuBreakdown {
     pub base: u8,       // Always 20
     pub menzen_ron: u8, // +10 for closed hand ron
@@ -81,7 +83,7 @@ pub struct FuBreakdown {
 }
 
 /// Payment structure for a winning hand
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Payment {
     /// Total points won
     pub total: u32,
@@ -94,7 +96,7 @@ pub struct Payment {
 }
 
 /// Complete scoring result
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScoringResult {
     pub fu: FuResult,
     pub han: u8,
@@ -302,7 +304,11 @@ fn meld_fu_with_context(meld: &Meld, all_melds: &[Meld], context: &GameContext) 
 
             // Note: Kans cannot be completed by ron (you can't ron a kan),
             // so we only check the kan type
-            if kan_type.is_open() { base } else { base * 2 }
+            if kan_type.is_open() {
+                base
+            } else {
+                base * 2
+            }
         }
     }
 }
@@ -363,7 +369,11 @@ fn meld_fu(meld: &Meld) -> u8 {
             // Double for closed
             let base = if is_terminal_or_honor { 4 } else { 2 };
 
-            if *is_meld_open { base } else { base * 2 }
+            if *is_meld_open {
+                base
+            } else {
+                base * 2
+            }
         }
 
         Meld::Kan(tile, kan_type) => {
@@ -374,7 +384,11 @@ fn meld_fu(meld: &Meld) -> u8 {
             // Terminal/Honor: 16 open, 32 closed
             let base = if is_terminal_or_honor { 16 } else { 8 };
 
-            if kan_type.is_open() { base } else { base * 2 }
+            if kan_type.is_open() {
+                base
+            } else {
+                base * 2
+            }
         }
     }
 }

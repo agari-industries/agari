@@ -1,10 +1,12 @@
 //! Game context for scoring - tracks win conditions, winds, dora, etc.
 
+use serde::{Deserialize, Serialize};
+
 use crate::parse::TileCounts;
 use crate::tile::{Honor, Tile};
 
 /// How the hand was won
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WinType {
     /// Won by taking another player's discard
     Ron,
@@ -13,7 +15,7 @@ pub enum WinType {
 }
 
 /// Complete game context needed for scoring
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameContext {
     // === Win condition ===
     pub win_type: WinType,
@@ -207,7 +209,7 @@ pub fn indicator_to_dora(indicator: Tile) -> Tile {
 }
 
 /// Breakdown of dora counts by type
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct DoraCount {
     pub regular: u8,
     pub ura: u8,
