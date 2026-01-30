@@ -54,6 +54,7 @@ EXAMPLES:
 
 #[derive(Parser)]
 #[command(name = "agari")]
+#[command(version)]
 #[command(about = "Riichi Mahjong Hand Scoring Calculator")]
 #[command(after_help = AFTER_HELP)]
 struct Args {
