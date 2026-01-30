@@ -95,6 +95,9 @@ pub struct ScoringOutput {
     pub fu_breakdown: FuBreakdownInfo,
     /// Hand structure description
     pub hand_structure: String,
+    /// The inferred winning tile (if not explicitly provided)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inferred_winning_tile: Option<String>,
 }
 
 /// Information about a single yaku
@@ -424,6 +427,13 @@ fn score_hand_internal(request: &ScoreRequest) -> Result<ScoringOutput, String> 
 
     let total_han = yaku.total_han_with_dora();
 
+    // Determine if winning tile was inferred
+    let inferred_winning_tile = if !explicit_winning_tile {
+        context.winning_tile.map(|t| format!("{}", t))
+    } else {
+        None
+    };
+
     Ok(ScoringOutput {
         yaku: yaku_list,
         han: yaku.total_han,
@@ -455,6 +465,7 @@ fn score_hand_internal(request: &ScoreRequest) -> Result<ScoringOutput, String> 
             rounded: score.fu.total,
         },
         hand_structure: format_structure(&structure),
+        inferred_winning_tile,
     })
 }
 

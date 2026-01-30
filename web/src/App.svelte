@@ -427,6 +427,22 @@
       if (response.success && response.result) {
         scoreResult = response.result;
         scoreError = null;
+
+        // If winning tile was inferred, auto-select it in the hand
+        if (response.result.inferred_winning_tile && selectedWinningTileIndex === null) {
+          const inferredTile = response.result.inferred_winning_tile;
+          // Find the first matching tile in hand
+          // Handle red fives: inferred "5m" should match "5m" or red "0m"
+          const matchIndex = handTiles.findIndex(entry => {
+            if (entry.tile === inferredTile) return true;
+            // Check if inferred is a 5 and entry is a red five (0) of same suit
+            if (inferredTile[0] === '5' && entry.isRed && entry.tile[1] === inferredTile[1]) return true;
+            return false;
+          });
+          if (matchIndex !== -1) {
+            selectedWinningTileIndex = matchIndex;
+          }
+        }
       } else {
         scoreError = response.error || 'Unknown error';
         scoreResult = null;

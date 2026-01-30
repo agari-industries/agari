@@ -71,6 +71,7 @@ export interface ScoringOutput {
   is_counted_yakuman: boolean;
   fu_breakdown: FuBreakdownInfo;
   hand_structure: string;
+  inferred_winning_tile?: string;
 }
 
 export interface YakuInfo {
