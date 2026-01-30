@@ -899,6 +899,7 @@
               bind:isChankan
               bind:isTenhou
               bind:isChiihou
+              hasOpenMelds={hasOpenMelds}
               onChange={handleContextChange}
             />
           </div>
