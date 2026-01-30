@@ -48,7 +48,14 @@
       const honors = ['東', '南', '西', '北', '白', '發', '中'];
       return honors[num - 1] || '';
     }
+    // Red five (0) displays as 5
+    if (t[0] === '0') return '5';
     return t[0];
+  };
+
+  // Check if tile is a red five (0m, 0p, 0s notation)
+  const isRedFive = (t: string): boolean => {
+    return t[0] === '0' && (t.endsWith('m') || t.endsWith('p') || t.endsWith('s'));
   };
 
   // Get suit symbol
@@ -65,7 +72,9 @@
     lg: 'w-12 h-16 text-xl',
   };
 
-  const color = $derived(red ? '#c41e3a' : getSuitColor(tile));
+  // Determine if this tile should be rendered as red (either explicit red prop or 0-notation)
+  const isRed = $derived(red || isRedFive(tile));
+  const color = $derived(isRed ? '#c41e3a' : getSuitColor(tile));
   const value = $derived(getTileValue(tile));
   const suitSymbol = $derived(getSuitSymbol(tile));
   const isHonor = $derived(tile.endsWith('z'));
@@ -144,14 +153,14 @@
         font-size="18"
         font-weight="bold"
       >
-        {red ? '5' : value}
+        {value}
       </text>
 
       {#if suitSymbol}
         {#if tile.endsWith('p')}
           <!-- Pin - circles pattern -->
           <g fill={color}>
-            {#if tile[0] === '1' || red}
+            {#if tile[0] === '1' || isRed}
               <circle cx="20" cy="40" r="5" />
             {:else if tile[0] === '2'}
               <circle cx="15" cy="40" r="4" />
@@ -180,7 +189,7 @@
         {:else if tile.endsWith('s')}
           <!-- Sou - bamboo lines -->
           <g stroke={color} stroke-width="2" stroke-linecap="round">
-            {#if tile[0] === '1' || red}
+            {#if tile[0] === '1' || isRed}
               <line x1="20" y1="35" x2="20" y2="48" />
               <circle cx="20" cy="35" r="3" fill={color} />
             {:else}
@@ -193,7 +202,7 @@
     {/if}
 
     <!-- Red five indicator -->
-    {#if red}
+    {#if isRed}
       <circle cx="32" cy="8" r="4" fill="#c41e3a" />
     {/if}
   </svg>

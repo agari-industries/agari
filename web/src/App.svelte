@@ -342,6 +342,14 @@
     scoreError = null;
     scoreResult = null;
 
+    // Convert red five notation (0m/0p/0s) to standard notation (5m/5p/5s) for backend
+    const normalizeRedFive = (tile: string): string => {
+      if (tile[0] === '0') {
+        return '5' + tile[1];
+      }
+      return tile;
+    };
+
     try {
       const fullHand = handString + buildMeldNotation();
       const request: ScoreRequest = {
@@ -353,8 +361,8 @@
         is_ippatsu: hasOpenMelds ? false : isIppatsu,
         round_wind: roundWind,
         seat_wind: seatWind,
-        dora_indicators: doraIndicators.map(d => d.tile),
-        ura_dora_indicators: uraDoraIndicators.map(d => d.tile),
+        dora_indicators: doraIndicators.map(d => normalizeRedFive(d.tile)),
+        ura_dora_indicators: uraDoraIndicators.map(d => normalizeRedFive(d.tile)),
         is_last_tile: isLastTile,
         is_rinshan: isRinshan,
         is_chankan: isChankan,
