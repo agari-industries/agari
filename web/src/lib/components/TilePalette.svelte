@@ -37,13 +37,16 @@
   };
 
   // Check if tile is disabled
-  const isDisabled = (tile: string): boolean => {
-    return disabledTiles.has(tile) || getCount(tile) <= 0;
+  const isDisabled = (tile: string, isRed: boolean = false): boolean => {
+    // Check if tile is in the disabled set
+    if (disabledTiles.has(tile)) return true;
+    // Check count
+    return getCount(tile, isRed) <= 0;
   };
 
   // Handle tile click
   const handleClick = (tile: string, isRed: boolean = false) => {
-    if (!isDisabled(tile)) {
+    if (!isDisabled(tile, isRed)) {
       onSelect(tile, isRed);
     }
   };
@@ -69,7 +72,7 @@
           tile="5m"
           size="md"
           red={true}
-          disabled={getCount('5m', true) <= 0}
+          disabled={isDisabled('5m', true)}
           showCount={true}
           count={getCount('5m', true)}
           onclick={() => handleClick('5m', true)}
@@ -97,7 +100,7 @@
           tile="5p"
           size="md"
           red={true}
-          disabled={getCount('5p', true) <= 0}
+          disabled={isDisabled('5p', true)}
           showCount={true}
           count={getCount('5p', true)}
           onclick={() => handleClick('5p', true)}
@@ -125,7 +128,7 @@
           tile="5s"
           size="md"
           red={true}
-          disabled={getCount('5s', true) <= 0}
+          disabled={isDisabled('5s', true)}
           showCount={true}
           count={getCount('5s', true)}
           onclick={() => handleClick('5s', true)}
