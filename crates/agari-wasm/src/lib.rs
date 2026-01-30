@@ -636,3 +636,330 @@ fn yaku_name(yaku: &Yaku) -> String {
         Yaku::JunseiChuurenPoutou => "Junsei Chuuren Poutou".to_string(),
     }
 }
+
+// ============================================================================
+// Tests - WASM-specific functionality only
+// (Scoring/yaku/shanten logic is tested in agari-core)
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agari::shanten::ShantenType;
+
+    // ========================================================================
+    // Helper functions for tests
+    // ========================================================================
+
+    fn make_request(hand: &str) -> ScoreRequest {
+        ScoreRequest {
+            hand: hand.to_string(),
+            winning_tile: None,
+            is_tsumo: false,
+            is_riichi: false,
+            is_double_riichi: false,
+            is_ippatsu: false,
+            round_wind: "east".to_string(),
+            seat_wind: "east".to_string(),
+            dora_indicators: vec![],
+            ura_dora_indicators: vec![],
+            is_last_tile: false,
+            is_rinshan: false,
+            is_chankan: false,
+            is_tenhou: false,
+            is_chiihou: false,
+        }
+    }
+
+    // ========================================================================
+    // Request/Response integration tests
+    // (Tests the WASM binding layer, not the scoring logic)
+    // ========================================================================
+
+    #[test]
+    fn test_score_request_success() {
+        let mut request = make_request("234m345p456s678m66p");
+        request.winning_tile = Some("6p".to_string());
+
+        let result = score_hand_internal(&request);
+
+        assert!(result.is_ok());
+        let output = result.unwrap();
+        assert!(output.payment.total > 0);
+        assert!(!output.yaku.is_empty());
+    }
+
+    #[test]
+    fn test_score_request_invalid_hand() {
+        let request = make_request("123m456p"); // Too few tiles
+
+        let result = score_hand_internal(&request);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_score_request_invalid_wind() {
+        let mut request = make_request("234m345p456s678m66p");
+        request.winning_tile = Some("6p".to_string());
+        request.round_wind = "invalid".to_string();
+
+        let result = score_hand_internal(&request);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_score_request_with_dora_indicators() {
+        let mut request = make_request("234m345p456s678m66p");
+        request.winning_tile = Some("6p".to_string());
+        request.dora_indicators = vec!["5p".to_string()]; // 6p is dora
+
+        let result = score_hand_internal(&request).unwrap();
+
+        assert_eq!(result.dora.regular, 2); // Two 6p tiles
+    }
+
+    #[test]
+    fn test_score_request_with_ura_dora() {
+        let mut request = make_request("234m345p456s678m66p");
+        request.winning_tile = Some("6p".to_string());
+        request.is_riichi = true;
+        request.ura_dora_indicators = vec!["5p".to_string()];
+
+        let result = score_hand_internal(&request).unwrap();
+
+        assert_eq!(result.dora.ura, 2);
+    }
+
+    #[test]
+    fn test_score_request_with_open_melds() {
+        let mut request = make_request("234m55p(111z)(222z)(333z)");
+        request.winning_tile = Some("5p".to_string());
+
+        let result = score_hand_internal(&request);
+
+        assert!(result.is_ok());
+    }
+
+    // ========================================================================
+    // Inferred winning tile tests (WASM-specific feature)
+    // ========================================================================
+
+    #[test]
+    fn test_inferred_winning_tile_set_when_not_provided() {
+        let request = make_request("123m456p789s234m55s");
+
+        let result = score_hand_internal(&request).unwrap();
+
+        assert!(result.inferred_winning_tile.is_some());
+    }
+
+    #[test]
+    fn test_inferred_winning_tile_none_when_provided() {
+        let mut request = make_request("234m345p456s678m66p");
+        request.winning_tile = Some("6p".to_string());
+
+        let result = score_hand_internal(&request).unwrap();
+
+        assert!(result.inferred_winning_tile.is_none());
+    }
+
+    #[test]
+    fn test_inferred_winning_tile_maximizes_score() {
+        // Hand where ryanmen wait gives pinfu (higher score than tanki)
+        let request = make_request("123m456p789s234m55s");
+
+        let result = score_hand_internal(&request).unwrap();
+
+        // Should infer the tile that gives pinfu
+        assert!(result.yaku.iter().any(|y| y.name == "Pinfu"));
+    }
+
+    // ========================================================================
+    // Shanten API tests
+    // ========================================================================
+
+    #[test]
+    fn test_shanten_api_success() {
+        let (result, desc) = calculate_shanten_internal("123m456p789s234m55p").unwrap();
+
+        assert_eq!(result.shanten, -1);
+        assert!(!desc.is_empty());
+    }
+
+    #[test]
+    fn test_shanten_api_with_melds() {
+        let (result, _) = calculate_shanten_internal("123m5p(111z)(222z)(333z)").unwrap();
+
+        assert_eq!(result.shanten, 0);
+    }
+
+    #[test]
+    fn test_shanten_api_returns_best_type() {
+        let (result, _) = calculate_shanten_internal("1133557799m11p3s").unwrap();
+
+        assert_eq!(result.best_type, ShantenType::Chiitoitsu);
+    }
+
+    #[test]
+    fn test_shanten_api_invalid_hand() {
+        let result = calculate_shanten_internal("invalid");
+
+        assert!(result.is_err());
+    }
+
+    // ========================================================================
+    // Ukeire API tests
+    // ========================================================================
+
+    #[test]
+    fn test_ukeire_api_success() {
+        let result = calculate_ukeire_internal("123m456p789s234m5p").unwrap();
+
+        assert_eq!(result.shanten, 0);
+        assert!(!result.tiles.is_empty());
+        assert!(result.total_count > 0);
+    }
+
+    #[test]
+    fn test_ukeire_api_complete_hand() {
+        let result = calculate_ukeire_internal("123m456p789s234m55p").unwrap();
+
+        assert_eq!(result.shanten, -1);
+        assert!(result.tiles.is_empty());
+    }
+
+    // ========================================================================
+    // parse_wind tests (WASM-specific helper)
+    // ========================================================================
+
+    #[test]
+    fn test_parse_wind_full_names() {
+        assert_eq!(parse_wind("east").unwrap(), Honor::East);
+        assert_eq!(parse_wind("south").unwrap(), Honor::South);
+        assert_eq!(parse_wind("west").unwrap(), Honor::West);
+        assert_eq!(parse_wind("north").unwrap(), Honor::North);
+    }
+
+    #[test]
+    fn test_parse_wind_abbreviations() {
+        assert_eq!(parse_wind("e").unwrap(), Honor::East);
+        assert_eq!(parse_wind("s").unwrap(), Honor::South);
+        assert_eq!(parse_wind("w").unwrap(), Honor::West);
+        assert_eq!(parse_wind("n").unwrap(), Honor::North);
+    }
+
+    #[test]
+    fn test_parse_wind_tile_notation() {
+        assert_eq!(parse_wind("1z").unwrap(), Honor::East);
+        assert_eq!(parse_wind("2z").unwrap(), Honor::South);
+        assert_eq!(parse_wind("3z").unwrap(), Honor::West);
+        assert_eq!(parse_wind("4z").unwrap(), Honor::North);
+    }
+
+    #[test]
+    fn test_parse_wind_case_insensitive() {
+        assert_eq!(parse_wind("EAST").unwrap(), Honor::East);
+        assert_eq!(parse_wind("East").unwrap(), Honor::East);
+    }
+
+    #[test]
+    fn test_parse_wind_invalid() {
+        assert!(parse_wind("invalid").is_err());
+        assert!(parse_wind("5z").is_err());
+    }
+
+    // ========================================================================
+    // yaku_name tests (WASM-specific display helper)
+    // ========================================================================
+
+    #[test]
+    fn test_yaku_name_basic() {
+        assert_eq!(yaku_name(&Yaku::Riichi), "Riichi");
+        assert_eq!(yaku_name(&Yaku::Tanyao), "Tanyao");
+        assert_eq!(yaku_name(&Yaku::Pinfu), "Pinfu");
+    }
+
+    #[test]
+    fn test_yaku_name_yakuhai_winds() {
+        assert_eq!(yaku_name(&Yaku::Yakuhai(Honor::East)), "Yakuhai (East)");
+        assert_eq!(yaku_name(&Yaku::Yakuhai(Honor::South)), "Yakuhai (South)");
+        assert_eq!(yaku_name(&Yaku::Yakuhai(Honor::West)), "Yakuhai (West)");
+        assert_eq!(yaku_name(&Yaku::Yakuhai(Honor::North)), "Yakuhai (North)");
+    }
+
+    #[test]
+    fn test_yaku_name_yakuhai_dragons() {
+        assert_eq!(yaku_name(&Yaku::Yakuhai(Honor::White)), "Yakuhai (Haku)");
+        assert_eq!(yaku_name(&Yaku::Yakuhai(Honor::Green)), "Yakuhai (Hatsu)");
+        assert_eq!(yaku_name(&Yaku::Yakuhai(Honor::Red)), "Yakuhai (Chun)");
+    }
+
+    #[test]
+    fn test_yaku_name_yakuman() {
+        assert_eq!(yaku_name(&Yaku::KokushiMusou), "Kokushi Musou");
+        assert_eq!(yaku_name(&Yaku::Suuankou), "Suuankou");
+        assert_eq!(yaku_name(&Yaku::Daisangen), "Daisangen");
+    }
+
+    // ========================================================================
+    // format_structure tests (WASM-specific display helper)
+    // ========================================================================
+
+    #[test]
+    fn test_format_structure_standard() {
+        use agari::hand::{HandStructure, Meld};
+        use agari::tile::{Suit, Tile};
+
+        let structure = HandStructure::Standard {
+            melds: vec![
+                Meld::Shuntsu(Tile::suited(Suit::Man, 1), false),
+                Meld::Shuntsu(Tile::suited(Suit::Pin, 4), false),
+                Meld::Shuntsu(Tile::suited(Suit::Sou, 7), false),
+                Meld::Shuntsu(Tile::suited(Suit::Man, 2), false),
+            ],
+            pair: Tile::suited(Suit::Pin, 5),
+        };
+
+        let formatted = format_structure(&structure);
+
+        assert!(formatted.contains("Standard"));
+    }
+
+    #[test]
+    fn test_format_structure_chiitoitsu() {
+        use agari::hand::HandStructure;
+        use agari::tile::{Suit, Tile};
+
+        let structure = HandStructure::Chiitoitsu {
+            pairs: vec![
+                Tile::suited(Suit::Man, 1),
+                Tile::suited(Suit::Man, 3),
+                Tile::suited(Suit::Man, 5),
+                Tile::suited(Suit::Man, 7),
+                Tile::suited(Suit::Man, 9),
+                Tile::suited(Suit::Pin, 1),
+                Tile::suited(Suit::Sou, 3),
+            ],
+        };
+
+        let formatted = format_structure(&structure);
+
+        assert!(formatted.contains("Chiitoitsu"));
+    }
+
+    #[test]
+    fn test_format_structure_kokushi() {
+        use agari::hand::HandStructure;
+        use agari::tile::{Suit, Tile};
+
+        let structure = HandStructure::Kokushi {
+            pair: Tile::suited(Suit::Man, 1),
+        };
+
+        let formatted = format_structure(&structure);
+
+        assert!(formatted.contains("Kokushi"));
+    }
+}
