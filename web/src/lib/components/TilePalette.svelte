@@ -200,11 +200,11 @@
   .tile-group {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: 0.5rem;
   }
 
   .tile-group.honors {
-    gap: 0.5rem;
+    gap: 0.625rem;
   }
 
   @media (max-width: 768px) {
@@ -219,7 +219,7 @@
     }
 
     .tile-group {
-      gap: 0.125rem;
+      gap: 0.25rem;
     }
   }
 </style>
