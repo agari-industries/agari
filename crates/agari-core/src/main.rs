@@ -19,7 +19,7 @@ use agari::{
     hand::{HandStructure, decompose_hand, decompose_hand_with_melds},
     parse::{TileCounts, parse_hand_with_aka, to_counts, validate_hand, validate_hand_with_melds},
     scoring::{ScoreLevel, ScoringResult, calculate_score},
-    shanten::{ShantenType, calculate_shanten, calculate_ukeire},
+    shanten::{ShantenType, calculate_shanten_with_melds, calculate_ukeire},
     tile::{Honor, Suit, Tile},
     yaku::{Yaku, YakuResult, detect_yaku_with_context},
 };
@@ -526,11 +526,12 @@ fn main() {
 
     // Shanten mode: calculate shanten and optionally ukeire
     if shanten_mode {
+        let called_melds_count = parsed.called_melds.len() as u8;
         if args.json {
-            print_shanten_json(&counts, ukeire_mode);
+            print_shanten_json(&counts, called_melds_count, ukeire_mode);
         } else {
             print_header(use_unicode);
-            print_shanten(&counts, ukeire_mode, use_unicode);
+            print_shanten(&counts, called_melds_count, ukeire_mode, use_unicode);
             print_footer(use_unicode);
         }
         return;
@@ -1257,8 +1258,13 @@ fn print_score(score: &ScoringResult) {
     }
 }
 
-fn print_shanten(counts: &agari::parse::TileCounts, show_ukeire: bool, use_unicode: bool) {
-    let result = calculate_shanten(counts);
+fn print_shanten(
+    counts: &agari::parse::TileCounts,
+    called_melds: u8,
+    show_ukeire: bool,
+    use_unicode: bool,
+) {
+    let result = calculate_shanten_with_melds(counts, called_melds);
 
     println!("\n{}", "📊 Shanten Analysis:".yellow().bold());
 
@@ -1342,8 +1348,8 @@ fn print_shanten(counts: &agari::parse::TileCounts, show_ukeire: bool, use_unico
     }
 }
 
-fn print_shanten_json(counts: &agari::parse::TileCounts, show_ukeire: bool) {
-    let result = calculate_shanten(counts);
+fn print_shanten_json(counts: &agari::parse::TileCounts, called_melds: u8, show_ukeire: bool) {
+    let result = calculate_shanten_with_melds(counts, called_melds);
 
     let shanten_desc = match result.shanten {
         -1 => "Complete hand (Agari)".to_string(),

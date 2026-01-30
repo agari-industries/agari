@@ -9,8 +9,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::parse::TileCounts;
-use crate::tile::{Honor, Suit, Tile, KOKUSHI_TILES};
-use std::cmp::min;
+use crate::tile::{Honor, KOKUSHI_TILES, Suit, Tile};
+use std::cmp::{max, min};
 
 /// Result of shanten calculation
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,7 +37,27 @@ pub enum ShantenType {
 /// Returns the minimum shanten across all possible hand types
 /// (standard, chiitoitsu, kokushi)
 pub fn calculate_shanten(counts: &TileCounts) -> ShantenResult {
-    let standard = calculate_standard_shanten(counts);
+    calculate_shanten_with_melds(counts, 0)
+}
+
+/// Calculate shanten for a hand with called melds
+///
+/// `called_melds` is the number of complete melds already called (pon, chi, kan).
+/// These melds are not included in `counts` - only the remaining hand tiles are.
+///
+/// For example, with 3 called pons and 4 tiles in hand (waiting for a pair),
+/// pass `called_melds = 3` and counts containing only the 4 hand tiles.
+pub fn calculate_shanten_with_melds(counts: &TileCounts, called_melds: u8) -> ShantenResult {
+    let standard = calculate_standard_shanten_with_melds(counts, called_melds);
+
+    // Chiitoitsu and Kokushi are not possible with called melds
+    if called_melds > 0 {
+        return ShantenResult {
+            shanten: standard,
+            best_type: ShantenType::Standard,
+        };
+    }
+
     let chiitoi = calculate_chiitoitsu_shanten(counts);
     let kokushi = calculate_kokushi_shanten(counts);
 
@@ -70,16 +90,42 @@ pub fn calculate_shanten(counts: &TileCounts) -> ShantenResult {
 /// Formula: shanten = 8 - 2*melds - max(taatsu + pairs, melds + 1)
 /// With adjustment for having a pair
 pub fn calculate_standard_shanten(counts: &TileCounts) -> i8 {
+    calculate_standard_shanten_with_melds(counts, 0)
+}
+
+/// Calculate shanten for standard hand with called melds
+///
+/// `called_melds` is the number of complete melds already called.
+fn calculate_standard_shanten_with_melds(counts: &TileCounts, called_melds: u8) -> i8 {
     // Convert to array representation for faster calculation
     // Index 0-8: man 1-9, 9-17: pin 1-9, 18-26: sou 1-9, 27-33: honors
     let tiles = counts_to_array(counts);
+
+    // Count total tiles in hand
+    let total_hand_tiles: u8 = tiles.iter().sum();
+
+    // Calculate minimum tiles needed for tenpai with this many called melds
+    // Tenpai requires: (4 - called_melds - 1) complete melds + 1 taatsu + 1 pair
+    // OR: (4 - called_melds) complete melds + 1 floating tile (tanki wait)
+    // Minimum is: max(1, 13 - 3 * called_melds) for called_melds < 4
+    // For 4 called melds: 1 tile minimum (tanki wait)
+    let min_tenpai_tiles: u8 = if called_melds >= 4 {
+        1
+    } else {
+        13u8.saturating_sub(3 * called_melds)
+    };
+
+    // If we don't have enough tiles for tenpai, calculate how many we're short
+    // and add that to the formula-based shanten
+    let tile_deficit = min_tenpai_tiles.saturating_sub(total_hand_tiles);
 
     let mut best_shanten = 8i8; // Maximum possible shanten
 
     // Try with and without a pair extracted
     // Without pair
     let (melds, taatsu) = count_melds_and_taatsu(&tiles);
-    let shanten = calculate_shanten_value(melds, taatsu, false);
+    let shanten =
+        calculate_shanten_value_with_called(melds, taatsu, false, called_melds, tile_deficit);
     best_shanten = min(best_shanten, shanten);
 
     // Try extracting each possible pair
@@ -88,7 +134,13 @@ pub fn calculate_standard_shanten(counts: &TileCounts) -> i8 {
             let mut tiles_copy = tiles;
             tiles_copy[i] -= 2;
             let (melds, taatsu) = count_melds_and_taatsu(&tiles_copy);
-            let shanten = calculate_shanten_value(melds, taatsu, true);
+            let shanten = calculate_shanten_value_with_called(
+                melds,
+                taatsu,
+                true,
+                called_melds,
+                tile_deficit,
+            );
             best_shanten = min(best_shanten, shanten);
         }
     }
@@ -290,16 +342,29 @@ fn extract_melds_triplets_first(tiles: &[u8; 34], start: usize) -> (u8, [u8; 34]
     (melds, remaining)
 }
 
-/// Calculate shanten value from meld and taatsu counts
-fn calculate_shanten_value(melds: u8, taatsu: u8, has_pair: bool) -> i8 {
+/// Calculate shanten value from meld and taatsu counts, accounting for called melds
+///
+/// `tile_deficit` is how many tiles short we are of the minimum needed for tenpai.
+/// This ensures we don't report tenpai when there aren't enough tiles to form a valid wait.
+fn calculate_shanten_value_with_called(
+    melds: u8,
+    taatsu: u8,
+    has_pair: bool,
+    called_melds: u8,
+    tile_deficit: u8,
+) -> i8 {
+    // Total melds = melds found in hand + called melds
+    let total_melds = melds + called_melds;
+
     // If we have 4+ melds and a pair, we have a complete hand
-    if melds >= 4 && has_pair {
+    // But only if we have enough tiles (no deficit)
+    if total_melds >= 4 && has_pair && tile_deficit == 0 {
         return -1;
     }
 
-    // Maximum useful taatsu is (4 - melds) because we need exactly 4 melds
-    // Use saturating_sub to avoid overflow when melds > 4
-    let max_useful_taatsu = 4u8.saturating_sub(melds);
+    // Maximum useful taatsu is (4 - total_melds) because we need exactly 4 melds
+    // Use saturating_sub to avoid overflow when total_melds > 4
+    let max_useful_taatsu = 4u8.saturating_sub(total_melds);
     let useful_taatsu = min(taatsu, max_useful_taatsu);
 
     // Base shanten: need 4 melds, each meld needs 3 tiles
@@ -308,18 +373,24 @@ fn calculate_shanten_value(melds: u8, taatsu: u8, has_pair: bool) -> i8 {
     // Subtract 1 for each taatsu (saves 1 tile change)
     // Subtract 1 if we have a pair (saves 1 tile change for the pair)
 
-    let mut shanten = 8i8 - (2 * melds.min(4) as i8) - (useful_taatsu as i8);
+    let mut shanten = 8i8 - (2 * total_melds.min(4) as i8) - (useful_taatsu as i8);
 
     if has_pair {
         shanten -= 1;
     }
 
-    // However, if melds + useful_taatsu > 4, we have too many blocks
+    // However, if total_melds + useful_taatsu > 4, we have too many blocks
     // We can only use 4 blocks total (excluding the pair)
-    let total_blocks = melds.min(4) + useful_taatsu;
+    let total_blocks = total_melds.min(4) + useful_taatsu;
     if total_blocks > 4 {
         // Each excess block means we counted a taatsu that won't help
         shanten += (total_blocks - 4) as i8;
+    }
+
+    // If we don't have enough tiles to form a valid tenpai, we can't be tenpai
+    // Add the tile deficit to shanten (each missing tile is one more step away)
+    if shanten >= 0 {
+        shanten = max(shanten, tile_deficit as i8);
     }
 
     shanten
