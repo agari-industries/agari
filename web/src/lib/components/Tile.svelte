@@ -1,4 +1,49 @@
 <script lang="ts">
+  // Import all tile SVGs statically
+  import Man1 from '../assets/tiles/Man1.svg';
+  import Man2 from '../assets/tiles/Man2.svg';
+  import Man3 from '../assets/tiles/Man3.svg';
+  import Man4 from '../assets/tiles/Man4.svg';
+  import Man5 from '../assets/tiles/Man5.svg';
+  import Man5Dora from '../assets/tiles/Man5-Dora.svg';
+  import Man6 from '../assets/tiles/Man6.svg';
+  import Man7 from '../assets/tiles/Man7.svg';
+  import Man8 from '../assets/tiles/Man8.svg';
+  import Man9 from '../assets/tiles/Man9.svg';
+
+  import Pin1 from '../assets/tiles/Pin1.svg';
+  import Pin2 from '../assets/tiles/Pin2.svg';
+  import Pin3 from '../assets/tiles/Pin3.svg';
+  import Pin4 from '../assets/tiles/Pin4.svg';
+  import Pin5 from '../assets/tiles/Pin5.svg';
+  import Pin5Dora from '../assets/tiles/Pin5-Dora.svg';
+  import Pin6 from '../assets/tiles/Pin6.svg';
+  import Pin7 from '../assets/tiles/Pin7.svg';
+  import Pin8 from '../assets/tiles/Pin8.svg';
+  import Pin9 from '../assets/tiles/Pin9.svg';
+
+  import Sou1 from '../assets/tiles/Sou1.svg';
+  import Sou2 from '../assets/tiles/Sou2.svg';
+  import Sou3 from '../assets/tiles/Sou3.svg';
+  import Sou4 from '../assets/tiles/Sou4.svg';
+  import Sou5 from '../assets/tiles/Sou5.svg';
+  import Sou5Dora from '../assets/tiles/Sou5-Dora.svg';
+  import Sou6 from '../assets/tiles/Sou6.svg';
+  import Sou7 from '../assets/tiles/Sou7.svg';
+  import Sou8 from '../assets/tiles/Sou8.svg';
+  import Sou9 from '../assets/tiles/Sou9.svg';
+
+  import Ton from '../assets/tiles/Ton.svg';
+  import Nan from '../assets/tiles/Nan.svg';
+  import Shaa from '../assets/tiles/Shaa.svg';
+  import Pei from '../assets/tiles/Pei.svg';
+  import Haku from '../assets/tiles/Haku.svg';
+  import Hatsu from '../assets/tiles/Hatsu.svg';
+  import Chun from '../assets/tiles/Chun.svg';
+
+  import Back from '../assets/tiles/Back.svg';
+  import Front from '../assets/tiles/Front.svg';
+
   interface Props {
     tile: string;
     size?: 'sm' | 'md' | 'lg';
@@ -21,61 +66,83 @@
     onclick,
   }: Props = $props();
 
-  // Determine tile suit for coloring
-  const getSuitColor = (t: string): string => {
-    if (t.endsWith('m')) return '#c41e3a'; // Man - red
-    if (t.endsWith('p')) return '#1e90ff'; // Pin - blue
-    if (t.endsWith('s')) return '#228b22'; // Sou - green
-    if (t.endsWith('z')) {
-      const num = parseInt(t[0]);
-      if (num >= 5) {
-        // Dragons
-        if (num === 5) return '#666666'; // White
-        if (num === 6) return '#228b22'; // Green
-        if (num === 7) return '#c41e3a'; // Red
-      }
-      return '#2f2f2f'; // Winds - black
-    }
-    return '#2f2f2f';
+  // Map of tile codes to imported SVG paths
+  const tileMap: Record<string, string> = {
+    // Man (Characters)
+    '1m': Man1,
+    '2m': Man2,
+    '3m': Man3,
+    '4m': Man4,
+    '5m': Man5,
+    '6m': Man6,
+    '7m': Man7,
+    '8m': Man8,
+    '9m': Man9,
+    // Pin (Dots)
+    '1p': Pin1,
+    '2p': Pin2,
+    '3p': Pin3,
+    '4p': Pin4,
+    '5p': Pin5,
+    '6p': Pin6,
+    '7p': Pin7,
+    '8p': Pin8,
+    '9p': Pin9,
+    // Sou (Bamboo)
+    '1s': Sou1,
+    '2s': Sou2,
+    '3s': Sou3,
+    '4s': Sou4,
+    '5s': Sou5,
+    '6s': Sou6,
+    '7s': Sou7,
+    '8s': Sou8,
+    '9s': Sou9,
+    // Honors - Winds
+    '1z': Ton,   // East
+    '2z': Nan,   // South
+    '3z': Shaa,  // West
+    '4z': Pei,   // North
+    // Honors - Dragons
+    '5z': Haku,  // White
+    '6z': Hatsu, // Green
+    '7z': Chun,  // Red
+    // Red fives (aka dora)
+    '0m': Man5Dora,
+    '0p': Pin5Dora,
+    '0s': Sou5Dora,
+    // Back tile
+    'back': Back,
   };
 
-  // Get tile value display
-  const getTileValue = (t: string): string => {
-    if (t.endsWith('z')) {
-      const num = parseInt(t[0]);
-      const honors = ['東', '南', '西', '北', '白', '發', '中'];
-      return honors[num - 1] || '';
-    }
-    // Red five (0) displays as 5
-    if (t[0] === '0') return '5';
-    return t[0];
-  };
-
-  // Check if tile is a red five (0m, 0p, 0s notation)
+  // Check if tile is a red five based on notation (0m, 0p, 0s) or red prop
   const isRedFive = (t: string): boolean => {
     return t[0] === '0' && (t.endsWith('m') || t.endsWith('p') || t.endsWith('s'));
   };
 
-  // Get suit symbol
-  const getSuitSymbol = (t: string): string | null => {
-    if (t.endsWith('m')) return '萬';
-    if (t.endsWith('p')) return '●';
-    if (t.endsWith('s')) return '竹';
-    return null;
+  // Get the SVG path for a tile
+  const getTileSvg = (t: string, isRed: boolean): string => {
+    // Handle 0-notation for red fives
+    if (isRedFive(t)) {
+      return tileMap[t] || tileMap['back'];
+    }
+
+    // If red prop is set and it's a 5, use the dora version
+    if (isRed && t[0] === '5') {
+      const suit = t[1];
+      return tileMap[`0${suit}`] || tileMap[t] || tileMap['back'];
+    }
+
+    return tileMap[t] || tileMap['back'];
   };
 
   const sizeClasses = {
-    sm: 'w-7 h-10 text-sm',
-    md: 'w-10 h-14 text-lg',
-    lg: 'w-12 h-16 text-xl',
+    sm: 'tile-sm',
+    md: 'tile-md',
+    lg: 'tile-lg',
   };
 
-  // Determine if this tile should be rendered as red (either explicit red prop or 0-notation)
-  const isRed = $derived(red || isRedFive(tile));
-  const color = $derived(isRed ? '#c41e3a' : getSuitColor(tile));
-  const value = $derived(getTileValue(tile));
-  const suitSymbol = $derived(getSuitSymbol(tile));
-  const isHonor = $derived(tile.endsWith('z'));
+  const tileSvg = $derived(getTileSvg(tile, red));
 </script>
 
 <button
@@ -88,122 +155,10 @@
   onclick={onclick}
   aria-label="Tile {tile}"
 >
-  <svg viewBox="0 0 40 56" class="w-full h-full">
-    <!-- Tile background with 3D effect -->
-    <defs>
-      <linearGradient id="tileGradient-{tile}" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" style="stop-color:#fff8e7" />
-        <stop offset="100%" style="stop-color:#f5f0e6" />
-      </linearGradient>
-      <filter id="tileShadow" x="-20%" y="-20%" width="140%" height="140%">
-        <feDropShadow dx="0" dy="2" stdDeviation="1" flood-color="#5c4a3a" flood-opacity="0.5" />
-      </filter>
-    </defs>
-
-    <!-- Main tile body -->
-    <rect
-      x="2"
-      y="2"
-      width="36"
-      height="50"
-      rx="4"
-      fill="url(#tileGradient-{tile})"
-      stroke="#8b7355"
-      stroke-width="2"
-      filter="url(#tileShadow)"
-    />
-
-    <!-- Inner border for depth -->
-    <rect
-      x="4"
-      y="4"
-      width="32"
-      height="46"
-      rx="3"
-      fill="none"
-      stroke="#d4c4a8"
-      stroke-width="1"
-    />
-
-    <!-- Tile content -->
-    {#if isHonor}
-      <!-- Honor tile - single large character -->
-      <text
-        x="20"
-        y="34"
-        text-anchor="middle"
-        dominant-baseline="middle"
-        fill={color}
-        font-size="22"
-        font-weight="bold"
-        font-family="serif"
-      >
-        {value}
-      </text>
-    {:else}
-      <!-- Suited tile - number and suit -->
-      <text
-        x="20"
-        y="22"
-        text-anchor="middle"
-        dominant-baseline="middle"
-        fill={color}
-        font-size="18"
-        font-weight="bold"
-      >
-        {value}
-      </text>
-
-      {#if suitSymbol}
-        {#if tile.endsWith('p')}
-          <!-- Pin - circles pattern -->
-          <g fill={color}>
-            {#if tile[0] === '1' || isRed}
-              <circle cx="20" cy="40" r="5" />
-            {:else if tile[0] === '2'}
-              <circle cx="15" cy="40" r="4" />
-              <circle cx="25" cy="40" r="4" />
-            {:else if tile[0] === '3'}
-              <circle cx="20" cy="36" r="3.5" />
-              <circle cx="14" cy="44" r="3.5" />
-              <circle cx="26" cy="44" r="3.5" />
-            {:else}
-              <text x="20" y="44" text-anchor="middle" font-size="12">{suitSymbol}</text>
-            {/if}
-          </g>
-        {:else if tile.endsWith('m')}
-          <!-- Man - 萬 character -->
-          <text
-            x="20"
-            y="44"
-            text-anchor="middle"
-            dominant-baseline="middle"
-            fill={color}
-            font-size="12"
-            font-family="serif"
-          >
-            {suitSymbol}
-          </text>
-        {:else if tile.endsWith('s')}
-          <!-- Sou - bamboo lines -->
-          <g stroke={color} stroke-width="2" stroke-linecap="round">
-            {#if tile[0] === '1' || isRed}
-              <line x1="20" y1="35" x2="20" y2="48" />
-              <circle cx="20" cy="35" r="3" fill={color} />
-            {:else}
-              <line x1="16" y1="36" x2="16" y2="46" />
-              <line x1="24" y1="36" x2="24" y2="46" />
-            {/if}
-          </g>
-        {/if}
-      {/if}
-    {/if}
-
-    <!-- Red five indicator -->
-    {#if isRed}
-      <circle cx="32" cy="8" r="4" fill="#c41e3a" />
-    {/if}
-  </svg>
+  <div class="tile-layers">
+    <img src={Front} alt="" class="tile-background" draggable="false" />
+    <img src={tileSvg} alt="Mahjong tile {tile}" class="tile-face" draggable="false" />
+  </div>
 
   <!-- Count badge -->
   {#if showCount}
@@ -221,6 +176,48 @@
     padding: 0;
     cursor: default;
     transition: transform 0.1s ease, filter 0.1s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tile-layers {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .tile-background {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+
+  .tile-face {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+
+  /* Size variants - maintaining roughly 5:7 aspect ratio */
+  .tile-sm {
+    width: 28px;
+    height: 40px;
+  }
+
+  .tile-md {
+    width: 40px;
+    height: 56px;
+  }
+
+  .tile-lg {
+    width: 52px;
+    height: 72px;
   }
 
   .tile-button.clickable {
