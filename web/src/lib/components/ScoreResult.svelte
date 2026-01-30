@@ -49,6 +49,17 @@
     </div>
   {:else if result}
     <div class="result-content">
+      <!-- Inferred Winning Tile Warning -->
+      {#if result.inferred_winning_tile}
+        <div class="inferred-warning">
+          <span class="warning-icon">💡</span>
+          <span class="warning-text">
+            Winning tile inferred as <strong>{result.inferred_winning_tile}</strong>.
+            Click a tile in your hand to select explicitly.
+          </span>
+        </div>
+      {/if}
+
       <!-- Score Summary -->
       <div class="score-summary">
         {#if result.score_level}
@@ -234,6 +245,33 @@
   .error-message {
     color: #ef4444;
     font-size: 0.875rem;
+  }
+
+  .inferred-warning {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: rgba(251, 191, 36, 0.15);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+  }
+
+  .warning-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  .warning-text {
+    color: #fbbf24;
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
+  .warning-text strong {
+    color: #fcd34d;
+    font-weight: 600;
   }
 
   .result-content {
