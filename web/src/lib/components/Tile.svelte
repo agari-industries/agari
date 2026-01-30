@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { tileToUnicode } from '../agari';
-
   interface Props {
     tile: string;
     size?: 'sm' | 'md' | 'lg';

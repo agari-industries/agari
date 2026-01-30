@@ -2,20 +2,18 @@
   import { onMount } from 'svelte';
   import {
     initAgari,
-    isLoaded,
     scoreHand,
     calculateShanten,
     type ScoreRequest,
     type ScoringOutput,
     type ShantenResponse,
     ALL_TILES,
-    ALL_TILES_WITH_RED,
   } from './lib/agari';
   import TilePalette from './lib/components/TilePalette.svelte';
-  import HandDisplay from './lib/components/HandDisplay.svelte';
   import ContextOptions from './lib/components/ContextOptions.svelte';
   import ScoreResult from './lib/components/ScoreResult.svelte';
   import Tile from './lib/components/Tile.svelte';
+  import DoraPicker from './lib/components/DoraPicker.svelte';
 
   // ============================================================================
   // State
@@ -54,7 +52,9 @@
   let doraIndicators = $state<TileEntry[]>([]);
   let uraDoraIndicators = $state<TileEntry[]>([]);
   let nextDoraId = $state(0);
-  let showDoraSection = $state(false);
+  let showDoraSection = $state(true);
+  let showDoraPicker = $state(false);
+  let showUraDoraPicker = $state(false);
 
   // Context options
   let isTsumo = $state(false);
@@ -82,9 +82,12 @@
   // Derived state
   // ============================================================================
 
+  // Type for tile counts including red five tracking
+  type TileCountsType = Record<string, number>;
+
   // Calculate remaining tiles
-  const tileCounts = $derived.by(() => {
-    const counts: Record<string, number> = {};
+  const tileCounts: TileCountsType = $derived.by(() => {
+    const counts: TileCountsType = {};
     for (const tile of ALL_TILES) {
       counts[tile] = 4;
     }
@@ -117,14 +120,26 @@
     }
     // Subtract dora indicators
     for (const entry of doraIndicators) {
-      if (counts[entry.tile] !== undefined) {
-        counts[entry.tile]--;
+      // Red fives use 0m/0p/0s notation - map to 5m/5p/5s for count tracking
+      const countTile = entry.tile.startsWith('0') ? '5' + entry.tile[1] : entry.tile;
+      if (counts[countTile] !== undefined) {
+        counts[countTile]--;
+      }
+      // Track red five usage for dora indicators
+      if (entry.tile.startsWith('0') && redFiveCounts[countTile] !== undefined) {
+        redFiveCounts[countTile]--;
       }
     }
     // Subtract ura dora indicators
     for (const entry of uraDoraIndicators) {
-      if (counts[entry.tile] !== undefined) {
-        counts[entry.tile]--;
+      // Red fives use 0m/0p/0s notation - map to 5m/5p/5s for count tracking
+      const countTile = entry.tile.startsWith('0') ? '5' + entry.tile[1] : entry.tile;
+      if (counts[countTile] !== undefined) {
+        counts[countTile]--;
+      }
+      // Track red five usage for ura dora indicators
+      if (entry.tile.startsWith('0') && redFiveCounts[countTile] !== undefined) {
+        redFiveCounts[countTile]--;
       }
     }
 
@@ -296,7 +311,14 @@
   // Add dora indicator
   function addDoraIndicator(tile: string, _isRed: boolean = false) {
     if (doraIndicators.length >= 5) return;
-    if (tileCounts[tile] <= 0) return;
+    // For red fives (0m/0p/0s), check both the regular 5 count and red five count
+    if (tile.startsWith('0')) {
+      const baseTile = '5' + tile[1];
+      const redKey = `red${baseTile}` as keyof typeof tileCounts;
+      if (tileCounts[baseTile] <= 0 || tileCounts[redKey] <= 0) return;
+    } else {
+      if (tileCounts[tile] <= 0) return;
+    }
     doraIndicators = [...doraIndicators, { tile, id: nextDoraId++ }];
   }
 
@@ -308,7 +330,14 @@
   // Add ura dora indicator
   function addUraDoraIndicator(tile: string, _isRed: boolean = false) {
     if (uraDoraIndicators.length >= 5) return;
-    if (tileCounts[tile] <= 0) return;
+    // For red fives (0m/0p/0s), check both the regular 5 count and red five count
+    if (tile.startsWith('0')) {
+      const baseTile = '5' + tile[1];
+      const redKey = `red${baseTile}` as keyof typeof tileCounts;
+      if (tileCounts[baseTile] <= 0 || tileCounts[redKey] <= 0) return;
+    } else {
+      if (tileCounts[tile] <= 0) return;
+    }
     uraDoraIndicators = [...uraDoraIndicators, { tile, id: nextDoraId++ }];
   }
 
@@ -554,26 +583,30 @@
             </div>
             <div class="hand-tiles-selectable">
               {#each handTiles as entry, index (entry.id)}
-                <button
-                  type="button"
-                  class="tile-wrapper"
-                  class:selected={selectedWinningTileIndex === index}
-                  onclick={() => selectWinningTile(index)}
-                  oncontextmenu={(e) => { e.preventDefault(); removeTile(index); }}
-                >
-                  <Tile tile={entry.tile} red={entry.isRed} size="md" />
-                  {#if selectedWinningTileIndex === index}
-                    <div class="winning-badge">WIN</div>
-                  {/if}
-                </button>
+                <div class="tile-container">
+                  <button
+                    type="button"
+                    class="tile-wrapper"
+                    class:selected={selectedWinningTileIndex === index}
+                    onclick={() => selectWinningTile(index)}
+                  >
+                    <Tile tile={entry.tile} red={entry.isRed} size="md" />
+                    {#if selectedWinningTileIndex === index}
+                      <div class="winning-badge">WIN</div>
+                    {/if}
+                  </button>
+                  <button
+                    type="button"
+                    class="tile-remove-btn"
+                    onclick={(e) => { e.stopPropagation(); removeTile(index); }}
+                    aria-label="Remove tile"
+                  >×</button>
+                </div>
               {/each}
               {#each Array(Math.max(0, maxHandTiles - handTiles.length)) as _}
                 <div class="tile-placeholder"></div>
               {/each}
             </div>
-            {#if handTiles.length > 0}
-              <p class="hand-hint">Right-click to remove a tile</p>
-            {/if}
             {#if handTiles.length > 0 || melds.length > 0}
               <p class="hand-notation">{handString}{buildMeldNotation()}</p>
             {/if}
@@ -615,28 +648,26 @@
                   <label class="dora-label">Dora</label>
                   <div class="dora-tiles">
                     {#each doraIndicators as entry, index (entry.id)}
-                      <Tile
-                        tile={entry.tile}
-                        size="sm"
-                        onclick={() => removeDoraIndicator(index)}
-                      />
+                      <div class="dora-tile-wrapper">
+                        <Tile
+                          tile={entry.tile}
+                          size="sm"
+                          red={entry.tile.startsWith('0')}
+                        />
+                        <button
+                          type="button"
+                          class="dora-remove-btn"
+                          onclick={() => removeDoraIndicator(index)}
+                          aria-label="Remove dora indicator"
+                        >×</button>
+                      </div>
                     {/each}
                     {#if doraIndicators.length < 5}
-                      <select
-                        class="dora-select"
-                        onchange={(e) => {
-                          const target = e.target as HTMLSelectElement;
-                          if (target.value) {
-                            addDoraIndicator(target.value);
-                            target.value = '';
-                          }
-                        }}
-                      >
-                        <option value="">+ Add</option>
-                        {#each ALL_TILES_WITH_RED as tile}
-                          <option value={tile}>{tile}</option>
-                        {/each}
-                      </select>
+                      <button
+                        type="button"
+                        class="dora-add-btn"
+                        onclick={() => showDoraPicker = true}
+                      >+ Add</button>
                     {/if}
                   </div>
                 </div>
@@ -646,28 +677,26 @@
                     <label class="dora-label">Ura Dora</label>
                     <div class="dora-tiles">
                       {#each uraDoraIndicators as entry, index (entry.id)}
-                        <Tile
-                          tile={entry.tile}
-                          size="sm"
-                          onclick={() => removeUraDoraIndicator(index)}
-                        />
+                        <div class="dora-tile-wrapper">
+                          <Tile
+                            tile={entry.tile}
+                            size="sm"
+                            red={entry.tile.startsWith('0')}
+                          />
+                          <button
+                            type="button"
+                            class="dora-remove-btn"
+                            onclick={() => removeUraDoraIndicator(index)}
+                            aria-label="Remove ura dora indicator"
+                          >×</button>
+                        </div>
                       {/each}
                       {#if uraDoraIndicators.length < 5}
-                        <select
-                          class="dora-select"
-                          onchange={(e) => {
-                            const target = e.target as HTMLSelectElement;
-                            if (target.value) {
-                              addUraDoraIndicator(target.value);
-                              target.value = '';
-                            }
-                          }}
-                        >
-                          <option value="">+ Add</option>
-                          {#each ALL_TILES_WITH_RED as tile}
-                            <option value={tile}>{tile}</option>
-                          {/each}
-                        </select>
+                        <button
+                          type="button"
+                          class="dora-add-btn"
+                          onclick={() => showUraDoraPicker = true}
+                        >+ Add</button>
                       {/if}
                     </div>
                   </div>
@@ -679,6 +708,22 @@
                   </div>
                 {/if}
               </div>
+            {/if}
+
+            <!-- Dora Picker Modal -->
+            {#if showDoraPicker}
+              <DoraPicker
+                onSelect={(tile) => { addDoraIndicator(tile); showDoraPicker = false; }}
+                onClose={() => showDoraPicker = false}
+              />
+            {/if}
+
+            <!-- Ura Dora Picker Modal -->
+            {#if showUraDoraPicker}
+              <DoraPicker
+                onSelect={(tile) => { addUraDoraIndicator(tile); showUraDoraPicker = false; }}
+                onClose={() => showUraDoraPicker = false}
+              />
             {/if}
           </div>
 
@@ -1144,18 +1189,54 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   }
 
+  .tile-container {
+    position: relative;
+  }
+
+  .tile-remove-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ef4444;
+    color: white;
+    border: 2px solid var(--bg-primary);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    opacity: 0;
+    transition: opacity 0.15s ease, transform 0.1s ease;
+    z-index: 10;
+  }
+
+  .tile-container:hover .tile-remove-btn,
+  .tile-remove-btn:focus {
+    opacity: 1;
+  }
+
+  .tile-remove-btn:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+  }
+
+  /* Always show remove buttons on touch devices */
+  @media (hover: none) {
+    .tile-remove-btn {
+      opacity: 0.8;
+    }
+  }
+
   .tile-placeholder {
     width: 40px;
     height: 56px;
     border: 2px dashed rgba(255, 255, 255, 0.15);
     border-radius: 4px;
-  }
-
-  .hand-hint {
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.4);
-    margin-top: 0.5rem;
-    margin-bottom: 0;
   }
 
   .shanten-error {
@@ -1201,18 +1282,65 @@
   .dora-tiles {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
   }
 
-  .dora-select {
+  .dora-tile-wrapper {
+    position: relative;
+  }
+
+  .dora-remove-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ef4444;
+    color: white;
+    border: 1px solid var(--bg-primary);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 10;
+  }
+
+  .dora-tile-wrapper:hover .dora-remove-btn,
+  .dora-remove-btn:focus {
+    opacity: 1;
+  }
+
+  .dora-remove-btn:hover {
+    background: #dc2626;
+  }
+
+  @media (hover: none) {
+    .dora-remove-btn {
+      opacity: 0.8;
+    }
+  }
+
+  .dora-add-btn {
     padding: 0.25rem 0.5rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--text-secondary);
+    border: 1px dashed var(--text-secondary);
     border-radius: 4px;
     color: var(--text-primary);
     font-size: 0.75rem;
     cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .dora-add-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: var(--accent);
   }
 
   .aka-display {
