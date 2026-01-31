@@ -304,11 +304,7 @@ fn meld_fu_with_context(meld: &Meld, all_melds: &[Meld], context: &GameContext) 
 
             // Note: Kans cannot be completed by ron (you can't ron a kan),
             // so we only check the kan type
-            if kan_type.is_open() {
-                base
-            } else {
-                base * 2
-            }
+            if kan_type.is_open() { base } else { base * 2 }
         }
     }
 }
@@ -369,11 +365,7 @@ fn meld_fu(meld: &Meld) -> u8 {
             // Double for closed
             let base = if is_terminal_or_honor { 4 } else { 2 };
 
-            if *is_meld_open {
-                base
-            } else {
-                base * 2
-            }
+            if *is_meld_open { base } else { base * 2 }
         }
 
         Meld::Kan(tile, kan_type) => {
@@ -384,11 +376,7 @@ fn meld_fu(meld: &Meld) -> u8 {
             // Terminal/Honor: 16 open, 32 closed
             let base = if is_terminal_or_honor { 16 } else { 8 };
 
-            if kan_type.is_open() {
-                base
-            } else {
-                base * 2
-            }
+            if kan_type.is_open() { base } else { base * 2 }
         }
     }
 }
@@ -421,7 +409,7 @@ fn pair_fu(pair: Tile, context: &GameContext) -> u8 {
 
 /// Round up to the nearest 10
 fn round_up_to_10(value: u8) -> u8 {
-    ((value + 9) / 10) * 10
+    value.div_ceil(10) * 10
 }
 
 // ============================================================================
@@ -444,11 +432,7 @@ pub fn determine_score_level(han: u8, fu: u8, is_yakuman: bool) -> ScoreLevel {
         ScoreLevel::Baiman
     } else if han >= 6 {
         ScoreLevel::Haneman
-    } else if han >= 5 {
-        ScoreLevel::Mangan
-    } else if han == 4 && fu >= 40 {
-        ScoreLevel::Mangan
-    } else if han == 3 && fu >= 70 {
+    } else if han >= 5 || (han == 4 && fu >= 40) || (han == 3 && fu >= 70) {
         ScoreLevel::Mangan
     } else {
         ScoreLevel::Normal
@@ -514,7 +498,7 @@ pub fn calculate_payment(basic_points: u32, is_dealer: bool, win_type: WinType) 
 
 /// Round up to the nearest 100
 fn round_up_to_100(value: u32) -> u32 {
-    ((value + 99) / 100) * 100
+    value.div_ceil(100) * 100
 }
 
 // ============================================================================
@@ -605,18 +589,14 @@ pub fn format_score(result: &ScoringResult, yaku_result: &YakuResult) -> String 
 
     if let Some(from_discarder) = result.payment.from_discarder {
         output.push_str(&format!("Ron: {} from discarder\n", from_discarder));
-    } else {
-        if result.is_dealer {
-            if let Some(from_each) = result.payment.from_non_dealer {
-                output.push_str(&format!("Tsumo: {} all\n", from_each));
-            }
-        } else {
-            if let (Some(from_dealer), Some(from_non_dealer)) =
-                (result.payment.from_dealer, result.payment.from_non_dealer)
-            {
-                output.push_str(&format!("Tsumo: {}/{}\n", from_dealer, from_non_dealer));
-            }
+    } else if result.is_dealer {
+        if let Some(from_each) = result.payment.from_non_dealer {
+            output.push_str(&format!("Tsumo: {} all\n", from_each));
         }
+    } else if let (Some(from_dealer), Some(from_non_dealer)) =
+        (result.payment.from_dealer, result.payment.from_non_dealer)
+    {
+        output.push_str(&format!("Tsumo: {}/{}\n", from_dealer, from_non_dealer));
     }
 
     output

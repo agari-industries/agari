@@ -177,7 +177,7 @@ impl TryFrom<&str> for Tile {
                 // Convert value_char to a digit (1-9)
                 let val = value_char.to_digit(10).ok_or("Not a digit")? as u8;
 
-                if val < 1 || val > 9 {
+                if !(1..=9).contains(&val) {
                     return Err("Suited tiles must be 1-9".to_string());
                 }
 

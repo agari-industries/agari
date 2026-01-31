@@ -378,16 +378,14 @@ fn main() {
                 eprintln!("{} {}", "❌ Invalid hand:".red().bold(), e);
                 process::exit(1);
             }
-        } else {
-            if let Err(e) = validate_hand(&parsed.tiles) {
-                eprintln!("{} {}", "❌ Invalid hand:".red().bold(), e);
-                process::exit(1);
-            }
+        } else if let Err(e) = validate_hand(&parsed.tiles) {
+            eprintln!("{} {}", "❌ Invalid hand:".red().bold(), e);
+            process::exit(1);
         }
     } else {
         // For shanten, allow 1-14 tiles (not counting melds)
         let tile_count = parsed.tiles.len();
-        if tile_count < 1 || tile_count > 14 {
+        if !(1..=14).contains(&tile_count) {
             eprintln!(
                 "{} expected 1-14 tiles, got {}",
                 "❌ Invalid hand:".red().bold(),
@@ -810,7 +808,7 @@ fn parse_single_tile(s: &str) -> Result<Tile, String> {
     let suit_char = s.chars().last().unwrap();
 
     let value = match value_char.to_digit(10) {
-        Some(v) if v >= 1 && v <= 9 => v as u8,
+        Some(v) if (1..=9).contains(&v) => v as u8,
         Some(0) => 5, // Red five
         _ => return Err(format!("Invalid tile value: {}", value_char)),
     };
@@ -848,7 +846,7 @@ fn try_parse_honor_letter(chars: &[char], pos: usize) -> Option<(Honor, usize)> 
     let ch = chars[pos].to_ascii_lowercase();
 
     // Check for two-character "wh" (white dragon) first to avoid conflict with "w" (west)
-    if ch == 'w' && pos + 1 < chars.len() && chars[pos + 1].to_ascii_lowercase() == 'h' {
+    if ch == 'w' && pos + 1 < chars.len() && chars[pos + 1].eq_ignore_ascii_case(&'h') {
         return Some((Honor::White, 2));
     }
 
@@ -901,8 +899,8 @@ fn parse_tile_list(s: &str) -> Result<Vec<Tile>, String> {
                 let suit_char = chars[pos].to_ascii_lowercase();
                 if "mpsz".contains(suit_char) {
                     // Parse digits with this suit
-                    for i in digit_start..pos {
-                        let single = format!("{}{}", chars[i], suit_char);
+                    for &digit in &chars[digit_start..pos] {
+                        let single = format!("{}{}", digit, suit_char);
                         tiles.push(parse_single_tile(&single)?);
                     }
                     pos += 1; // consume the suit character
@@ -1094,11 +1092,10 @@ fn print_yaku(yaku_result: &agari::yaku::YakuResult, context: &GameContext) {
 
         if yaku.is_yakuman() {
             println!(
-                "   {} {} {} {}",
+                "   {} {} {} 🌟",
                 "•".green(),
                 name.green().bold(),
-                han_str.green(),
-                "🌟".to_string()
+                han_str.green()
             );
         } else {
             println!("   {} {} {}", "•".white(), name.white(), han_str.dimmed());
@@ -1212,41 +1209,25 @@ fn print_score(score: &ScoringResult) {
     // Fu breakdown (only if interesting)
     if score.fu.total != 25 && score.fu.total != 20 && score.fu.breakdown.raw_total > 20 {
         println!("\n   {}:", "Fu breakdown".dimmed());
-        println!("     {}: {}", "Base".dimmed(), "20");
+        println!("     {}: 20", "Base".dimmed());
         if score.fu.breakdown.menzen_ron > 0 {
             println!(
-                "     {}: {}",
+                "     {}: +{}",
                 "Menzen Ron".dimmed(),
-                format!("+{}", score.fu.breakdown.menzen_ron)
+                score.fu.breakdown.menzen_ron
             );
         }
         if score.fu.breakdown.tsumo > 0 {
-            println!(
-                "     {}: {}",
-                "Tsumo".dimmed(),
-                format!("+{}", score.fu.breakdown.tsumo)
-            );
+            println!("     {}: +{}", "Tsumo".dimmed(), score.fu.breakdown.tsumo);
         }
         if score.fu.breakdown.melds > 0 {
-            println!(
-                "     {}: {}",
-                "Melds".dimmed(),
-                format!("+{}", score.fu.breakdown.melds)
-            );
+            println!("     {}: +{}", "Melds".dimmed(), score.fu.breakdown.melds);
         }
         if score.fu.breakdown.pair > 0 {
-            println!(
-                "     {}: {}",
-                "Pair".dimmed(),
-                format!("+{}", score.fu.breakdown.pair)
-            );
+            println!("     {}: +{}", "Pair".dimmed(), score.fu.breakdown.pair);
         }
         if score.fu.breakdown.wait > 0 {
-            println!(
-                "     {}: {}",
-                "Wait".dimmed(),
-                format!("+{}", score.fu.breakdown.wait)
-            );
+            println!("     {}: +{}", "Wait".dimmed(), score.fu.breakdown.wait);
         }
         println!(
             "     {}: {} → {}: {}",

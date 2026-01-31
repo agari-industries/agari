@@ -248,7 +248,7 @@ pub fn format_structure_normalized(structure: &HandStructure) -> String {
             tile_strs.join(" ")
         }
         HandStructure::Standard { melds, pair } => {
-            let mut parts: Vec<String> = melds.iter().map(|m| format_meld_normalized(m)).collect();
+            let mut parts: Vec<String> = melds.iter().map(format_meld_normalized).collect();
 
             let (val, suit) = tile_to_notation(pair);
             parts.push(format!("[{}{}{}]", val, val, suit));

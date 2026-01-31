@@ -223,14 +223,14 @@ fn count_melds_and_taatsu(tiles: &[u8; 34]) -> (u8, u8) {
     }
 
     // Process honors (27-33) - can only form triplets, not sequences
-    for i in 27..34 {
-        if tiles[i] >= 3 {
+    for tile_count in tiles.iter_mut().skip(27) {
+        if *tile_count >= 3 {
             melds += 1;
-            tiles[i] -= 3;
+            *tile_count -= 3
         }
-        if tiles[i] >= 2 {
+        if *tile_count >= 2 {
             taatsu += 1;
-            tiles[i] -= 2;
+            *tile_count -= 2;
         }
     }
 
@@ -257,10 +257,10 @@ fn count_suit_melds(tiles: &mut [u8; 34], start: usize) -> (u8, u8) {
 
     // Second pass: count taatsu (incomplete melds) from remaining tiles
     // Pairs
-    for i in start..(start + 9) {
-        if remaining[i] >= 2 {
+    for count in remaining.iter_mut().skip(start).take(9) {
+        if *count >= 2 {
             taatsu += 1;
-            remaining[i] -= 2;
+            *count -= 2;
         }
     }
 
@@ -283,9 +283,7 @@ fn count_suit_melds(tiles: &mut [u8; 34], start: usize) -> (u8, u8) {
     }
 
     // Update the original tiles array
-    for i in start..(start + 9) {
-        tiles[i] = remaining[i];
-    }
+    tiles[start..(start + 9)].copy_from_slice(&remaining[start..(start + 9)]);
 
     (melds, taatsu)
 }
@@ -306,10 +304,10 @@ fn extract_melds_sequences_first(tiles: &[u8; 34], start: usize) -> (u8, [u8; 34
     }
 
     // Then triplets
-    for i in start..(start + 9) {
-        while remaining[i] >= 3 {
+    for count in remaining.iter_mut().skip(start).take(9) {
+        while *count > 3 {
             melds += 1;
-            remaining[i] -= 3;
+            *count -= 3;
         }
     }
 
@@ -322,10 +320,10 @@ fn extract_melds_triplets_first(tiles: &[u8; 34], start: usize) -> (u8, [u8; 34]
     let mut melds = 0u8;
 
     // Extract triplets first
-    for i in start..(start + 9) {
-        while remaining[i] >= 3 {
+    for count in remaining.iter_mut().skip(start).take(9) {
+        while *count >= 3 {
             melds += 1;
-            remaining[i] -= 3;
+            *count -= 3;
         }
     }
 
@@ -417,9 +415,8 @@ pub fn calculate_chiitoitsu_shanten(counts: &TileCounts) -> i8 {
     // We need 7 pairs from 7 different tiles
     // Each pair reduces shanten by 1 from base of 6
     // But we also need 7 unique tiles
-    let shanten = 6 - pairs + (7 - unique_tiles).max(0);
 
-    shanten
+    6 - pairs + (7 - unique_tiles).max(0)
 }
 
 /// Calculate shanten for kokushi (thirteen orphans)
@@ -442,9 +439,8 @@ pub fn calculate_kokushi_shanten(counts: &TileCounts) -> i8 {
 
     // We need 13 unique terminals + 1 pair
     // Base shanten is 13 (need all 13 + 1 for pair = 14 tiles, but we have 13)
-    let shanten = 13 - unique_terminals - if has_pair { 1 } else { 0 };
 
-    shanten
+    13 - unique_terminals - if has_pair { 1 } else { 0 }
 }
 
 /// Calculate ukeire (tile acceptance) for a hand
