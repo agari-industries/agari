@@ -42,7 +42,6 @@
   import Chun from '../assets/tiles/Chun.svg';
 
   import Back from '../assets/tiles/Back.svg';
-  import Front from '../assets/tiles/Front.svg';
 
   interface Props {
     tile: string;
@@ -155,10 +154,7 @@
   onclick={onclick}
   aria-label="Tile {tile}"
 >
-  <div class="tile-layers">
-    <img src={Front} alt="" class="tile-background" draggable="false" />
-    <img src={tileSvg} alt="Mahjong tile {tile}" class="tile-face" draggable="false" />
-  </div>
+  <img src={tileSvg} alt="Mahjong tile {tile}" class="tile-image" draggable="false" />
 
   <!-- Count badge -->
   {#if showCount}
@@ -181,23 +177,7 @@
     justify-content: center;
   }
 
-  .tile-layers {
-    position: relative;
-    width: 100%;
-    height: 100%;
-  }
-
-  .tile-background {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    pointer-events: none;
-  }
-
-  .tile-face {
-    position: absolute;
-    top: 0;
-    left: 0;
+  .tile-image {
     width: 100%;
     height: 100%;
     object-fit: contain;
