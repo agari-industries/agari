@@ -1,6 +1,6 @@
 [package]
 name = "agari-wasm"
-version = "0.13.0"
+version = "0.13.1"
 edition = "2024"
 description = "WebAssembly bindings for Agari Riichi Mahjong scoring engine"
 license = "MIT"

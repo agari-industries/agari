@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "agari"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "clap",
  "colored",
@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "agari-wasm"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "agari",
  "js-sys",

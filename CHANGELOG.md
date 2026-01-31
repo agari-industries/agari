@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.1]
+
+### Fixed
+
+- **Tile Texture Rendering**: Embedded Front.svg background directly into all tile SVGs for proper texture/3D effect rendering
+- **Dora Picker Exhausted Tiles**: Tiles that have been fully used in the hand are now disabled in the dora/ura dora picker, preventing selection of unavailable tiles
+- **WIN Badge Overlap**: Moved the "WIN" label from top-right to bottom-center of tiles to avoid overlap with the remove button
+- **TypeScript Warning**: Fixed "Cannot find name 'process'" warning in vite.config.ts by using Vite's built-in `mode` parameter
+
+### Changed
+
+- **Tile Component Simplification**: Removed redundant tile background layering in Tile.svelte since backgrounds are now embedded in SVGs
+
 ## [0.13.0]
 
 ### Fixed
