@@ -254,6 +254,21 @@
     return new Set();
   });
 
+  // Compute disabled tiles for dora pickers (tiles with 0 remaining count)
+  const doraDisabledTiles: Set<string> = $derived.by(() => {
+    const disabled = new Set<string>();
+    for (const tile of ALL_TILES) {
+      if (tileCounts[tile] <= 0) {
+        disabled.add(tile);
+      }
+    }
+    // Also disable red fives if no red fives remaining
+    if (tileCounts['red5m'] <= 0) disabled.add('0m');
+    if (tileCounts['red5p'] <= 0) disabled.add('0p');
+    if (tileCounts['red5s'] <= 0) disabled.add('0s');
+    return disabled;
+  });
+
   // ============================================================================
   // Functions
   // ============================================================================
@@ -859,6 +874,7 @@
               <DoraPicker
                 onSelect={(tile) => { addDoraIndicator(tile); showDoraPicker = false; }}
                 onClose={() => showDoraPicker = false}
+                disabledTiles={doraDisabledTiles}
               />
             {/if}
 
@@ -867,6 +883,7 @@
               <DoraPicker
                 onSelect={(tile) => { addUraDoraIndicator(tile); showUraDoraPicker = false; }}
                 onClose={() => showUraDoraPicker = false}
+                disabledTiles={doraDisabledTiles}
               />
             {/if}
           </div>
@@ -1323,8 +1340,9 @@
 
   .winning-badge {
     position: absolute;
-    top: -8px;
-    right: -8px;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
     background: #22c55e;
     color: white;
     font-size: 0.6rem;
