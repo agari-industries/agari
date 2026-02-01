@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.0]
+
+### Added
+
+- **CI Test Workflow**: Added GitHub Actions workflow to run tests on all PRs and pushes to main
+- **CI Clippy Lint Check**: Added clippy linting to CI pipeline, enforcing zero warnings
+- **Regression Tests**: Added tests for sequences-first triplet extraction in shanten calculation
+
+### Changed
+
+- **Clippy 2024 Compliance**: Comprehensive clippy fixes across the codebase (PR #10)
+  - Modernized iterator patterns and range checks
+  - Replaced manual implementations with idiomatic Rust
+  - Simplified conditional expressions and closures
+
+### Fixed
+
+- **Deploy Workflow on Forks**: Fixed GitHub Pages deploy workflow failing on forks by adding repository owner check
+
+### New Contributors
+
+- **@DrCheeseFace** made their first contribution in PR #10 — thank you! 🎉
+
 ## [0.13.1]
 
 ### Fixed
