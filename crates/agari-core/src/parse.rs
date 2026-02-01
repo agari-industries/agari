@@ -40,6 +40,7 @@ pub fn parse_hand(input: &str) -> Result<Vec<Tile>, String> {
 /// - Open kan (daiminkan/shouminkan): (1111m) or (5555z)
 /// - Open triplet (pon): (111m) or (555z)
 /// - Open sequence (chi): (123m)
+///
 /// Try to parse an honor tile from letter notation at the given position.
 /// Returns Some((Honor, chars_consumed)) if successful, None otherwise.
 /// Supports: e/E (east), s/S (south), w/W (west), n/N (north)
@@ -52,7 +53,7 @@ fn try_parse_honor_letter(chars: &[char], pos: usize) -> Option<(Honor, usize)> 
     let ch = chars[pos].to_ascii_lowercase();
 
     // Check for two-character "wh" (white dragon) first to avoid conflict with "w" (west)
-    if ch == 'w' && pos + 1 < chars.len() && chars[pos + 1].to_ascii_lowercase() == 'h' {
+    if ch == 'w' && pos + 1 < chars.len() && chars[pos + 1].eq_ignore_ascii_case(&'h') {
         return Some((Honor::White, 2));
     }
 

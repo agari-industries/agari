@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::context::{count_dora_detailed, GameContext, WinType};
+use crate::context::{GameContext, WinType, count_dora_detailed};
 use crate::hand::{HandStructure, Meld};
 use crate::parse::TileCounts;
 use crate::tile::{Honor, Suit, Tile};
@@ -311,10 +311,8 @@ pub fn detect_yaku_with_context(
             }
 
             // Chuuren Poutou (Nine Gates) - closed only
-            if !is_open {
-                if let Some(yaku) = check_chuuren_poutou(counts, context) {
-                    yaku_list.push(yaku);
-                }
+            if !is_open && let Some(yaku) = check_chuuren_poutou(counts, context) {
+                yaku_list.push(yaku);
             }
         }
     }
@@ -399,17 +397,15 @@ pub fn detect_yaku_with_context(
                 }
 
                 // Pinfu (requires winning tile to be set)
-                if let Some(winning_tile) = context.winning_tile {
-                    if is_pinfu(structure, winning_tile, context) {
-                        yaku_list.push(Yaku::Pinfu);
-                    }
+                if let Some(winning_tile) = context.winning_tile
+                    && is_pinfu(structure, winning_tile, context)
+                {
+                    yaku_list.push(Yaku::Pinfu);
                 }
 
                 // Iipeikou / Ryanpeikou (closed only)
-                if !is_open {
-                    if let Some(peikou) = check_peikou(melds) {
-                        yaku_list.push(peikou);
-                    }
+                if !is_open && let Some(peikou) = check_peikou(melds) {
+                    yaku_list.push(peikou);
                 }
 
                 // Yakuhai (dragons and value winds)
@@ -488,10 +484,10 @@ pub fn detect_yaku_with_context(
                                 if !is_open_meld {
                                     if context.win_type == WinType::Tsumo {
                                         concealed_triplets += 1;
-                                    } else if let Some(wt) = context.winning_tile {
-                                        if *tile != wt || winning_tile_completes_sequence {
-                                            concealed_triplets += 1;
-                                        }
+                                    } else if let Some(wt) = context.winning_tile
+                                        && (*tile != wt || winning_tile_completes_sequence)
+                                    {
+                                        concealed_triplets += 1;
                                     }
                                 }
                             }
@@ -819,9 +815,7 @@ fn check_flush_tiles(tiles: &[Tile]) -> Option<Yaku> {
     }
 
     // Must have at least one suited tile for flush
-    if found_suit.is_none() {
-        return None;
-    }
+    found_suit?;
 
     if has_honors {
         Some(Yaku::Honitsu)
@@ -851,13 +845,12 @@ fn check_suuankou(melds: &[Meld], _pair: Tile, context: &GameContext) -> Option<
             Meld::Koutsu(tile, is_open) => {
                 if !is_open {
                     // For ron, check if this triplet was completed by the winning tile
-                    if context.win_type == WinType::Ron {
-                        if let Some(wt) = context.winning_tile {
-                            if *tile == wt {
-                                // This triplet was completed by ron, not concealed
-                                continue;
-                            }
-                        }
+                    if context.win_type == WinType::Ron
+                        && let Some(wt) = context.winning_tile
+                        && *tile == wt
+                    {
+                        // This triplet was completed by ron, not concealed
+                        continue;
                     }
                     concealed_triplet_count += 1;
                 }
@@ -909,13 +902,13 @@ fn check_four_winds(melds: &[Meld], pair: Tile) -> Option<Yaku> {
                 Meld::Koutsu(Tile::Honor(h), _) | Meld::Kan(Tile::Honor(h), _) => Some(h),
                 _ => None,
             };
-            if let Some(honor) = honor {
-                if matches!(
+            if let Some(honor) = honor
+                && matches!(
                     honor,
                     Honor::East | Honor::South | Honor::West | Honor::North
-                ) {
-                    return Some(*honor);
-                }
+                )
+            {
+                return Some(*honor);
             }
             None
         })
@@ -927,15 +920,14 @@ fn check_four_winds(melds: &[Meld], pair: Tile) -> Option<Yaku> {
 
     if wind_triplets.len() == 3 {
         // Check if pair is the fourth wind
-        if let Tile::Honor(honor) = pair {
-            if matches!(
+        if let Tile::Honor(honor) = pair
+            && matches!(
                 honor,
                 Honor::East | Honor::South | Honor::West | Honor::North
-            ) {
-                if !wind_triplets.contains(&honor) {
-                    return Some(Yaku::Shousuushii);
-                }
-            }
+            )
+            && !wind_triplets.contains(&honor)
+        {
+            return Some(Yaku::Shousuushii);
         }
     }
 
@@ -1047,20 +1039,18 @@ fn check_chuuren_poutou(counts: &TileCounts, context: &GameContext) -> Option<Ya
 
     // Check for junsei (pure) nine gates - 9-sided wait
     // This happens when winning tile could be any of 1-9
-    if let Some(winning_tile) = context.winning_tile {
-        if let Tile::Suited {
+    if let Some(winning_tile) = context.winning_tile
+        && let Tile::Suited {
             value: wv,
             suit: ws,
         } = winning_tile
-        {
-            if ws == suit {
-                // If the extra tile equals winning tile, check if removing it
-                // leaves exactly the base pattern
-                if extra_tile == Some(wv) {
-                    // This is the pure 9-sided wait
-                    return Some(Yaku::JunseiChuurenPoutou);
-                }
-            }
+        && ws == suit
+    {
+        // If the extra tile equals winning tile, check if removing it
+        // leaves exactly the base pattern
+        if extra_tile == Some(wv) {
+            // This is the pure 9-sided wait
+            return Some(Yaku::JunseiChuurenPoutou);
         }
     }
 

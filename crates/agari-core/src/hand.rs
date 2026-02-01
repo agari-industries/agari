@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::parse::TileCounts;
-use crate::tile::{Tile, KOKUSHI_TILES};
+use crate::tile::{KOKUSHI_TILES, Tile};
 
 /// Type of kan (quad) meld
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -249,24 +249,24 @@ fn find_all_meld_combinations(mut counts: TileCounts, needed: u32) -> Vec<Vec<Me
     }
 
     // Option 2: Form a sequence (shuntsu) starting with this tile
-    if let Tile::Suited { suit, value } = tile {
-        if value <= 7 {
-            let next1 = Tile::suited(suit, value + 1);
-            let next2 = Tile::suited(suit, value + 2);
+    if let Tile::Suited { suit, value } = tile
+        && value <= 7
+    {
+        let next1 = Tile::suited(suit, value + 1);
+        let next2 = Tile::suited(suit, value + 2);
 
-            let has_seq = counts.get(&next1).copied().unwrap_or(0) >= 1
-                && counts.get(&next2).copied().unwrap_or(0) >= 1;
+        let has_seq = counts.get(&next1).copied().unwrap_or(0) >= 1
+            && counts.get(&next2).copied().unwrap_or(0) >= 1;
 
-            if has_seq {
-                let mut after_seq = counts.clone();
-                *after_seq.get_mut(&tile).unwrap() -= 1;
-                *after_seq.get_mut(&next1).unwrap() -= 1;
-                *after_seq.get_mut(&next2).unwrap() -= 1;
+        if has_seq {
+            let mut after_seq = counts.clone();
+            *after_seq.get_mut(&tile).unwrap() -= 1;
+            *after_seq.get_mut(&next1).unwrap() -= 1;
+            *after_seq.get_mut(&next2).unwrap() -= 1;
 
-                for mut sub_result in find_all_meld_combinations(after_seq, needed - 1) {
-                    sub_result.insert(0, Meld::shuntsu(tile));
-                    results.push(sub_result);
-                }
+            for mut sub_result in find_all_meld_combinations(after_seq, needed - 1) {
+                sub_result.insert(0, Meld::shuntsu(tile));
+                results.push(sub_result);
             }
         }
     }
@@ -373,22 +373,22 @@ fn can_form_melds(mut counts: TileCounts, needed: u32) -> bool {
         }
     }
 
-    if let Tile::Suited { suit, value } = tile {
-        if value <= 7 {
-            let next1 = Tile::suited(suit, value + 1);
-            let next2 = Tile::suited(suit, value + 2);
+    if let Tile::Suited { suit, value } = tile
+        && value <= 7
+    {
+        let next1 = Tile::suited(suit, value + 1);
+        let next2 = Tile::suited(suit, value + 2);
 
-            let has_seq = counts.get(&next1).copied().unwrap_or(0) >= 1
-                && counts.get(&next2).copied().unwrap_or(0) >= 1;
+        let has_seq = counts.get(&next1).copied().unwrap_or(0) >= 1
+            && counts.get(&next2).copied().unwrap_or(0) >= 1;
 
-            if has_seq {
-                let mut after_seq = counts.clone();
-                *after_seq.get_mut(&tile).unwrap() -= 1;
-                *after_seq.get_mut(&next1).unwrap() -= 1;
-                *after_seq.get_mut(&next2).unwrap() -= 1;
-                if can_form_melds(after_seq, needed - 1) {
-                    return true;
-                }
+        if has_seq {
+            let mut after_seq = counts.clone();
+            *after_seq.get_mut(&tile).unwrap() -= 1;
+            *after_seq.get_mut(&next1).unwrap() -= 1;
+            *after_seq.get_mut(&next2).unwrap() -= 1;
+            if can_form_melds(after_seq, needed - 1) {
+                return true;
             }
         }
     }
