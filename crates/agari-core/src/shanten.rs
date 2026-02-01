@@ -691,4 +691,55 @@ mod tests {
         assert_eq!(tile_to_index(Tile::honor(Honor::East)), 27);
         assert_eq!(tile_to_index(Tile::honor(Honor::Red)), 33);
     }
+
+    // ===== Regression Tests =====
+
+    #[test]
+    fn test_sequences_first_then_triplet_extraction() {
+        // Regression test: ensure triplets are correctly extracted after sequences
+        // Hand: 233344455666m1p (13 tiles)
+        // Optimal decomposition: 234m + 345m + 345m + 666m = 4 melds, waiting for 1p pair
+        // This should be tenpai (shanten = 0)
+        //
+        // The sequences-first algorithm should:
+        // 1. Extract sequences: 234m, 345m, 345m (3 melds)
+        // 2. Extract remaining triplet: 666m (1 meld)
+        // Total: 4 melds
+        //
+        // If triplet extraction incorrectly uses `> 3` instead of `>= 3`,
+        // it will fail to extract the 666m triplet, giving only 3 melds
+        // and incorrectly reporting shanten = 1 instead of 0.
+        assert_eq!(
+            shanten("233344455666m1p"),
+            0,
+            "Hand 233344455666m1p should be tenpai (shanten=0), not iishanten"
+        );
+    }
+
+    #[test]
+    fn test_extract_melds_sequences_first_with_remaining_triplet() {
+        // Direct test of the internal meld extraction logic
+        // Input: 2(x1), 3(x3), 4(x3), 5(x2), 6(x3) in manzu
+        // After extracting sequences 234, 345, 345, we should have 6(x3) left
+        // which should be extracted as a triplet
+        let mut tiles = [0u8; 34];
+        tiles[1] = 1; // 2m
+        tiles[2] = 3; // 3m
+        tiles[3] = 3; // 4m
+        tiles[4] = 2; // 5m
+        tiles[5] = 3; // 6m
+
+        let (melds, remaining) = extract_melds_sequences_first(&tiles, 0);
+
+        assert_eq!(
+            melds, 4,
+            "Should extract 4 melds (3 sequences + 1 triplet), got {}",
+            melds
+        );
+        assert_eq!(
+            remaining[5], 0,
+            "All 6m tiles should be extracted as triplet, but {} remain",
+            remaining[5]
+        );
+    }
 }
