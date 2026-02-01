@@ -305,7 +305,7 @@ fn extract_melds_sequences_first(tiles: &[u8; 34], start: usize) -> (u8, [u8; 34
 
     // Then triplets
     for count in remaining.iter_mut().skip(start).take(9) {
-        while *count > 3 {
+        while *count >= 3 {
             melds += 1;
             *count -= 3;
         }
