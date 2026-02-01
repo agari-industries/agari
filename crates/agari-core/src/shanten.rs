@@ -592,7 +592,7 @@ mod tests {
         let s = shanten("123m147p258s12345z");
         // High shanten due to scattered tiles
         assert!(
-            s >= 3 && s <= 7,
+            (3..=7).contains(&s),
             "Expected shanten between 3 and 7, got {}",
             s
         );

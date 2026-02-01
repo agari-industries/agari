@@ -1134,7 +1134,7 @@ mod tests {
         let tiles = parse_hand(hand).unwrap();
         let counts = to_counts(&tiles);
         let structures = decompose_hand(&counts);
-        structures.iter().map(|s| detect_yaku(s)).collect()
+        structures.iter().map(detect_yaku).collect()
     }
 
     /// Helper to get yaku with context
@@ -1393,7 +1393,7 @@ mod tests {
         let structures = decompose_hand(&counts);
         let result = detect_yaku_with_context(&structures[0], &counts, &context);
 
-        assert!(has_yaku(&[result.clone()], Yaku::Tanyao));
+        assert!(has_yaku(std::slice::from_ref(&result), Yaku::Tanyao));
         assert_eq!(result.dora_count, 3);
         assert_eq!(result.total_han_with_dora(), result.total_han + 3);
     }
