@@ -21,6 +21,8 @@ concurrency:
 
 jobs:
   build:
+    # Only run on the main repository, not on forks
+    if: github.repository == 'ryblogs/agari'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
