@@ -2,31 +2,18 @@
   import { WIND_NAMES } from '../agari';
 
   interface Props {
-    /** Whether win is by tsumo (self-draw) */
     isTsumo: boolean;
-    /** Whether riichi was declared */
     isRiichi: boolean;
-    /** Whether double riichi was declared */
     isDoubleRiichi: boolean;
-    /** Whether ippatsu (win within one turn of riichi) */
     isIppatsu: boolean;
-    /** Round wind */
     roundWind: 'east' | 'south' | 'west' | 'north';
-    /** Seat wind */
     seatWind: 'east' | 'south' | 'west' | 'north';
-    /** Whether won on the last tile */
     isLastTile: boolean;
-    /** Whether won on kan replacement tile */
     isRinshan: boolean;
-    /** Whether ron on another player's added kan */
     isChankan: boolean;
-    /** Whether tenhou */
     isTenhou: boolean;
-    /** Whether chiihou */
     isChiihou: boolean;
-    /** Whether hand has open melds (chi, pon, open kan) */
     hasOpenMelds?: boolean;
-    /** Callback for any option change */
     onChange: () => void;
   }
 
@@ -46,7 +33,6 @@
     onChange,
   }: Props = $props();
 
-  // When hand becomes open, uncheck riichi-related options
   $effect(() => {
     if (hasOpenMelds) {
       if (isRiichi) isRiichi = false;
@@ -58,7 +44,6 @@
   const winds = ['east', 'south', 'west', 'north'] as const;
   const windSymbols = { east: '東', south: '南', west: '西', north: '北' };
 
-  // Handle riichi toggle
   const handleRiichiChange = () => {
     if (!isRiichi) {
       isDoubleRiichi = false;
@@ -67,7 +52,6 @@
     onChange();
   };
 
-  // Handle double riichi toggle
   const handleDoubleRiichiChange = () => {
     if (isDoubleRiichi) {
       isRiichi = true;
@@ -75,7 +59,6 @@
     onChange();
   };
 
-  // Is dealer (East seat)
   const isDealer = $derived(seatWind === 'east');
 </script>
 
@@ -90,8 +73,7 @@
         class:active={!isTsumo}
         onclick={() => { isTsumo = false; onChange(); }}
       >
-        <span class="toggle-icon">🀄</span>
-        <span>Ron</span>
+        Ron
       </button>
       <button
         type="button"
@@ -99,8 +81,7 @@
         class:active={isTsumo}
         onclick={() => { isTsumo = true; onChange(); }}
       >
-        <span class="toggle-icon">🎯</span>
-        <span>Tsumo</span>
+        Tsumo
       </button>
     </div>
   </div>
@@ -143,7 +124,7 @@
       </div>
     </div>
     {#if isDealer}
-      <div class="dealer-badge">👑 Dealer (Oya)</div>
+      <div class="dealer-badge">Dealer (Oya)</div>
     {/if}
   </div>
 
@@ -151,9 +132,7 @@
   <div class="option-section">
     <h3 class="section-title">Riichi</h3>
     {#if hasOpenMelds}
-      <div class="open-hand-notice">
-        🔓 Open hand — Riichi not available
-      </div>
+      <div class="open-hand-notice">Open hand — Riichi not available</div>
     {/if}
     <div class="checkbox-group">
       <label class="checkbox-item" class:disabled={hasOpenMelds}>
@@ -164,7 +143,7 @@
           onchange={handleRiichiChange}
         />
         <span class="checkbox-label">Riichi</span>
-        <span class="han-indicator">+1 han</span>
+        <span class="han-indicator">+1</span>
       </label>
       <label class="checkbox-item" class:disabled={hasOpenMelds || !isRiichi}>
         <input
@@ -174,7 +153,7 @@
           onchange={handleDoubleRiichiChange}
         />
         <span class="checkbox-label">Double Riichi</span>
-        <span class="han-indicator">+1 han</span>
+        <span class="han-indicator">+1</span>
       </label>
       <label class="checkbox-item" class:disabled={hasOpenMelds || !isRiichi}>
         <input
@@ -184,7 +163,7 @@
           onchange={onChange}
         />
         <span class="checkbox-label">Ippatsu</span>
-        <span class="han-indicator">+1 han</span>
+        <span class="han-indicator">+1</span>
       </label>
     </div>
   </div>
@@ -194,15 +173,11 @@
     <h3 class="section-title">Situational</h3>
     <div class="checkbox-group">
       <label class="checkbox-item">
-        <input
-          type="checkbox"
-          bind:checked={isLastTile}
-          onchange={onChange}
-        />
+        <input type="checkbox" bind:checked={isLastTile} onchange={onChange} />
         <span class="checkbox-label">
           {isTsumo ? 'Haitei (Last Draw)' : 'Houtei (Last Discard)'}
         </span>
-        <span class="han-indicator">+1 han</span>
+        <span class="han-indicator">+1</span>
       </label>
       <label class="checkbox-item" class:disabled={!isTsumo}>
         <input
@@ -212,7 +187,7 @@
           onchange={onChange}
         />
         <span class="checkbox-label">Rinshan Kaihou</span>
-        <span class="han-indicator">+1 han</span>
+        <span class="han-indicator">+1</span>
       </label>
       <label class="checkbox-item" class:disabled={isTsumo}>
         <input
@@ -222,7 +197,7 @@
           onchange={onChange}
         />
         <span class="checkbox-label">Chankan</span>
-        <span class="han-indicator">+1 han</span>
+        <span class="han-indicator">+1</span>
       </label>
     </div>
   </div>
@@ -238,7 +213,7 @@
           disabled={!isDealer || !isTsumo}
           onchange={onChange}
         />
-        <span class="checkbox-label">Tenhou (Blessing of Heaven)</span>
+        <span class="checkbox-label">Tenhou</span>
         <span class="han-indicator yakuman">役満</span>
       </label>
       <label class="checkbox-item" class:disabled={isDealer || !isTsumo}>
@@ -248,7 +223,7 @@
           disabled={isDealer || !isTsumo}
           onchange={onChange}
         />
-        <span class="checkbox-label">Chiihou (Blessing of Earth)</span>
+        <span class="checkbox-label">Chiihou</span>
         <span class="han-indicator yakuman">役満</span>
       </label>
     </div>
@@ -259,19 +234,19 @@
   .context-options {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: var(--space-5);
   }
 
   .option-section {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
   .section-title {
-    font-size: 0.875rem;
+    font-size: 0.6875rem;
     font-weight: 600;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin: 0;
@@ -280,81 +255,77 @@
   /* Toggle Buttons */
   .toggle-group {
     display: flex;
-    gap: 0.5rem;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
   }
 
   .toggle-btn {
     flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border: 2px solid var(--text-secondary);
-    border-radius: 8px;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font-size: 0.875rem;
+    padding: var(--space-2) var(--space-3);
+    border: none;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
   }
 
   .toggle-btn:hover {
-    border-color: var(--accent);
+    background: var(--bg-muted);
+    color: var(--text-primary);
   }
 
   .toggle-btn.active {
-    border-color: var(--accent);
     background: var(--accent);
     color: white;
-  }
-
-  .toggle-icon {
-    font-size: 1.25rem;
   }
 
   /* Wind Buttons */
   .winds-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   .wind-selector {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .wind-label {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
   .wind-buttons {
     display: flex;
-    gap: 0.25rem;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
   }
 
   .wind-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 6px;
-    border: 2px solid var(--text-secondary);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font-size: 1.25rem;
+    flex: 1;
+    padding: var(--space-2);
+    border: none;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-size: 1rem;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
   }
 
   .wind-btn:hover {
-    border-color: var(--accent);
+    background: var(--bg-muted);
+    color: var(--text-primary);
   }
 
   .wind-btn.active {
-    border-color: var(--accent);
     background: var(--accent);
     color: white;
   }
@@ -362,36 +333,39 @@
   .dealer-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    background: linear-gradient(135deg, #ffd700, #ff8c00);
-    color: var(--bg-primary);
-    border-radius: 4px;
-    font-size: 0.75rem;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    background: var(--warning-muted);
+    border: 1px solid var(--warning);
+    color: var(--warning);
+    font-size: 0.6875rem;
     font-weight: 600;
     width: fit-content;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
   /* Checkbox Items */
   .checkbox-group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
   }
 
   .checkbox-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background: var(--bg-secondary);
-    border-radius: 6px;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg-elevated);
     cursor: pointer;
-    transition: background 0.2s ease;
+    transition: background 0.15s ease;
   }
 
   .checkbox-item:hover:not(.disabled) {
-    background: rgba(233, 69, 96, 0.1);
+    background: var(--bg-muted);
   }
 
   .checkbox-item.disabled {
@@ -400,9 +374,8 @@
   }
 
   .checkbox-item input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
     cursor: pointer;
   }
 
@@ -412,48 +385,38 @@
 
   .checkbox-label {
     flex: 1;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     color: var(--text-primary);
   }
 
   .han-indicator {
-    font-size: 0.75rem;
-    padding: 0.125rem 0.375rem;
-    background: var(--accent);
-    color: white;
-    border-radius: 4px;
+    font-size: 0.625rem;
+    font-family: var(--font-mono);
     font-weight: 600;
+    padding: var(--space-1) var(--space-2);
+    background: var(--accent-muted);
+    border: 1px solid var(--accent);
+    color: var(--accent);
   }
 
   .han-indicator.yakuman {
-    background: linear-gradient(135deg, #ffd700, #ff8c00);
-    color: var(--bg-primary);
+    background: var(--warning-muted);
+    border-color: var(--warning);
+    color: var(--warning);
   }
 
   .open-hand-notice {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    background: rgba(255, 193, 7, 0.15);
-    border: 1px solid rgba(255, 193, 7, 0.3);
-    border-radius: 6px;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--warning);
+    background: var(--warning-muted);
+    border: 1px solid var(--warning);
+    padding: var(--space-2) var(--space-3);
   }
 
   @media (max-width: 768px) {
     .winds-grid {
       grid-template-columns: 1fr;
-    }
-
-    .toggle-btn {
-      padding: 0.5rem 0.75rem;
-      font-size: 0.8rem;
-    }
-
-    .wind-btn {
-      width: 36px;
-      height: 36px;
-      font-size: 1rem;
+      gap: var(--space-3);
     }
   }
 </style>
