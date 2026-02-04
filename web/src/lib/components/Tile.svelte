@@ -68,79 +68,38 @@
   // Map of tile codes to imported SVG paths
   const tileMap: Record<string, string> = {
     // Man (Characters)
-    '1m': Man1,
-    '2m': Man2,
-    '3m': Man3,
-    '4m': Man4,
-    '5m': Man5,
-    '6m': Man6,
-    '7m': Man7,
-    '8m': Man8,
-    '9m': Man9,
+    '1m': Man1, '2m': Man2, '3m': Man3, '4m': Man4, '5m': Man5,
+    '6m': Man6, '7m': Man7, '8m': Man8, '9m': Man9,
     // Pin (Dots)
-    '1p': Pin1,
-    '2p': Pin2,
-    '3p': Pin3,
-    '4p': Pin4,
-    '5p': Pin5,
-    '6p': Pin6,
-    '7p': Pin7,
-    '8p': Pin8,
-    '9p': Pin9,
+    '1p': Pin1, '2p': Pin2, '3p': Pin3, '4p': Pin4, '5p': Pin5,
+    '6p': Pin6, '7p': Pin7, '8p': Pin8, '9p': Pin9,
     // Sou (Bamboo)
-    '1s': Sou1,
-    '2s': Sou2,
-    '3s': Sou3,
-    '4s': Sou4,
-    '5s': Sou5,
-    '6s': Sou6,
-    '7s': Sou7,
-    '8s': Sou8,
-    '9s': Sou9,
+    '1s': Sou1, '2s': Sou2, '3s': Sou3, '4s': Sou4, '5s': Sou5,
+    '6s': Sou6, '7s': Sou7, '8s': Sou8, '9s': Sou9,
     // Honors - Winds
-    '1z': Ton,   // East
-    '2z': Nan,   // South
-    '3z': Shaa,  // West
-    '4z': Pei,   // North
+    '1z': Ton, '2z': Nan, '3z': Shaa, '4z': Pei,
     // Honors - Dragons
-    '5z': Haku,  // White
-    '6z': Hatsu, // Green
-    '7z': Chun,  // Red
+    '5z': Haku, '6z': Hatsu, '7z': Chun,
     // Red fives (aka dora)
-    '0m': Man5Dora,
-    '0p': Pin5Dora,
-    '0s': Sou5Dora,
+    '0m': Man5Dora, '0p': Pin5Dora, '0s': Sou5Dora,
     // Back tile
     'back': Back,
   };
 
-  // Check if tile is a red five based on notation (0m, 0p, 0s) or red prop
   const isRedFive = (t: string): boolean => {
     return t[0] === '0' && (t.endsWith('m') || t.endsWith('p') || t.endsWith('s'));
   };
 
-  // Get the SVG path for a tile
   const getTileSvg = (t: string, isRed: boolean): string => {
-    // Handle 0-notation for red fives
-    if (isRedFive(t)) {
-      return tileMap[t] || tileMap['back'];
-    }
-
-    // If red prop is set and it's a 5, use the dora version
+    if (isRedFive(t)) return tileMap[t] || tileMap['back'];
     if (isRed && t[0] === '5') {
       const suit = t[1];
       return tileMap[`0${suit}`] || tileMap[t] || tileMap['back'];
     }
-
     return tileMap[t] || tileMap['back'];
   };
 
-  const sizeClasses = {
-    sm: 'tile-sm',
-    md: 'tile-md',
-    lg: 'tile-lg',
-  };
-
+  const sizeClasses = { sm: 'tile-sm', md: 'tile-md', lg: 'tile-lg' };
   const tileSvg = $derived(getTileSvg(tile, red));
 </script>
 
@@ -155,23 +114,19 @@
   aria-label="Tile {tile}"
 >
   <img src={tileSvg} alt="Mahjong tile {tile}" class="tile-image" draggable="false" />
-
-  <!-- Count badge -->
   {#if showCount}
-    <span class="count-badge" class:zero={count === 0}>
-      {count}
-    </span>
+    <span class="count-badge" class:zero={count === 0}>{count}</span>
   {/if}
 </button>
 
 <style>
   .tile-button {
     position: relative;
-    border: none;
-    background: transparent;
-    padding: 0;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    padding: 2px;
     cursor: default;
-    transition: transform 0.1s ease, filter 0.1s ease;
+    transition: border-color 0.1s ease, background 0.1s ease;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -185,32 +140,17 @@
   }
 
   /* Size variants - maintaining roughly 5:7 aspect ratio */
-  .tile-sm {
-    width: 28px;
-    height: 40px;
-  }
-
-  .tile-md {
-    width: 40px;
-    height: 56px;
-  }
-
-  .tile-lg {
-    width: 52px;
-    height: 72px;
-  }
+  .tile-sm { width: 28px; height: 40px; }
+  .tile-md { width: 40px; height: 56px; }
+  .tile-lg { width: 52px; height: 72px; }
 
   .tile-button.clickable {
     cursor: pointer;
   }
 
   .tile-button.clickable:hover:not(.disabled) {
-    transform: translateY(-3px);
-    filter: brightness(1.05);
-  }
-
-  .tile-button.clickable:active:not(.disabled) {
-    transform: translateY(1px);
+    border-color: var(--accent);
+    background: var(--accent-muted);
   }
 
   .tile-button.disabled {
@@ -219,36 +159,30 @@
   }
 
   .tile-button.selected {
-    filter: drop-shadow(0 0 8px rgba(233, 69, 96, 0.7));
-  }
-
-  .tile-button.selected::after {
-    content: '';
-    position: absolute;
-    inset: -2px;
-    border: 2px solid #e94560;
-    border-radius: 6px;
-    pointer-events: none;
+    border-color: var(--accent);
+    background: var(--accent-muted);
   }
 
   .count-badge {
     position: absolute;
-    bottom: -4px;
-    right: -4px;
-    background: #0f3460;
-    color: #eaeaea;
-    font-size: 10px;
-    font-weight: bold;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
+    bottom: -3px;
+    right: -3px;
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font-size: 9px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    width: 14px;
+    height: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid #8b7355;
+    border: 1px solid var(--border);
   }
 
   .count-badge.zero {
-    background: #e94560;
+    background: var(--error);
+    border-color: var(--error);
+    color: white;
   }
 </style>

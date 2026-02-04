@@ -3,13 +3,9 @@
   import Tile from './Tile.svelte';
 
   interface Props {
-    /** Callback when a tile is selected */
     onSelect: (tile: string, isRed?: boolean) => void;
-    /** Map of tile code to count remaining (4 - tiles in hand) */
     tileCounts?: Record<string, number>;
-    /** Whether to show red five buttons */
     showRedFives?: boolean;
-    /** Disabled tiles */
     disabledTiles?: Set<string>;
   }
 
@@ -20,15 +16,12 @@
     disabledTiles = new Set(),
   }: Props = $props();
 
-  // Group tiles by suit
   const manTiles = ALL_TILES.filter((t) => t.endsWith('m'));
   const pinTiles = ALL_TILES.filter((t) => t.endsWith('p'));
   const souTiles = ALL_TILES.filter((t) => t.endsWith('s'));
   const honorTiles = ALL_TILES.filter((t) => t.endsWith('z'));
 
-  // Get count for a tile (default 4 if not tracked)
   const getCount = (tile: string, isRed: boolean = false): number => {
-    // For red fives, use the separate red5 counts (max 1 each)
     if (isRed) {
       const redKey = `red${tile}` as keyof typeof tileCounts;
       return tileCounts[redKey] ?? 1;
@@ -36,15 +29,11 @@
     return tileCounts[tile] ?? 4;
   };
 
-  // Check if tile is disabled
   const isDisabled = (tile: string, isRed: boolean = false): boolean => {
-    // Check if tile is in the disabled set
     if (disabledTiles.has(tile)) return true;
-    // Check count
     return getCount(tile, isRed) <= 0;
   };
 
-  // Handle tile click
   const handleClick = (tile: string, isRed: boolean = false) => {
     if (!isDisabled(tile, isRed)) {
       onSelect(tile, isRed);
@@ -140,7 +129,7 @@
   <!-- Honors -->
   <div class="tile-row">
     <span class="suit-label honor">字</span>
-    <div class="tile-group honors">
+    <div class="tile-group">
       {#each honorTiles as tile}
         <Tile
           {tile}
@@ -159,70 +148,67 @@
   .tile-palette {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
   .tile-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
   .suit-label {
-    width: 2rem;
-    height: 2rem;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
-    font-weight: bold;
-    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
     flex-shrink: 0;
   }
 
   .suit-label.man {
-    background: rgba(196, 30, 58, 0.2);
-    color: #c41e3a;
+    color: var(--man-color);
+    border-color: var(--man-color);
+    background: rgba(248, 113, 113, 0.1);
   }
 
   .suit-label.pin {
-    background: rgba(30, 144, 255, 0.2);
-    color: #1e90ff;
+    color: var(--pin-color);
+    border-color: var(--pin-color);
+    background: rgba(96, 165, 250, 0.1);
   }
 
   .suit-label.sou {
-    background: rgba(34, 139, 34, 0.2);
-    color: #228b22;
+    color: var(--sou-color);
+    border-color: var(--sou-color);
+    background: rgba(74, 222, 128, 0.1);
   }
 
   .suit-label.honor {
-    background: rgba(47, 47, 47, 0.2);
-    color: #a0a0a0;
+    color: var(--honor-color);
+    border-color: var(--honor-color);
+    background: rgba(161, 161, 170, 0.1);
   }
 
   .tile-group {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .tile-group.honors {
-    gap: 0.625rem;
+    gap: var(--space-1);
   }
 
   @media (max-width: 768px) {
     .suit-label {
-      width: 1.5rem;
-      height: 1.5rem;
-      font-size: 1rem;
+      width: 20px;
+      height: 20px;
+      font-size: 0.75rem;
     }
 
     .tile-row {
-      gap: 0.5rem;
-    }
-
-    .tile-group {
-      gap: 0.25rem;
+      gap: var(--space-2);
     }
   }
 </style>
