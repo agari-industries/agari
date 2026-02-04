@@ -10,7 +10,8 @@ This script:
 5. Reports discrepancies
 
 Usage:
-    python agari_validator.py /path/to/tenhou/data --samples 100 --agari /path/to/agari
+    python agari_validator.py /path/to/tenhou/data --samples 1000
+    python agari_validator.py /path/to/tenhou/data --samples 5000 --agari ../target/release/agari
 """
 
 import argparse
@@ -957,17 +958,6 @@ def find_mjson_files(base_dir: str) -> list[str]:
     return mjson_files
 
 
-def sample_files(files: list[str], n: int, seed: Optional[int] = None) -> list[str]:
-    """Randomly sample n files from the list."""
-    if seed is not None:
-        random.seed(seed)
-
-    if n >= len(files):
-        return files
-
-    return random.sample(files, n)
-
-
 # ============================================================================
 # Main Validation Logic
 # ============================================================================
@@ -977,7 +967,6 @@ def validate_samples(
     data_dir: str,
     agari_path: str,
     num_samples: int = 100,
-    num_files: int = 50,
     seed: Optional[int] = None,
     verbose: bool = False,
 ) -> dict:
@@ -988,7 +977,6 @@ def validate_samples(
         data_dir: Path to Tenhou data directory
         agari_path: Path to agari executable
         num_samples: Target number of hora events to validate
-        num_files: Number of mjson files to sample from
         seed: Random seed for reproducibility
         verbose: Print detailed progress
 
@@ -1003,43 +991,50 @@ def validate_samples(
         print("No mjson files found!")
         return {}
 
-    # Sample files
-    sampled_files = sample_files(all_files, num_files, seed)
-    print(f"Sampling from {len(sampled_files)} files")
+    # Shuffle files for random sampling
+    if seed is not None:
+        random.seed(seed)
+    random.shuffle(all_files)
 
     parser = MjsonParser()
     runner = AgariRunner(agari_path)
 
     all_horas = []
+    files_processed = 0
 
-    # Extract hora events from sampled files
-    print("Extracting hora events...")
-    for i, filepath in enumerate(sampled_files):
+    # Extract hora events from files until we have enough samples
+    # Each game typically has ~4-8 hora events, so we load progressively
+    print(f"Extracting hora events (target: {num_samples})...")
+    for filepath in all_files:
         try:
             horas = parser.parse_file(filepath)
-            all_horas.extend(horas)
+            # Filter valid horas immediately to avoid loading more files than needed
+            valid_horas = [h for h in horas if h.is_valid()]
+            all_horas.extend(valid_horas)
+            files_processed += 1
             if verbose:
                 print(
-                    f"  [{i + 1}/{len(sampled_files)}] {filepath}: {len(horas)} horas"
+                    f"  [{files_processed}] {filepath}: {len(valid_horas)} valid horas (total: {len(all_horas)})"
                 )
+            # Stop once we have enough samples
+            if len(all_horas) >= num_samples:
+                break
         except Exception as e:
+            files_processed += 1
             if verbose:
                 print(f"  Error parsing {filepath}: {e}")
 
-    print(f"Extracted {len(all_horas)} total hora events")
+    print(
+        f"Processed {files_processed} files, extracted {len(all_horas)} valid hora events"
+    )
 
-    # Sample hora events
+    # Sample down if we got more than requested
     if num_samples < len(all_horas):
         if seed is not None:
             random.seed(seed + 1)
         all_horas = random.sample(all_horas, num_samples)
 
-    # Filter out invalid hora events (e.g., from logs with hidden tiles)
-    valid_horas = [h for h in all_horas if h.is_valid()]
-    skipped = len(all_horas) - len(valid_horas)
-    if skipped > 0:
-        print(f"Skipped {skipped} invalid hora events (likely from hidden-tile logs)")
-
+    valid_horas = all_horas
     print(f"Validating {len(valid_horas)} hora events...")
 
     # Run validation
@@ -1089,8 +1084,7 @@ def validate_samples(
     print("\n" + "=" * 60)
     print("VALIDATION SUMMARY")
     print("=" * 60)
-    print(f"Total extracted: {len(all_horas)}")
-    print(f"Skipped invalid: {skipped}")
+    print(f"Files processed: {files_processed}")
     print(f"Total validated: {total_validated}")
     if total_validated > 0:
         print(f"Matches:         {matches} ({100 * matches / total_validated:.1f}%)")
@@ -1103,7 +1097,7 @@ def validate_samples(
 
     return {
         "total": total_validated,
-        "skipped": skipped,
+        "files_processed": files_processed,
         "matches": matches,
         "mismatches": mismatches,
         "errors": errors,
@@ -1138,13 +1132,6 @@ def main():
         help="Number of hora events to validate (default: 100)",
     )
     parser.add_argument(
-        "--files",
-        "-f",
-        type=int,
-        default=50,
-        help="Number of mjson files to sample from (default: 50)",
-    )
-    parser.add_argument(
         "--seed", "-s", type=int, default=None, help="Random seed for reproducibility"
     )
     parser.add_argument(
@@ -1163,7 +1150,6 @@ def main():
         data_dir=args.data_dir,
         agari_path=args.agari,
         num_samples=args.samples,
-        num_files=args.files,
         seed=args.seed,
         verbose=args.verbose,
     )
