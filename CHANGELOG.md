@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.15.0]
+
+### Changed
+
+- **Web UI Redesign**: Complete redesign of the web interface with a modern linear design language
+  - Boxy, sharp-cornered design with no border-radius
+  - 1px borders for depth instead of shadows
+  - Modern dark color scheme (`#09090b` base, `#3b82f6` accent)
+  - Monospace typography for values, badges, and code elements
+  - Grid-based panel layout with 1px gap separators
+  - Flat hover states using border color changes
+  - Updated all components: Tile, TilePalette, ContextOptions, ScoreResult, DoraPicker
+
+### Fixed
+
+- **Validator CLI**: Simplified CLI by removing `--files` parameter; validator now always uses bundled test files
+
 ## [0.14.0]
 
 ### Added
