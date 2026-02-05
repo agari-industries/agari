@@ -76,6 +76,13 @@
     box-sizing: border-box;
 }
 
+/* Prevent double-tap-to-zoom on interactive elements for mobile */
+button,
+.btn,
+[role="button"] {
+    touch-action: manipulation;
+}
+
 html {
     font-family: var(--font-sans);
     font-size: 14px;
