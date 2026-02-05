@@ -1,6 +1,25 @@
 <script lang="ts">
   import type { ScoringOutput } from '../agari';
-  import { t, translateYaku, translateScoreLevel } from '../i18n';
+  import type { Translations } from '../i18n/types';
+  import { t } from '../i18n';
+  import { yakuNameMap, scoreLevelMap } from '../i18n';
+
+  // Reactive translation helpers that depend on $t
+  function translateYaku(backendName: string, trans: Translations): string {
+    const key = yakuNameMap[backendName];
+    if (key) {
+      return trans[key] as string;
+    }
+    return backendName;
+  }
+
+  function translateScoreLevel(backendLevel: string, trans: Translations): string {
+    const key = scoreLevelMap[backendLevel];
+    if (key) {
+      return trans[key] as string;
+    }
+    return backendLevel;
+  }
 
   interface Props {
     result: ScoringOutput | null;
@@ -57,7 +76,7 @@
       <div class="score-summary">
         {#if result.score_level}
           <div class="score-level {getScoreLevelClass(result.score_level)}">
-            {translateScoreLevel(result.score_level)}
+            {translateScoreLevel(result.score_level, $t)}
           </div>
         {/if}
 
@@ -92,7 +111,7 @@
         <div class="yaku-list">
           {#each result.yaku as yaku}
             <div class="yaku-item">
-              <span class="yaku-name">{translateYaku(yaku.name)}</span>
+              <span class="yaku-name">{translateYaku(yaku.name, $t)}</span>
               <span class="yaku-han" class:yakuman={yaku.is_yakuman}>
                 {#if yaku.is_yakuman}{$t.scoreLevelYakuman}{:else}{yaku.han}{/if}
               </span>

@@ -10,58 +10,58 @@ import { en } from "./en";
 import { ja } from "./ja";
 
 // Mapping from backend yaku names to translation keys
-const yakuNameMap: Record<string, keyof Translations> = {
+// These must match exactly what agari-wasm/src/lib.rs yaku_name() returns
+export const yakuNameMap: Record<string, keyof Translations> = {
   Riichi: "yakuRiichi",
   Ippatsu: "yakuIppatsu",
   "Menzen Tsumo": "yakuMenzenTsumo",
-  "Tanyao (All Simples)": "yakuTanyao",
+  Tanyao: "yakuTanyao",
   Pinfu: "yakuPinfu",
-  "Iipeikou (Pure Double Sequence)": "yakuIipeikou",
-  "Yakuhai: East Wind": "yakuYakuhaiEast",
-  "Yakuhai: South Wind": "yakuYakuhaiSouth",
-  "Yakuhai: West Wind": "yakuYakuhaiWest",
-  "Yakuhai: North Wind": "yakuYakuhaiNorth",
-  "Yakuhai: White Dragon (Haku)": "yakuYakuhaiWhite",
-  "Yakuhai: Green Dragon (Hatsu)": "yakuYakuhaiGreen",
-  "Yakuhai: Red Dragon (Chun)": "yakuYakuhaiRed",
-  "Rinshan Kaihou (After Kan)": "yakuRinshanKaihou",
-  "Chankan (Robbing the Kan)": "yakuChankan",
-  "Haitei Raoyue (Last Tile Draw)": "yakuHaitei",
-  "Houtei Raoyui (Last Tile Discard)": "yakuHoutei",
+  Iipeikou: "yakuIipeikou",
+  "Yakuhai (East)": "yakuYakuhaiEast",
+  "Yakuhai (South)": "yakuYakuhaiSouth",
+  "Yakuhai (West)": "yakuYakuhaiWest",
+  "Yakuhai (North)": "yakuYakuhaiNorth",
+  "Yakuhai (Haku)": "yakuYakuhaiWhite",
+  "Yakuhai (Hatsu)": "yakuYakuhaiGreen",
+  "Yakuhai (Chun)": "yakuYakuhaiRed",
+  "Rinshan Kaihou": "yakuRinshanKaihou",
+  Chankan: "yakuChankan",
+  "Haitei Raoyue": "yakuHaitei",
+  "Houtei Raoyui": "yakuHoutei",
   "Double Riichi": "yakuDoubleRiichi",
-  "Toitoi (All Triplets)": "yakuToitoi",
-  "Sanshoku Doujun (Mixed Triple Sequence)": "yakuSanshokuDoujun",
-  "Sanshoku Doukou (Triple Triplets)": "yakuSanshokuDoukou",
-  "Ittsu (Pure Straight)": "yakuIttsu",
-  "Chiitoitsu (Seven Pairs)": "yakuChiitoitsu",
-  "Chanta (Outside Hand)": "yakuChanta",
-  "San Ankou (Three Concealed Triplets)": "yakuSanAnkou",
-  "San Kantsu (Three Kans)": "yakuSanKantsu",
-  "Honroutou (All Terminals and Honors)": "yakuHonroutou",
-  "Shousangen (Little Three Dragons)": "yakuShousangen",
-  "Honitsu (Half Flush)": "yakuHonitsu",
-  "Junchan (Terminals in All Groups)": "yakuJunchan",
-  "Ryanpeikou (Twice Pure Double Sequence)": "yakuRyanpeikou",
-  "Chinitsu (Full Flush)": "yakuChinitsu",
-  "Tenhou (Heavenly Hand)": "yakuTenhou",
-  "Chiihou (Earthly Hand)": "yakuChiihou",
-  "Kokushi Musou (Thirteen Orphans)": "yakuKokushiMusou",
-  "Suuankou (Four Concealed Triplets)": "yakuSuuankou",
-  "Daisangen (Big Three Dragons)": "yakuDaisangen",
-  "Shousuushii (Little Four Winds)": "yakuShousuushii",
-  "Daisuushii (Big Four Winds)": "yakuDaisuushii",
-  "Tsuuiisou (All Honors)": "yakuTsuuiisou",
-  "Chinroutou (All Terminals)": "yakuChinroutou",
-  "Ryuuiisou (All Green)": "yakuRyuuiisou",
-  "Chuuren Poutou (Nine Gates)": "yakuChuurenPoutou",
-  "Kokushi Juusanmen (Kokushi Musou 13-wait)": "yakuKokushi13Wait",
+  Toitoi: "yakuToitoi",
+  "Sanshoku Doujun": "yakuSanshokuDoujun",
+  "Sanshoku Doukou": "yakuSanshokuDoukou",
+  Ittsu: "yakuIttsu",
+  Chiitoitsu: "yakuChiitoitsu",
+  Chanta: "yakuChanta",
+  "San Ankou": "yakuSanAnkou",
+  "San Kantsu": "yakuSanKantsu",
+  Honroutou: "yakuHonroutou",
+  Shousangen: "yakuShousangen",
+  Honitsu: "yakuHonitsu",
+  Junchan: "yakuJunchan",
+  Ryanpeikou: "yakuRyanpeikou",
+  Chinitsu: "yakuChinitsu",
+  Tenhou: "yakuTenhou",
+  Chiihou: "yakuChiihou",
+  "Kokushi Musou": "yakuKokushiMusou",
+  Suuankou: "yakuSuuankou",
+  Daisangen: "yakuDaisangen",
+  Shousuushii: "yakuShousuushii",
+  Daisuushii: "yakuDaisuushii",
+  Tsuuiisou: "yakuTsuuiisou",
+  Chinroutou: "yakuChinroutou",
+  Ryuuiisou: "yakuRyuuiisou",
+  "Chuuren Poutou": "yakuChuurenPoutou",
+  "Kokushi 13-Wait": "yakuKokushi13Wait",
   "Suuankou Tanki": "yakuSuuankouTanki",
   "Junsei Chuuren Poutou": "yakuJunseiChuurenPoutou",
-  "Suu Kantsu (Four Kans)": "yakuSuuKantsu",
 };
 
 // Mapping from backend score level names to translation keys
-const scoreLevelMap: Record<string, keyof Translations> = {
+export const scoreLevelMap: Record<string, keyof Translations> = {
   Mangan: "scoreLevelMangan",
   Haneman: "scoreLevelHaneman",
   Baiman: "scoreLevelBaiman",
@@ -158,9 +158,13 @@ export function getWindNames(localeCode: Locale = get(locale)) {
 
 /**
  * Translate a yaku name from backend to current locale
+ * @param backendName - The yaku name from the backend
+ * @param trans - The translations object (pass $t for reactivity in Svelte components)
  */
-export function translateYaku(backendName: string): string {
-  const trans = get(t);
+export function translateYaku(
+  backendName: string,
+  trans: Translations,
+): string {
   const key = yakuNameMap[backendName];
   if (key) {
     return trans[key] as string;
@@ -171,9 +175,13 @@ export function translateYaku(backendName: string): string {
 
 /**
  * Translate a score level from backend to current locale
+ * @param backendLevel - The score level from the backend
+ * @param trans - The translations object (pass $t for reactivity in Svelte components)
  */
-export function translateScoreLevel(backendLevel: string): string {
-  const trans = get(t);
+export function translateScoreLevel(
+  backendLevel: string,
+  trans: Translations,
+): string {
   const key = scoreLevelMap[backendLevel];
   if (key) {
     return trans[key] as string;
