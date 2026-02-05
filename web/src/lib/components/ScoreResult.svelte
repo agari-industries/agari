@@ -124,23 +124,23 @@
       {#if result.dora.total > 0}
         <div class="dora-section">
           <h3 class="section-title">{$t.dora}</h3>
-          <div class="dora-breakdown">
+          <div class="dora-list">
             {#if result.dora.regular > 0}
               <div class="dora-item">
-                <span>{$t.dora}</span>
-                <span class="dora-count">{result.dora.regular}</span>
+                <span class="dora-name">{$t.dora}</span>
+                <span class="dora-han">{result.dora.regular}</span>
               </div>
             {/if}
             {#if result.dora.ura > 0}
               <div class="dora-item">
-                <span>{$t.ura}</span>
-                <span class="dora-count ura">{result.dora.ura}</span>
+                <span class="dora-name">{$t.ura}</span>
+                <span class="dora-han ura">{result.dora.ura}</span>
               </div>
             {/if}
             {#if result.dora.aka > 0}
               <div class="dora-item">
-                <span>{$t.aka}</span>
-                <span class="dora-count aka">{result.dora.aka}</span>
+                <span class="dora-name">{$t.aka}</span>
+                <span class="dora-han aka">{result.dora.aka}</span>
               </div>
             {/if}
           </div>
@@ -148,7 +148,7 @@
       {/if}
 
       <!-- Fu Breakdown -->
-      <details class="fu-details">
+      <details class="fu-details" open>
         <summary>{$t.fuBreakdown}</summary>
         <div class="fu-breakdown">
           <div class="fu-item">
@@ -193,10 +193,10 @@
       </details>
 
       <!-- Hand Structure -->
-      <div class="structure-section">
-        <span class="structure-label">{$t.structure}</span>
+      <details class="structure-details">
+        <summary>{$t.structure}</summary>
         <code class="structure-value">{result.hand_structure}</code>
-      </div>
+      </details>
     </div>
   {:else}
     <div class="empty-state">
@@ -414,33 +414,47 @@
     color: var(--warning);
   }
 
-  /* Dora */
-  .dora-breakdown {
+  /* Dora - styled like yaku list */
+  .dora-list {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
+    flex-direction: column;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
   }
 
   .dora-item {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: var(--space-2);
     padding: var(--space-2) var(--space-3);
     background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    font-size: 0.8125rem;
   }
 
-  .dora-count {
+  .dora-name {
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+  }
+
+  .dora-han {
+    font-size: 0.6875rem;
     font-family: var(--font-mono);
     font-weight: 600;
+    padding: var(--space-1) var(--space-2);
+    background: var(--accent-muted);
+    border: 1px solid var(--accent);
     color: var(--accent);
   }
 
-  .dora-count.ura {
+  .dora-han.ura {
+    background: rgba(167, 139, 250, 0.15);
+    border-color: #a78bfa;
     color: #a78bfa;
   }
-  .dora-count.aka {
+
+  .dora-han.aka {
+    background: rgba(248, 113, 113, 0.15);
+    border-color: var(--man-color);
     color: var(--man-color);
   }
 
@@ -488,23 +502,28 @@
   }
 
   /* Structure */
-  .structure-section {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    padding: var(--space-2) var(--space-3);
+  .structure-details {
     background: var(--bg-elevated);
     border: 1px solid var(--border);
-    display: flex;
-    gap: var(--space-2);
+    padding: var(--space-3);
   }
 
-  .structure-label {
-    font-weight: 600;
+  .structure-details summary {
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .structure-details[open] summary {
+    margin-bottom: var(--space-2);
   }
 
   .structure-value {
     font-family: var(--font-mono);
+    font-size: 0.75rem;
     color: var(--text-secondary);
+    display: block;
   }
 
   /* Empty State */
