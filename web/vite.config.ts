@@ -2,9 +2,9 @@ import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
-  // Use /agari/ base path for GitHub Pages, or / for local dev
-  base: mode === "production" ? "/agari/" : "/",
+export default defineConfig(() => ({
+  // Use root base path for custom domain (agari.org)
+  base: "/",
   plugins: [svelte()],
   build: {
     target: "esnext",
