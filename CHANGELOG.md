@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.16.0]
+
+### Added
+
+- **Japanese Localization (Web UI)**: Full Japanese (日本語) language support for the web interface
+  - Type-safe i18n system with English and Japanese translations
+  - Language switcher in header with persistent preference (localStorage)
+  - Auto-detection of browser language preference
+  - All UI strings, yaku names, and score levels translated
+  - Translations for: 満貫, 跳満, 倍満, 三倍満, 役満, etc.
+
+- **Suu Kantsu (四槓子) Yakuman**: Added the missing Four Kans yakuman
+  - Detects when hand contains exactly 4 kans (open or closed)
+  - Awards yakuman (13 han) - can stack with Suuankou for double yakuman
+  - Added CLI display: "Suu Kantsu (Four Kans)"
+  - Added WASM support and i18n translations
+
+### Fixed
+
+- **Yaku Translation Mapping**: Fixed yaku names not translating in Japanese locale
+  - Updated yakuNameMap to match actual WASM backend output format
+  - WASM uses shorter names (e.g., "Sanshoku Doujun") vs CLI verbose names
+  - Made translation helpers reactive to locale changes
+
 ## [0.15.0]
 
 ### Changed
