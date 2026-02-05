@@ -55,6 +55,7 @@ export const yakuNameMap: Record<string, keyof Translations> = {
   Chinroutou: "yakuChinroutou",
   Ryuuiisou: "yakuRyuuiisou",
   "Chuuren Poutou": "yakuChuurenPoutou",
+  "Suu Kantsu": "yakuSuuKantsu",
   "Kokushi 13-Wait": "yakuKokushi13Wait",
   "Suuankou Tanki": "yakuSuuankouTanki",
   "Junsei Chuuren Poutou": "yakuJunseiChuurenPoutou",

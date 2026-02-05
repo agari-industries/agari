@@ -58,6 +58,7 @@ pub enum Yaku {
     Chinroutou,    // All terminals
     Ryuuiisou,     // All green
     ChuurenPoutou, // Nine gates
+    SuuKantsu,     // Four kans (quads)
 
     // === Double Yakuman ===
     Kokushi13Wait,       // Kokushi with 13-sided wait
@@ -116,6 +117,7 @@ impl Yaku {
             Yaku::Chinroutou => 13,
             Yaku::Ryuuiisou => 13,
             Yaku::ChuurenPoutou => 13,
+            Yaku::SuuKantsu => 13,
 
             // Double Yakuman (26 han equivalent)
             Yaku::Kokushi13Wait => 26,
@@ -174,6 +176,7 @@ impl Yaku {
             Yaku::Tsuuiisou => Some(13),
             Yaku::Chinroutou => Some(13),
             Yaku::Ryuuiisou => Some(13),
+            Yaku::SuuKantsu => Some(13),
         }
     }
 
@@ -200,6 +203,7 @@ impl Yaku {
                 | Yaku::Ryuuiisou
                 | Yaku::ChuurenPoutou
                 | Yaku::JunseiChuurenPoutou
+                | Yaku::SuuKantsu
         )
     }
 }
@@ -313,6 +317,17 @@ pub fn detect_yaku_with_context(
             // Chuuren Poutou (Nine Gates) - closed only
             if !is_open && let Some(yaku) = check_chuuren_poutou(counts, context) {
                 yaku_list.push(yaku);
+            }
+
+            // Suu Kantsu (Four Kans)
+            {
+                let kan_count = melds
+                    .iter()
+                    .filter(|m| matches!(m, Meld::Kan(_, _)))
+                    .count();
+                if kan_count == 4 {
+                    yaku_list.push(Yaku::SuuKantsu);
+                }
             }
         }
     }
@@ -1711,5 +1726,82 @@ mod tests {
 
         // Sanankou should NOT be awarded - only 2 concealed triplets remain
         assert!(!has_yaku(&results_ron, Yaku::SanAnkou));
+    }
+
+    #[test]
+    fn test_suu_kantsu() {
+        use crate::hand::decompose_hand_with_melds;
+        use crate::parse::parse_hand_with_aka;
+
+        // Suu Kantsu (Four Kans) - yakuman
+        // Hand with four closed kans: [1111m] [2222m] [3333m] [4444m] 55m
+        // Total tiles: 4*4 + 2 = 18 tiles
+        let parsed = parse_hand_with_aka("[1111m][2222m][3333m][4444m]55m").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds: Vec<_> = parsed
+            .called_melds
+            .iter()
+            .map(|cm| cm.meld.clone())
+            .collect();
+
+        let structures = decompose_hand_with_melds(&counts, &called_melds);
+        assert!(!structures.is_empty());
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East);
+        let result = detect_yaku_with_context(&structures[0], &counts, &context);
+
+        assert!(result.yaku_list.contains(&Yaku::SuuKantsu));
+        assert!(result.is_yakuman);
+    }
+
+    #[test]
+    fn test_suu_kantsu_open() {
+        use crate::hand::decompose_hand_with_melds;
+        use crate::parse::parse_hand_with_aka;
+
+        // Suu Kantsu can be achieved with open kans
+        // Hand with mixed open/closed kans: (1111m) (2222p) [3333s] [4444s] 55z
+        let parsed = parse_hand_with_aka("(1111m)(2222p)[3333s][4444s]55z").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds: Vec<_> = parsed
+            .called_melds
+            .iter()
+            .map(|cm| cm.meld.clone())
+            .collect();
+
+        let structures = decompose_hand_with_melds(&counts, &called_melds);
+        assert!(!structures.is_empty());
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East).open();
+        let result = detect_yaku_with_context(&structures[0], &counts, &context);
+
+        assert!(result.yaku_list.contains(&Yaku::SuuKantsu));
+        assert!(result.is_yakuman);
+    }
+
+    #[test]
+    fn test_san_kantsu_not_suu_kantsu() {
+        use crate::hand::decompose_hand_with_melds;
+        use crate::parse::parse_hand_with_aka;
+
+        // Three kans should give San Kantsu (2 han), not Suu Kantsu (yakuman)
+        // Hand: [1111m] [2222m] [3333m] 456s 77z
+        let parsed = parse_hand_with_aka("[1111m][2222m][3333m]456s77z").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds: Vec<_> = parsed
+            .called_melds
+            .iter()
+            .map(|cm| cm.meld.clone())
+            .collect();
+
+        let structures = decompose_hand_with_melds(&counts, &called_melds);
+        assert!(!structures.is_empty());
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East);
+        let result = detect_yaku_with_context(&structures[0], &counts, &context);
+
+        assert!(result.yaku_list.contains(&Yaku::SanKantsu));
+        assert!(!result.yaku_list.contains(&Yaku::SuuKantsu));
+        assert!(!result.is_yakuman);
     }
 }
