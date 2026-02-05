@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ScoringOutput } from '../agari';
+  import { t } from '../i18n';
 
   interface Props {
     result: ScoringOutput | null;
@@ -9,10 +10,10 @@
 
   let { result, error = null, loading = false }: Props = $props();
 
-  const formatPayment = (payment: ScoringOutput['payment'], isDealer: boolean, isTsumo: boolean): string => {
-    if (isTsumo) {
+  const formatPayment = (payment: ScoringOutput['payment'], isDealer: boolean, isTsumoWin: boolean): string => {
+    if (isTsumoWin) {
       if (isDealer) {
-        return `${payment.from_non_dealer?.toLocaleString()} all`;
+        return `${payment.from_non_dealer?.toLocaleString()} ${$t.all}`;
       } else {
         return `${payment.from_non_dealer?.toLocaleString()} / ${payment.from_dealer?.toLocaleString()}`;
       }
@@ -38,7 +39,7 @@
   {#if loading}
     <div class="loading">
       <div class="spinner"></div>
-      <span>Calculating...</span>
+      <span>{$t.calculating}</span>
     </div>
   {:else if error}
     <div class="error">
@@ -48,7 +49,7 @@
     <div class="result-content">
       {#if result.inferred_winning_tile}
         <div class="inferred-warning">
-          Winning tile inferred as <strong>{result.inferred_winning_tile}</strong>
+          {$t.inferredWinningTile} <strong>{result.inferred_winning_tile}</strong>
         </div>
       {/if}
 
@@ -63,31 +64,31 @@
         <div class="score-numbers">
           <div class="han-fu">
             <span class="value">{result.total_han}</span>
-            <span class="unit">han</span>
+            <span class="unit">{$t.han}</span>
           </div>
           <span class="divider">/</span>
           <div class="han-fu">
             <span class="value">{result.fu}</span>
-            <span class="unit">fu</span>
+            <span class="unit">{$t.fu}</span>
           </div>
         </div>
 
         <div class="total-points">
           <span class="points-value">{result.payment.total.toLocaleString()}</span>
-          <span class="points-label">pts</span>
+          <span class="points-label">{$t.pts}</span>
         </div>
 
         <div class="payment-breakdown">
           {formatPayment(result.payment, result.is_dealer, isTsumo)}
           {#if result.is_dealer}
-            <span class="dealer-tag">Dealer</span>
+            <span class="dealer-tag">{$t.dealer}</span>
           {/if}
         </div>
       </div>
 
       <!-- Yaku List -->
       <div class="yaku-section">
-        <h3 class="section-title">Yaku</h3>
+        <h3 class="section-title">{$t.yaku}</h3>
         <div class="yaku-list">
           {#each result.yaku as yaku}
             <div class="yaku-item">
@@ -103,23 +104,23 @@
       <!-- Dora -->
       {#if result.dora.total > 0}
         <div class="dora-section">
-          <h3 class="section-title">Dora</h3>
+          <h3 class="section-title">{$t.dora}</h3>
           <div class="dora-breakdown">
             {#if result.dora.regular > 0}
               <div class="dora-item">
-                <span>Dora</span>
+                <span>{$t.dora}</span>
                 <span class="dora-count">{result.dora.regular}</span>
               </div>
             {/if}
             {#if result.dora.ura > 0}
               <div class="dora-item">
-                <span>Ura</span>
+                <span>{$t.ura}</span>
                 <span class="dora-count ura">{result.dora.ura}</span>
               </div>
             {/if}
             {#if result.dora.aka > 0}
               <div class="dora-item">
-                <span>Aka</span>
+                <span>{$t.aka}</span>
                 <span class="dora-count aka">{result.dora.aka}</span>
               </div>
             {/if}
@@ -129,44 +130,44 @@
 
       <!-- Fu Breakdown -->
       <details class="fu-details">
-        <summary>Fu Breakdown</summary>
+        <summary>{$t.fuBreakdown}</summary>
         <div class="fu-breakdown">
           <div class="fu-item">
-            <span>Base</span>
+            <span>{$t.fuBase}</span>
             <span>{result.fu_breakdown.base}</span>
           </div>
           {#if result.fu_breakdown.menzen_ron > 0}
             <div class="fu-item">
-              <span>Menzen Ron</span>
+              <span>{$t.fuMenzenRon}</span>
               <span>+{result.fu_breakdown.menzen_ron}</span>
             </div>
           {/if}
           {#if result.fu_breakdown.tsumo > 0}
             <div class="fu-item">
-              <span>Tsumo</span>
+              <span>{$t.fuTsumo}</span>
               <span>+{result.fu_breakdown.tsumo}</span>
             </div>
           {/if}
           {#if result.fu_breakdown.melds > 0}
             <div class="fu-item">
-              <span>Melds</span>
+              <span>{$t.fuMelds}</span>
               <span>+{result.fu_breakdown.melds}</span>
             </div>
           {/if}
           {#if result.fu_breakdown.pair > 0}
             <div class="fu-item">
-              <span>Pair</span>
+              <span>{$t.fuPair}</span>
               <span>+{result.fu_breakdown.pair}</span>
             </div>
           {/if}
           {#if result.fu_breakdown.wait > 0}
             <div class="fu-item">
-              <span>Wait</span>
+              <span>{$t.fuWait}</span>
               <span>+{result.fu_breakdown.wait}</span>
             </div>
           {/if}
           <div class="fu-item total">
-            <span>Total</span>
+            <span>{$t.fuTotal}</span>
             <span>{result.fu_breakdown.raw_total} → {result.fu_breakdown.rounded}</span>
           </div>
         </div>
@@ -174,13 +175,13 @@
 
       <!-- Hand Structure -->
       <div class="structure-section">
-        <span class="structure-label">Structure:</span>
+        <span class="structure-label">{$t.structure}</span>
         <code class="structure-value">{result.hand_structure}</code>
       </div>
     </div>
   {:else}
     <div class="empty-state">
-      <span class="empty-text">Enter a complete hand to calculate score</span>
+      <span class="empty-text">{$t.enterCompleteHand}</span>
     </div>
   {/if}
 </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ALL_TILES } from '../agari';
+  import { t } from '../i18n';
   import Tile from './Tile.svelte';
 
   interface Props {
@@ -42,11 +43,11 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
-<div class="picker-backdrop" role="dialog" aria-modal="true" onclick={handleBackdropClick}>
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<div class="picker-backdrop" role="dialog" aria-modal="true" tabindex="-1" onclick={handleBackdropClick}>
   <div class="picker-panel">
     <div class="picker-header">
-      <span>Select Tile</span>
+      <span>{$t.selectTile}</span>
       <button type="button" class="close-btn" onclick={onClose}>×</button>
     </div>
 
