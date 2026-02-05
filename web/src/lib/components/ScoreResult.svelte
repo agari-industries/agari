@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ScoringOutput } from '../agari';
-  import { t } from '../i18n';
+  import { t, translateYaku, translateScoreLevel } from '../i18n';
 
   interface Props {
     result: ScoringOutput | null;
@@ -57,7 +57,7 @@
       <div class="score-summary">
         {#if result.score_level}
           <div class="score-level {getScoreLevelClass(result.score_level)}">
-            {result.score_level}
+            {translateScoreLevel(result.score_level)}
           </div>
         {/if}
 
@@ -92,9 +92,9 @@
         <div class="yaku-list">
           {#each result.yaku as yaku}
             <div class="yaku-item">
-              <span class="yaku-name">{yaku.name}</span>
+              <span class="yaku-name">{translateYaku(yaku.name)}</span>
               <span class="yaku-han" class:yakuman={yaku.is_yakuman}>
-                {#if yaku.is_yakuman}役満{:else}{yaku.han}{/if}
+                {#if yaku.is_yakuman}{$t.scoreLevelYakuman}{:else}{yaku.han}{/if}
               </span>
             </div>
           {/each}

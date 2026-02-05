@@ -3,7 +3,7 @@
  * All translation keys are defined here for type safety
  */
 
-export type Locale = 'en' | 'ja';
+export type Locale = "en" | "ja";
 
 export interface Translations {
   // Header
@@ -116,4 +116,62 @@ export interface Translations {
 
   // Language
   language: string;
+
+  // Score levels
+  scoreLevelMangan: string;
+  scoreLevelHaneman: string;
+  scoreLevelBaiman: string;
+  scoreLevelSanbaiman: string;
+  scoreLevelYakuman: string;
+  scoreLevelDoubleYakuman: string;
+  scoreLevelCountedYakuman: string;
+
+  // Yaku names
+  yakuRiichi: string;
+  yakuIppatsu: string;
+  yakuMenzenTsumo: string;
+  yakuTanyao: string;
+  yakuPinfu: string;
+  yakuIipeikou: string;
+  yakuYakuhaiEast: string;
+  yakuYakuhaiSouth: string;
+  yakuYakuhaiWest: string;
+  yakuYakuhaiNorth: string;
+  yakuYakuhaiWhite: string;
+  yakuYakuhaiGreen: string;
+  yakuYakuhaiRed: string;
+  yakuRinshanKaihou: string;
+  yakuChankan: string;
+  yakuHaitei: string;
+  yakuHoutei: string;
+  yakuDoubleRiichi: string;
+  yakuToitoi: string;
+  yakuSanshokuDoujun: string;
+  yakuSanshokuDoukou: string;
+  yakuIttsu: string;
+  yakuChiitoitsu: string;
+  yakuChanta: string;
+  yakuSanAnkou: string;
+  yakuSanKantsu: string;
+  yakuHonroutou: string;
+  yakuShousangen: string;
+  yakuHonitsu: string;
+  yakuJunchan: string;
+  yakuRyanpeikou: string;
+  yakuChinitsu: string;
+  yakuTenhou: string;
+  yakuChiihou: string;
+  yakuKokushiMusou: string;
+  yakuSuuankou: string;
+  yakuDaisangen: string;
+  yakuShousuushii: string;
+  yakuDaisuushii: string;
+  yakuTsuuiisou: string;
+  yakuChinroutou: string;
+  yakuRyuuiisou: string;
+  yakuChuurenPoutou: string;
+  yakuKokushi13Wait: string;
+  yakuSuuankouTanki: string;
+  yakuJunseiChuurenPoutou: string;
+  yakuSuuKantsu: string;
 }
