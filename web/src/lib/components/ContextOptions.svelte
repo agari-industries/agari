@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { WIND_NAMES } from '../agari';
+  import { t, locale, getWindNames } from '../i18n';
 
   interface Props {
     isTsumo: boolean;
@@ -43,6 +43,7 @@
 
   const winds = ['east', 'south', 'west', 'north'] as const;
   const windSymbols = { east: '東', south: '南', west: '西', north: '北' };
+  const windNames = $derived(getWindNames($locale));
 
   const handleRiichiChange = () => {
     if (!isRiichi) {
@@ -65,7 +66,7 @@
 <div class="context-options">
   <!-- Win Type -->
   <div class="option-section">
-    <h3 class="section-title">Win Type</h3>
+    <h3 class="section-title">{$t.winType}</h3>
     <div class="toggle-group">
       <button
         type="button"
@@ -73,7 +74,7 @@
         class:active={!isTsumo}
         onclick={() => { isTsumo = false; onChange(); }}
       >
-        Ron
+        {$t.ron}
       </button>
       <button
         type="button"
@@ -81,25 +82,25 @@
         class:active={isTsumo}
         onclick={() => { isTsumo = true; onChange(); }}
       >
-        Tsumo
+        {$t.tsumo}
       </button>
     </div>
   </div>
 
   <!-- Winds -->
   <div class="option-section">
-    <h3 class="section-title">Winds</h3>
+    <h3 class="section-title">{$t.winds}</h3>
     <div class="winds-grid">
       <div class="wind-selector">
-        <label class="wind-label">Round</label>
-        <div class="wind-buttons">
+        <span class="wind-label">{$t.round}</span>
+        <div class="wind-buttons" role="group" aria-label={$t.round}>
           {#each winds as wind}
             <button
               type="button"
               class="wind-btn"
               class:active={roundWind === wind}
               onclick={() => { roundWind = wind; onChange(); }}
-              title={WIND_NAMES[wind]}
+              title={windNames[wind]}
             >
               {windSymbols[wind]}
             </button>
@@ -107,15 +108,15 @@
         </div>
       </div>
       <div class="wind-selector">
-        <label class="wind-label">Seat</label>
-        <div class="wind-buttons">
+        <span class="wind-label">{$t.seat}</span>
+        <div class="wind-buttons" role="group" aria-label={$t.seat}>
           {#each winds as wind}
             <button
               type="button"
               class="wind-btn"
               class:active={seatWind === wind}
               onclick={() => { seatWind = wind; onChange(); }}
-              title={WIND_NAMES[wind]}
+              title={windNames[wind]}
             >
               {windSymbols[wind]}
             </button>
@@ -124,15 +125,15 @@
       </div>
     </div>
     {#if isDealer}
-      <div class="dealer-badge">Dealer (Oya)</div>
+      <div class="dealer-badge">{$t.dealerOya}</div>
     {/if}
   </div>
 
   <!-- Riichi Options -->
   <div class="option-section">
-    <h3 class="section-title">Riichi</h3>
+    <h3 class="section-title">{$t.riichi}</h3>
     {#if hasOpenMelds}
-      <div class="open-hand-notice">Open hand — Riichi not available</div>
+      <div class="open-hand-notice">{$t.openHandNotice}</div>
     {/if}
     <div class="checkbox-group">
       <label class="checkbox-item" class:disabled={hasOpenMelds}>
@@ -142,7 +143,7 @@
           disabled={hasOpenMelds}
           onchange={handleRiichiChange}
         />
-        <span class="checkbox-label">Riichi</span>
+        <span class="checkbox-label">{$t.riichi}</span>
         <span class="han-indicator">+1</span>
       </label>
       <label class="checkbox-item" class:disabled={hasOpenMelds || !isRiichi}>
@@ -152,7 +153,7 @@
           disabled={hasOpenMelds || !isRiichi}
           onchange={handleDoubleRiichiChange}
         />
-        <span class="checkbox-label">Double Riichi</span>
+        <span class="checkbox-label">{$t.doubleRiichi}</span>
         <span class="han-indicator">+1</span>
       </label>
       <label class="checkbox-item" class:disabled={hasOpenMelds || !isRiichi}>
@@ -162,7 +163,7 @@
           disabled={hasOpenMelds || !isRiichi}
           onchange={onChange}
         />
-        <span class="checkbox-label">Ippatsu</span>
+        <span class="checkbox-label">{$t.ippatsu}</span>
         <span class="han-indicator">+1</span>
       </label>
     </div>
@@ -170,12 +171,12 @@
 
   <!-- Situational Yaku -->
   <div class="option-section">
-    <h3 class="section-title">Situational</h3>
+    <h3 class="section-title">{$t.situational}</h3>
     <div class="checkbox-group">
       <label class="checkbox-item">
         <input type="checkbox" bind:checked={isLastTile} onchange={onChange} />
         <span class="checkbox-label">
-          {isTsumo ? 'Haitei (Last Draw)' : 'Houtei (Last Discard)'}
+          {isTsumo ? $t.haitei : $t.houtei}
         </span>
         <span class="han-indicator">+1</span>
       </label>
@@ -186,7 +187,7 @@
           disabled={!isTsumo}
           onchange={onChange}
         />
-        <span class="checkbox-label">Rinshan Kaihou</span>
+        <span class="checkbox-label">{$t.rinshanKaihou}</span>
         <span class="han-indicator">+1</span>
       </label>
       <label class="checkbox-item" class:disabled={isTsumo}>
@@ -196,7 +197,7 @@
           disabled={isTsumo}
           onchange={onChange}
         />
-        <span class="checkbox-label">Chankan</span>
+        <span class="checkbox-label">{$t.chankan}</span>
         <span class="han-indicator">+1</span>
       </label>
     </div>
@@ -204,7 +205,7 @@
 
   <!-- Yakuman Starters -->
   <div class="option-section">
-    <h3 class="section-title">First Turn Yakuman</h3>
+    <h3 class="section-title">{$t.firstTurnYakuman}</h3>
     <div class="checkbox-group">
       <label class="checkbox-item" class:disabled={!isDealer || !isTsumo}>
         <input
@@ -213,7 +214,7 @@
           disabled={!isDealer || !isTsumo}
           onchange={onChange}
         />
-        <span class="checkbox-label">Tenhou</span>
+        <span class="checkbox-label">{$t.tenhou}</span>
         <span class="han-indicator yakuman">役満</span>
       </label>
       <label class="checkbox-item" class:disabled={isDealer || !isTsumo}>
@@ -223,7 +224,7 @@
           disabled={isDealer || !isTsumo}
           onchange={onChange}
         />
-        <span class="checkbox-label">Chiihou</span>
+        <span class="checkbox-label">{$t.chiihou}</span>
         <span class="han-indicator yakuman">役満</span>
       </label>
     </div>

@@ -9,11 +9,13 @@
     type ShantenResponse,
     ALL_TILES,
   } from './lib/agari';
+  import { t } from './lib/i18n';
   import TilePalette from './lib/components/TilePalette.svelte';
   import ContextOptions from './lib/components/ContextOptions.svelte';
   import ScoreResult from './lib/components/ScoreResult.svelte';
   import Tile from './lib/components/Tile.svelte';
   import DoraPicker from './lib/components/DoraPicker.svelte';
+  import LanguageSwitcher from './lib/components/LanguageSwitcher.svelte';
 
   // ============================================================================
   // State
@@ -623,19 +625,20 @@
         <span class="logo-icon">🀄</span>
         <span class="logo-text">Agari</span>
       </h1>
-      <p class="tagline">Riichi Mahjong Calculator</p>
+      <p class="tagline">{$t.tagline}</p>
+      <LanguageSwitcher />
     </div>
   </header>
 
   <main class="main">
     {#if wasmError}
       <div class="error-banner">
-        <span>⚠️ Failed to load calculator: {wasmError}</span>
+        <span>⚠️ {$t.failedToLoad} {wasmError}</span>
       </div>
     {:else if !wasmLoaded}
       <div class="loading-banner">
         <div class="spinner"></div>
-        <span>Loading calculator...</span>
+        <span>{$t.loadingCalculator}</span>
       </div>
     {:else}
       <div class="calculator-layout">
@@ -643,9 +646,9 @@
         <div class="hand-section">
           <div class="card">
             <div class="card-header">
-              <h2>Build Your Hand</h2>
+              <h2>{$t.buildYourHand}</h2>
               <button class="btn btn-secondary" onclick={clearHand}>
-                Clear
+                {$t.clear}
               </button>
             </div>
 
@@ -659,25 +662,25 @@
 
             <!-- Meld Builder Buttons -->
             <div class="meld-buttons">
-              <span class="meld-label">Add Meld:</span>
-              <button class="btn btn-sm" onclick={() => startMeldBuilder('chi')} disabled={showMeldBuilder}>Chi</button>
-              <button class="btn btn-sm" onclick={() => startMeldBuilder('pon')} disabled={showMeldBuilder}>Pon</button>
-              <button class="btn btn-sm" onclick={() => startMeldBuilder('kan')} disabled={showMeldBuilder}>Open Kan</button>
-              <button class="btn btn-sm" onclick={() => startMeldBuilder('ankan')} disabled={showMeldBuilder}>Closed Kan</button>
+              <span class="meld-label">{$t.addMeld}</span>
+              <button class="btn btn-sm" onclick={() => startMeldBuilder('chi')} disabled={showMeldBuilder}>{$t.chi}</button>
+              <button class="btn btn-sm" onclick={() => startMeldBuilder('pon')} disabled={showMeldBuilder}>{$t.pon}</button>
+              <button class="btn btn-sm" onclick={() => startMeldBuilder('kan')} disabled={showMeldBuilder}>{$t.openKan}</button>
+              <button class="btn btn-sm" onclick={() => startMeldBuilder('ankan')} disabled={showMeldBuilder}>{$t.closedKan}</button>
             </div>
 
             <!-- Meld Builder Panel -->
             {#if showMeldBuilder}
               <div class="meld-builder">
                 <div class="meld-builder-header">
-                  <span>Building {meldBuilderType === 'ankan' ? 'Closed Kan' : meldBuilderType === 'kan' ? 'Open Kan' : meldBuilderType.charAt(0).toUpperCase() + meldBuilderType.slice(1)}</span>
+                  <span>{#if meldBuilderType === 'chi'}{$t.buildingChi}{:else if meldBuilderType === 'pon'}{$t.buildingPon}{:else if meldBuilderType === 'kan'}{$t.buildingOpenKan}{:else}{$t.buildingClosedKan}{/if}</span>
                   <span class="meld-builder-hint">
                     {#if meldBuilderType === 'chi'}
-                      (select 3 sequential tiles of the same suit)
+                      {$t.hintChi}
                     {:else if meldBuilderType === 'pon'}
-                      (select 3 of the same tile)
+                      {$t.hintPon}
                     {:else}
-                      (select 4 of the same tile)
+                      {$t.hintKan}
                     {/if}
                   </span>
                 </div>
@@ -695,13 +698,13 @@
                   {/each}
                 </div>
                 <div class="meld-builder-actions">
-                  <button class="btn btn-sm btn-secondary" onclick={cancelMeldBuilder}>Cancel</button>
+                  <button class="btn btn-sm btn-secondary" onclick={cancelMeldBuilder}>{$t.cancel}</button>
                   <button
                     class="btn btn-sm btn-primary"
                     onclick={confirmMeld}
                     disabled={meldBuilderTiles.length !== (meldBuilderType === 'kan' || meldBuilderType === 'ankan' ? 4 : 3)}
                   >
-                    Add Meld
+                    {$t.confirmAddMeld}
                   </button>
                 </div>
               </div>
@@ -712,7 +715,7 @@
           {#if melds.length > 0}
             <div class="card">
               <div class="melds-display">
-                <h3 class="melds-title">Called Melds</h3>
+                <h3 class="melds-title">{$t.calledMelds}</h3>
                 <div class="melds-list">
                   {#each melds as meld, index (meld.id)}
                     <div class="meld-group">
@@ -735,9 +738,9 @@
           <!-- Hand Display -->
           <div class="card">
             <div class="hand-header">
-              <h3>Your Hand</h3>
+              <h3>{$t.yourHand}</h3>
               {#if handTiles.length > 0}
-                <span class="winning-tile-hint">Click a tile to select it as winning tile</span>
+                <span class="winning-tile-hint">{$t.selectWinningTileHint}</span>
               {/if}
             </div>
             <div class="hand-tiles-selectable">
@@ -751,7 +754,7 @@
                   >
                     <Tile tile={entry.tile} red={entry.isRed} size="md" />
                     {#if selectedWinningTileIndex === index}
-                      <div class="winning-badge">WIN</div>
+                      <div class="winning-badge">{$t.winBadge}</div>
                     {/if}
                   </button>
                   <button
@@ -775,11 +778,11 @@
               {#if shantenResult.success}
                 <div class="shanten-display">
                   {#if shantenResult.shanten === -1}
-                    <span class="shanten-badge complete">✓ Complete</span>
+                    <span class="shanten-badge complete">✓ {$t.complete}</span>
                   {:else if shantenResult.shanten === 0}
-                    <span class="shanten-badge tenpai">Tenpai</span>
+                    <span class="shanten-badge tenpai">{$t.tenpai}</span>
                   {:else}
-                    <span class="shanten-badge">{shantenResult.shanten}-shanten</span>
+                    <span class="shanten-badge">{shantenResult.shanten}{$t.shanten}</span>
                   {/if}
                   <span class="shanten-type">({shantenResult.best_type})</span>
                 </div>
@@ -797,14 +800,14 @@
               class="dora-toggle"
               onclick={() => showDoraSection = !showDoraSection}
             >
-              <span>Dora Indicators</span>
+              <span>{$t.doraIndicators}</span>
               <span class="toggle-arrow" class:open={showDoraSection}>▼</span>
             </button>
 
             {#if showDoraSection}
               <div class="dora-content">
                 <div class="dora-row">
-                  <label class="dora-label">Dora</label>
+                  <span class="dora-label">{$t.dora}</span>
                   <div class="dora-tiles">
                     {#each doraIndicators as entry, index (entry.id)}
                       <div class="dora-tile-wrapper">
@@ -826,14 +829,14 @@
                         type="button"
                         class="dora-add-btn"
                         onclick={() => showDoraPicker = true}
-                      >+ Add</button>
+                      >{$t.addButton}</button>
                     {/if}
                   </div>
                 </div>
 
                 {#if isRiichi}
                   <div class="dora-row">
-                    <label class="dora-label">Ura Dora</label>
+                    <span class="dora-label">{$t.uraDora}</span>
                     <div class="dora-tiles">
                       {#each uraDoraIndicators as entry, index (entry.id)}
                         <div class="dora-tile-wrapper">
@@ -855,7 +858,7 @@
                           type="button"
                           class="dora-add-btn"
                           onclick={() => showUraDoraPicker = true}
-                        >+ Add</button>
+                        >{$t.addButton}</button>
                       {/if}
                     </div>
                   </div>
@@ -863,7 +866,7 @@
 
                 {#if akaCount > 0}
                   <div class="aka-display">
-                    Aka Dora in hand: <span class="aka-count">{akaCount}</span>
+                    {$t.akadoraInHand} <span class="aka-count">{akaCount}</span>
                   </div>
                 {/if}
               </div>
@@ -890,7 +893,7 @@
 
           <!-- Results (moved from right column) -->
           <div class="card results-card">
-            <h2 class="card-title">Results</h2>
+            <h2 class="card-title">{$t.results}</h2>
             <ScoreResult
               result={scoreResult}
               error={scoreError}
@@ -903,7 +906,7 @@
         <div class="options-section">
           <!-- Context Options -->
           <div class="card">
-            <h2 class="card-title">Options</h2>
+            <h2 class="card-title">{$t.options}</h2>
             <ContextOptions
               bind:isTsumo
               bind:isRiichi
@@ -928,9 +931,9 @@
             disabled={!canCalculate || isCalculating}
           >
             {#if isCalculating}
-              Calculating...
+              {$t.calculating}
             {:else}
-              Calculate Score
+              {$t.calculateScore}
             {/if}
           </button>
         </div>
@@ -940,8 +943,8 @@
 
   <footer class="footer">
     <p>
-      Powered by <a href="https://github.com/ryblogs/agari" target="_blank" rel="noopener">Agari</a>
-      — A Riichi Mahjong scoring engine written in Rust
+      {$t.footerPoweredBy} <a href="https://github.com/ryblogs/agari" target="_blank" rel="noopener">Agari</a>
+      {$t.footerDescription}
     </p>
   </footer>
 </div>
