@@ -4,6 +4,9 @@ Agari is a comprehensive Riichi Mahjong scoring engine written in idiomatic, mod
 
 **[🎮 Live Demo](https://agari.org/)** — Try the web interface for agari-core
 
+<img width="648" height="891" alt="image" src="https://github.com/user-attachments/assets/a48ae09d-927f-4d74-b263-a2f1eefcc63f" />
+
+
 ---
 
 ## Installation
@@ -288,6 +291,9 @@ OPTIONS:
 ## Web Frontend (Optional)
 
 Agari includes an optional web-based calculator UI built with Svelte and WebAssembly. The core library is compiled to WASM, giving you instant client-side scoring with no server required.
+
+<img width="1186" height="1061" alt="image" src="https://github.com/user-attachments/assets/fa4efb7d-a53e-4498-a08b-230f939d91c4" />
+
 
 ### Running Locally
 
