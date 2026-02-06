@@ -117,6 +117,11 @@ export interface Translations {
   // Language
   language: string;
 
+  // Tile Theme
+  tileTheme: string;
+  tileThemeLight: string;
+  tileThemeDark: string;
+
   // Score levels
   scoreLevelMangan: string;
   scoreLevelHaneman: string;
