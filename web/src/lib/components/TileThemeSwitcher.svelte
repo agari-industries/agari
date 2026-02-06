@@ -1,43 +1,46 @@
 <script lang="ts">
-  import { locale, t, availableLocales, type Locale } from '../i18n';
+  import { tileTheme, availableTileThemes, type TileTheme } from '../stores/tileTheme';
+  import { t } from '../i18n';
 
   function handleChange(event: Event) {
     const select = event.target as HTMLSelectElement;
-    locale.set(select.value as Locale);
+    tileTheme.set(select.value as TileTheme);
   }
 </script>
 
-<div class="language-switcher">
-  <label class="language-label" for="language-select">
-    {$t.language}
+<div class="tile-theme-switcher">
+  <label class="tile-theme-label" for="tile-theme-select">
+    {$t.tileTheme}
   </label>
   <select
-    id="language-select"
-    class="language-select"
-    value={$locale}
+    id="tile-theme-select"
+    class="tile-theme-select"
+    value={$tileTheme}
     onchange={handleChange}
   >
-    {#each availableLocales as loc}
-      <option value={loc.code}>{loc.nativeName}</option>
+    {#each availableTileThemes as theme}
+      <option value={theme.code}>
+        {theme.code === 'light' ? $t.tileThemeLight : $t.tileThemeDark}
+      </option>
     {/each}
   </select>
 </div>
 
 <style>
-  .language-switcher {
+  .tile-theme-switcher {
     display: flex;
     align-items: center;
     gap: var(--space-2);
   }
 
-  .language-label {
+  .tile-theme-label {
     font-size: 0.6875rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
 
-  .language-select {
+  .tile-theme-select {
     padding: var(--space-1) var(--space-2);
     font-size: 0.8125rem;
     background: var(--bg-elevated);
@@ -47,17 +50,17 @@
     transition: all 0.15s ease;
   }
 
-  .language-select:hover {
+  .tile-theme-select:hover {
     border-color: var(--text-muted);
   }
 
-  .language-select:focus {
+  .tile-theme-select:focus {
     outline: none;
     border-color: var(--accent);
   }
 
   @media (max-width: 768px) {
-    .language-label {
+    .tile-theme-label {
       display: none;
     }
   }

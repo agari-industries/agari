@@ -112,6 +112,11 @@ export const ja: Translations = {
   // Language
   language: "言語",
 
+  // Tile Theme
+  tileTheme: "牌",
+  tileThemeLight: "白",
+  tileThemeDark: "黒",
+
   // Score levels
   scoreLevelMangan: "満貫",
   scoreLevelHaneman: "跳満",

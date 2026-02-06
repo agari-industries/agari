@@ -112,6 +112,11 @@ export const en: Translations = {
   // Language
   language: "Language",
 
+  // Tile Theme
+  tileTheme: "Tiles",
+  tileThemeLight: "Light",
+  tileThemeDark: "Dark",
+
   // Score levels
   scoreLevelMangan: "Mangan",
   scoreLevelHaneman: "Haneman",

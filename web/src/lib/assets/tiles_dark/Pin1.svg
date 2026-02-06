@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:ns1="http://www.inkscape.org/namespaces/inkscape" xmlns:ns2="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:ns3="http://www.openswatchbook.org/uri/2009/osb" xmlns:ns5="http://creativecommons.org/ns#" xmlns:ns7="http://www.w3.org/1999/xlink" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" width="300" height="400" viewBox="0 0 300 400" id="svg2" version="1.1" ns1:version="0.91 r13725" ns2:docname="Front.svg" ns1:export-filename="C:\Users\Fluffy\Documents\Projects\ExtraRiichi\Tiles\Export\Black\Front.png" ns1:export-xdpi="180" ns1:export-ydpi="180">
+  <defs id="defs4">
+    <ns1:path-effect effect="skeletal" id="path-effect7963" is_visible="true" pattern="m -90.825902,-314.06958 23.03016,41.38503 13.798268,-41.38503 z" copytype="repeated_stretched" prop_scale="1" scale_y_rel="false" spacing="0" normal_offset="0" tang_offset="0" prop_units="false" vertical_pattern="false" fuse_tolerance="0" pattern-nodetypes="cccc" />
+    <ns1:path-effect effect="skeletal" id="path-effect7830" is_visible="true" pattern="M -12.828427,33.715729 -17,-11 l 9.0000001,0 z" copytype="repeated_stretched" prop_scale="-1" scale_y_rel="false" spacing="5.1" normal_offset="0" tang_offset="0" prop_units="false" vertical_pattern="false" fuse_tolerance="0" pattern-nodetypes="cccc" />
+    <linearGradient id="linearGradient10055" ns3:paint="solid">
+      <stop style="stop-color:#000000;stop-opacity:1;" offset="0" id="stop10057" />
+    </linearGradient>
+    <marker ns1:stockid="Arrow1Lstart" orient="auto" refY="0" refX="0" id="Arrow1Lstart" style="overflow:visible" ns1:isstock="true">
+      <path id="path4978" d="M 0,0 5,-5 -12.5,0 5,5 0,0 Z" style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#ff5c00;stroke-width:1pt;stroke-opacity:1" transform="matrix(0.8,0,0,0.8,10,0)" ns1:connector-curvature="0" />
+    </marker>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath4243">
+      <circle style="opacity:1;fill:#000000;fill-opacity:0.29670332;fill-rule:nonzero;stroke:#000000;stroke-width:19.13299942;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="circle4245" cx="-264.65997" cy="-198.20665" r="293.95438" />
+    </clipPath>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath7847">
+      <ellipse style="opacity:1;fill:#822600;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:12;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="ellipse7849" cx="394" cy="552.36218" rx="349.49533" ry="216" />
+    </clipPath>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath4243-1">
+      <circle style="opacity:1;fill:#000000;fill-opacity:0.29670332;fill-rule:nonzero;stroke:#000000;stroke-width:19.13299942;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="circle4245-4" cx="-264.65997" cy="-198.20665" r="293.95438" />
+    </clipPath>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath7876">
+      <circle style="opacity:1;fill:#000000;fill-opacity:0.29670332;fill-rule:nonzero;stroke:#000000;stroke-width:19.13299942;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="circle7878" cx="-264.65997" cy="-198.20665" r="293.95438" />
+    </clipPath>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath14693">
+      <rect style="opacity:1;fill:#a53c3c;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:8;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="rect14695" width="131.78395" height="168.82127" x="-332.59583" y="383.49765" rx="1.2551664" ry="3.7514515" transform="matrix(0.99939083,-0.03489951,0.03489951,0.99939083,0,0)" />
+    </clipPath>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath14952">
+      <ellipse style="opacity:1;fill:#a53c3c;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="ellipse14954" cx="-271.34384" cy="647.25604" rx="69.057365" ry="116.91089" transform="matrix(0.99939083,-0.03489951,0.03489951,0.99939083,0,0)" />
+    </clipPath>
+    <pattern y="0" x="0" height="6" width="6" patternUnits="userSpaceOnUse" id="EMFhbasepattern" />
+    <filter style="color-interpolation-filters:sRGB;" ns1:label="Blur" id="filter4198">
+      <feGaussianBlur stdDeviation="2.51 2.51" result="blur" id="feGaussianBlur4200" />
+    </filter>
+    <mask maskUnits="userSpaceOnUse" id="mask4222">
+      <rect ry="40" y="652.28351" x="0" height="400.77808" width="300.05896" id="rect4224" style="opacity:1;fill:#ff3737;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:10;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+    </mask>
+    <filter style="color-interpolation-filters:sRGB" ns1:label="Blur" id="filter4198-0">
+      <feGaussianBlur stdDeviation="2.51 2.51" result="blur" id="feGaussianBlur4200-5" />
+    </filter>
+    <mask maskUnits="userSpaceOnUse" id="mask4216">
+      <rect ry="40" y="-1325.6035" x="-451.93805" height="400.77808" width="300.05896" id="rect4218" style="opacity:1;fill:#ff3737;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:10;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" transform="scale(-1,-1)" />
+    </mask>
+    <filter style="color-interpolation-filters:sRGB" ns1:label="Blur" id="filter4242">
+      <feGaussianBlur stdDeviation="2.51 2.51" result="blur" id="feGaussianBlur4244" />
+    </filter>
+    <mask maskUnits="userSpaceOnUse" id="mask4222-0">
+      <rect ry="40" y="652.28351" x="0" height="400.77808" width="300.05896" id="rect4224-8" style="opacity:1;fill:#ff3737;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:10;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+    </mask>
+    <filter style="color-interpolation-filters:sRGB" ns1:label="Blur" id="filter4198-8">
+      <feGaussianBlur stdDeviation="2.51 2.51" result="blur" id="feGaussianBlur4200-3" />
+    </filter>
+    <mask maskUnits="userSpaceOnUse" id="mask4216-0">
+      <rect ry="40" y="-1325.6035" x="-451.93805" height="400.77808" width="300.05896" id="rect4218-5" style="opacity:1;fill:#ff3737;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:10;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" transform="scale(-1,-1)" />
+    </mask>
+    <filter style="color-interpolation-filters:sRGB" ns1:label="Blur" id="filter4242-2">
+      <feGaussianBlur stdDeviation="2.51 2.51" result="blur" id="feGaussianBlur4244-2" />
+    </filter>
+  </defs>
+  <ns2:namedview id="base" pagecolor="#aeffff" bordercolor="#666666" borderopacity="1" ns1:pageopacity="0" ns1:pageshadow="2" ns1:zoom="1.0109639" ns1:cx="148.04487" ns1:cy="250.63846" ns1:document-units="px" ns1:current-layer="layer1" showgrid="true" ns1:window-width="1920" ns1:window-height="1017" ns1:window-x="1912" ns1:window-y="-8" ns1:window-maximized="1" showguides="true" ns1:guide-bbox="true" units="px">
+    <ns1:grid type="xygrid" id="grid4774" visible="true" dotted="false" color="#3f3fff" opacity="0.03921569" empcolor="#3f3fff" empopacity="0.07843137" enabled="false" />
+    <ns2:guide position="150,200" orientation="0,1" id="guide8231" ns1:label="" ns1:color="rgb(0,0,255)" />
+    <ns2:guide position="150,200" orientation="1,0" id="guide8233" ns1:label="" ns1:color="rgb(0,0,255)" />
+  </ns2:namedview>
+  <metadata id="metadata7">
+    <rdf:RDF>
+      <ns5:Work rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </ns5:Work>
+    </rdf:RDF>
+  </metadata>
+  <g ns1:label="Layer 1" ns1:groupmode="layer" id="layer1" transform="translate(0,-652.36216)">
+    <rect style="opacity:1;fill:#1e1e1e;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:10;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="rect4164" width="300.05896" height="400.77808" x="0" y="652.28351" ry="40" />
+    <path transform="translate(-1.3432789e-7,-1.3368765e-6)" style="fill:#ffffff;fill-opacity:0.15686275;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;filter:url(#filter4198-8)" d="M -4.7687833,775.07096 C -9.6501835,741.99485 -16.84552,674.23676 -1.2788716,652.0641 18.998297,625.94378 233.50094,631.63117 263.31435,653.90999 276.21398,662.64856 70.349579,663.12124 47.099353,691.74479 24.390958,719.11242 0.65060847,818.18718 -4.7687833,775.07096 Z" id="path4166" ns1:connector-curvature="0" ns2:nodetypes="ccccc" mask="url(#mask4222-0)" />
+    <path ns2:nodetypes="ccccc" ns1:connector-curvature="0" id="path4221" d="m 151.73588,1025.0177 c -3.32683,-9.3138 -10.24843,-68.45389 5.31821,-90.62655 20.27717,-26.12032 219.43558,-16.45796 231.55506,-9.93184 11.07433,5.31702 -178.60366,0.0589 -204.85126,34.86646 -21.59349,30.0006 -26.50086,82.17843 -32.02201,65.69193 z" style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;filter:url(#filter4198-8)" transform="matrix(-1,0,0,-1,451.93806,1977.887)" mask="url(#mask4216-0)" />
+  </g>
+<defs id="defs4">
+    <ns1:path-effect effect="skeletal" id="path-effect7963" is_visible="true" pattern="m -90.825902,-314.06958 23.03016,41.38503 21.477976,-41.38503 z" copytype="repeated_stretched" prop_scale="1" scale_y_rel="false" spacing="0" normal_offset="0" tang_offset="0" prop_units="false" vertical_pattern="false" fuse_tolerance="0" pattern-nodetypes="cccc" />
+    <ns1:path-effect effect="skeletal" id="path-effect7830" is_visible="true" pattern="M -12.828427,33.715729 -17,-11 l 9.0000001,0 z" copytype="repeated_stretched" prop_scale="-1" scale_y_rel="false" spacing="5.1" normal_offset="0" tang_offset="0" prop_units="false" vertical_pattern="false" fuse_tolerance="0" pattern-nodetypes="cccc" />
+    <linearGradient id="linearGradient10055" ns3:paint="solid">
+      <stop style="stop-color:#000000;stop-opacity:1;" offset="0" id="stop10057" />
+    </linearGradient>
+    <marker ns1:stockid="Arrow1Lstart" orient="auto" refY="0" refX="0" id="Arrow1Lstart" style="overflow:visible" ns1:isstock="true">
+      <path id="path4978" d="M 0,0 5,-5 -12.5,0 5,5 0,0 Z" style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#ff5c00;stroke-width:1pt;stroke-opacity:1" transform="matrix(0.8,0,0,0.8,10,0)" ns1:connector-curvature="0" />
+    </marker>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath4243">
+      <circle style="opacity:1;fill:#000000;fill-opacity:0.29670332;fill-rule:nonzero;stroke:#000000;stroke-width:19.13299942;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="circle4245" cx="-264.65997" cy="-198.20665" r="293.95438" />
+    </clipPath>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath7847">
+      <ellipse style="opacity:1;fill:#822600;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:12;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="ellipse7849" cx="394" cy="552.36218" rx="349.49533" ry="216" />
+    </clipPath>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath4243-1">
+      <circle style="opacity:1;fill:#000000;fill-opacity:0.29670332;fill-rule:nonzero;stroke:#000000;stroke-width:19.13299942;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="circle4245-4" cx="-264.65997" cy="-198.20665" r="293.95438" />
+    </clipPath>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath7876">
+      <circle style="opacity:1;fill:#000000;fill-opacity:0.29670332;fill-rule:nonzero;stroke:#000000;stroke-width:19.13299942;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="circle7878" cx="-264.65997" cy="-198.20665" r="293.95438" />
+    </clipPath>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath14693">
+      <rect style="opacity:1;fill:#a53c3c;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:8;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="rect14695" width="131.78395" height="168.82127" x="-332.59583" y="383.49765" rx="1.2551664" ry="3.7514515" transform="matrix(0.99939083,-0.03489951,0.03489951,0.99939083,0,0)" />
+    </clipPath>
+    <clipPath clipPathUnits="userSpaceOnUse" id="clipPath14952">
+      <ellipse style="opacity:1;fill:#a53c3c;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="ellipse14954" cx="-271.34384" cy="647.25604" rx="69.057365" ry="116.91089" transform="matrix(0.99939083,-0.03489951,0.03489951,0.99939083,0,0)" />
+    </clipPath>
+    <pattern y="0" x="0" height="6" width="6" patternUnits="userSpaceOnUse" id="EMFhbasepattern" />
+  </defs>
+  <ns2:namedview id="base" pagecolor="#000000" bordercolor="#666666" borderopacity="1" ns1:pageopacity="0" ns1:pageshadow="2" ns1:zoom="2.0219278" ns1:cx="213.95442" ns1:cy="213.42461" ns1:document-units="px" ns1:current-layer="layer1" showgrid="true" ns1:window-width="1920" ns1:window-height="1017" ns1:window-x="1912" ns1:window-y="-8" ns1:window-maximized="1" showguides="true" ns1:guide-bbox="true" units="px">
+    <ns1:grid type="xygrid" id="grid4774" visible="true" dotted="false" color="#3f3fff" opacity="0.03921569" empcolor="#3f3fff" empopacity="0.07843137" enabled="false" />
+    <ns2:guide position="150,200" orientation="0,1" id="guide8231" ns1:label="" ns1:color="rgb(0,0,255)" />
+    <ns2:guide position="150,200" orientation="1,0" id="guide8233" ns1:label="" ns1:color="rgb(0,0,255)" />
+  </ns2:namedview>
+  <metadata id="metadata7">
+    <rdf:RDF>
+      <ns5:Work rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </ns5:Work>
+    </rdf:RDF>
+  </metadata>
+  <g ns1:label="Layer 1" ns1:groupmode="layer" id="layer1" transform="translate(0,-652.36216)">
+    <g id="g6641" transform="matrix(0.89332354,0,0,0.89332354,-207.38654,341.03071)">
+      <circle r="160" cy="572.36218" cx="400" id="path5446" style="opacity:1;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:#ffffff;stroke-width:10.03299999;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+      <circle r="145" cy="572.36218" cx="400" id="path5448" style="opacity:1;fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:#ffffff;stroke-width:10.03299999;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+      <g transform="translate(0.35355339,0)" id="g5971">
+        <path style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:8.95532227;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" d="m 392.32741,496.48087 c -8.27246,-82.93549 24.08267,-82.93853 15.28731,0" id="path5460" ns1:connector-curvature="0" ns2:nodetypes="cc" ns1:transform-center-y="-122.30186" ns1:tile-cx="399.93275" ns1:tile-cy="572.50692" ns1:tile-w="30.803226" ns1:tile-h="64.041819" ns1:tile-x0="384.53113" ns1:tile-y0="430.98601" />
+        <g id="g5914" transform="translate(-31,-64.5)">
+          <use height="100%" width="100%" ns1:transform-center-y="-100.94097" ns1:transform-center-x="-33.466979" id="use5880" transform="matrix(0.93969262,0.34202014,-0.34202014,0.93969262,250.39181,-36.968234)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="-80.402085" ns1:transform-center-x="-66.418446" id="use5882" transform="matrix(0.76604444,0.64278761,-0.64278761,0.76604444,491.62428,-58.031527)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="-50.569105" ns1:transform-center-x="-92.035968" id="use5884" transform="matrix(0.5,0.8660254,-0.8660254,0.5,725.51269,4.6818112)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="-16.020278" ns1:transform-center-x="-106.83186" id="use5886" transform="matrix(0.17364818,0.98480775,-0.98480775,0.17364818,923.8467,143.6076)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="16.01696" ns1:transform-center-x="-106.83192" id="use5888" transform="matrix(-0.17364818,0.98480775,-0.98480775,-0.17364818,1062.7042,341.98942)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="50.568001" ns1:transform-center-x="-92.03626" id="use5890" transform="matrix(-0.5,0.8660254,-0.8660254,-0.5,1125.3371,575.89941)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="80.401655" ns1:transform-center-x="-66.419137" id="use5892" transform="matrix(-0.76604444,0.64278761,-0.64278761,-0.76604444,1104.1907,817.1246)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="100.94079" ns1:transform-center-x="-33.468884" id="use5894" transform="matrix(-0.93969262,0.34202014,-0.34202014,-0.93969262,1001.8161,1036.5696)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="109.52358" id="use5896" transform="matrix(-1,0,0,-1,830.56043,1207.7663)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="100.94095" ns1:transform-center-x="33.466976" id="use5898" transform="matrix(-0.93969262,-0.34202014,0.34202014,-0.93969262,611.08014,1310.0656)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="80.402089" ns1:transform-center-x="66.418443" id="use5900" transform="matrix(-0.76604444,-0.64278761,0.64278761,-0.76604444,369.84767,1331.1292)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="50.569089" ns1:transform-center-x="92.035965" id="use5902" transform="matrix(-0.5,-0.8660254,0.8660254,-0.5,135.95926,1268.4156)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="16.020282" ns1:transform-center-x="106.83186" id="use5904" transform="matrix(-0.17364818,-0.98480775,0.98480775,-0.17364818,-62.374757,1129.4899)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="-16.016956" ns1:transform-center-x="106.83194" id="use5906" transform="matrix(0.17364818,-0.98480775,0.98480775,0.17364818,-201.23234,931.10806)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="-50.567997" ns1:transform-center-x="92.036247" id="use5908" transform="matrix(0.5,-0.8660254,0.8660254,0.5,-263.86519,697.19807)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="-80.401651" ns1:transform-center-x="66.419125" id="use5910" transform="matrix(0.76604444,-0.64278761,0.64278761,0.76604444,-242.71892,455.97288)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+          <use height="100%" width="100%" ns1:transform-center-y="-100.94079" ns1:transform-center-x="33.468911" id="use5912" transform="matrix(0.93969262,-0.34202014,0.34202014,0.93969262,-140.34405,236.5278)" ns7:href="#path5460" ns1:tiled-clone-of="#path5460" y="0" x="0" />
+        </g>
+      </g>
+      <circle r="84.473503" cy="572.36218" cx="400" id="path5454" style="opacity:1;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:#ffffff;stroke-width:10.23999977;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+      <circle r="72.314705" cy="572.36218" cx="400" id="path5992" style="opacity:1;fill:#f0a023;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:12;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+      <g ns1:transform-center-y="-33.991657" ns1:transform-center-x="-0.057936225" transform="translate(-0.17677669,0.08838835)" id="g6038">
+        <path style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:23.10970306;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" d="m 401.33152,554.24492 c -3.14542,-9.94018 -29.56798,-32.56818 -1.22213,-34.01501 29.36983,1.60064 0.87135,23.52895 -1.71866,34.17839" id="path5994" ns1:connector-curvature="0" ns2:nodetypes="ccc" ns1:transform-center-x="-0.0026845101" ns1:transform-center-y="63.28125" />
+        <path style="fill:none;fill-rule:evenodd;stroke:#f0a023;stroke-width:6;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" d="m 400,555.19145 0,-25.65771" id="path6018" ns1:connector-curvature="0" ns2:nodetypes="cc" />
+        <circle style="opacity:1;fill:#f0a023;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="path6028" cx="400" cy="527.83356" r="4.818634" />
+        <path style="fill:none;fill-rule:evenodd;stroke:#f0a023;stroke-width:4;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" d="m 404.6875,557.4872 6.5651,-16.10951" id="path6030" ns1:connector-curvature="0" ns2:nodetypes="cc" />
+        <use x="0" y="0" ns7:href="#path6030" id="use6032" ns1:transform-center-x="7.5" width="100%" height="100%" transform="matrix(-1,0,0,1,799.9375,0)" style="fill:none;stroke:none" />
+      </g>
+      <circle r="16.034555" cy="572.36218" cx="400" id="path6010" style="opacity:1;fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:#f0a023;stroke-width:6.66957808;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+      <circle r="8.5365553" cy="572.36218" cx="400" id="path6016" style="opacity:1;fill:#f0a023;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:6;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+      <use height="100%" width="100%" transform="matrix(0.30901699,-0.95105652,0.95105652,0.30901699,-267.97075,775.88681)" id="use6047" ns1:transform-center-y="-12.637547" ns1:transform-center-x="31.767912" ns7:href="#g6038" y="0" x="0" />
+      <use height="100%" width="100%" transform="matrix(0.30901699,-0.95105652,0.95105652,0.30901699,-267.97075,775.88681)" id="use6049" ns1:transform-center-y="27.707643" ns1:transform-center-x="21.376967" ns7:href="#use6047" y="0" x="0" />
+      <use height="100%" width="100%" transform="matrix(0.30901699,-0.95105652,0.95105652,0.30901699,-267.97075,775.88681)" id="use6051" ns1:transform-center-y="27.656408" ns1:transform-center-x="-21.44051" ns7:href="#use6049" y="0" x="0" />
+      <use height="100%" width="100%" transform="matrix(0.30901699,-0.95105652,0.95105652,0.30901699,-267.97075,775.88681)" id="use6053" ns1:transform-center-y="-12.723383" ns1:transform-center-x="-31.665728" ns7:href="#use6051" y="0" x="0" />
+    </g>
+    <circle style="opacity:1;fill:none;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:4;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" id="path4198" cx="150" cy="852.36218" r="9.5215845" />
+  </g>
+</svg>

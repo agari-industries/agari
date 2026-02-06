@@ -16,6 +16,7 @@
   import Tile from './lib/components/Tile.svelte';
   import DoraPicker from './lib/components/DoraPicker.svelte';
   import LanguageSwitcher from './lib/components/LanguageSwitcher.svelte';
+  import TileThemeSwitcher from './lib/components/TileThemeSwitcher.svelte';
 
   // ============================================================================
   // State
@@ -626,7 +627,10 @@
         <span class="logo-text">Agari</span>
       </h1>
       <p class="tagline">{$t.tagline}</p>
-      <LanguageSwitcher />
+      <div class="header-settings">
+        <TileThemeSwitcher />
+        <LanguageSwitcher />
+      </div>
     </div>
   </header>
 
@@ -970,6 +974,13 @@
     display: flex;
     align-items: center;
     gap: var(--space-4);
+  }
+
+  .header-settings {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    margin-left: auto;
   }
 
   .logo {
