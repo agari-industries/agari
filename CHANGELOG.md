@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.17.0]
+
+### Changed
+
+- **GitHub Username Migration**: Updated all repository URLs and references from `ryblogs` to `sullenb`
+  - Updated Cargo.toml repository and homepage URLs
+  - Updated GitHub Actions workflows for deploy and release
+  - Updated Homebrew tap reference to `sullenb/homebrew-tap`
+  - Updated all installation instructions in README
+
+### Added
+
+- **Web UI Enhancements**:
+  - Dark tile theme with toggle option
+  - Improved score result layout
+  - Custom domain support (agari.org)
+
+### Fixed
+
+- **Mobile UX**: Prevented double-tap-to-zoom on mobile tile interactions
+
+### Documentation
+
+- Enhanced README with images and web frontend information
+- Updated live demo URL to agari.org
+
 ## [0.16.0]
 
 ### Added
