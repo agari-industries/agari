@@ -947,7 +947,7 @@
 
   <footer class="footer">
     <p>
-      {$t.footerPoweredBy} <a href="https://github.com/ryblogs/agari" target="_blank" rel="noopener">Agari</a>
+      {$t.footerPoweredBy} <a href="https://github.com/sullenb/agari" target="_blank" rel="noopener">Agari</a>
       {$t.footerDescription}
     </p>
   </footer>
