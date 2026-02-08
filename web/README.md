@@ -1,6 +1,6 @@
 # Agari Web
 
-A web-based Riichi Mahjong calculator powered by the [Agari](https://github.com/sullenb/agari) scoring engine via WebAssembly.
+A web-based Riichi Mahjong calculator powered by the [Agari](https://github.com/rysb-dev/agari) scoring engine via WebAssembly.
 
 ## Features
 
