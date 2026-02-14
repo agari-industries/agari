@@ -112,6 +112,10 @@ export const en: Translations = {
   // Language
   language: "Language",
 
+  // Share
+  share: "Share",
+  copiedToClipboard: "Link copied!",
+
   // Tile Theme
   tileTheme: "Tiles",
   tileThemeLight: "Light",
