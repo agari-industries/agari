@@ -6,6 +6,9 @@ repository = "https://github.com/rysb-dev/agari"
 homepage = "https://github.com/rysb-dev/agari"
 description = "A Riichi Mahjong hand calculator and scoring engine"
 license = "MIT"
+keywords = ["mahjong", "riichi", "scoring", "japanese-mahjong"]
+categories = ["game-development", "algorithms"]
+readme = "../../README.md"
 
 [lib]
 name = "agari"
