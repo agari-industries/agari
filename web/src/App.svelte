@@ -577,10 +577,19 @@
 
     // Share hand via URL
     async function shareHand() {
+        // Compute winning tile with red five notation for URL
+        let urlWinningTile = winningTile;
+        if (
+            selectedWinningTileIndex !== null &&
+            handTiles[selectedWinningTileIndex]?.isRed
+        ) {
+            urlWinningTile = "0" + handTiles[selectedWinningTileIndex].tile[1];
+        }
+
         const url = serializeToUrl({
             handTiles,
             melds,
-            winningTile,
+            winningTile: urlWinningTile,
             doraIndicators,
             uraDoraIndicators,
             isTsumo,
@@ -771,6 +780,14 @@
                     const wt = urlState.winningTile;
                     const matchIndex = handTiles.findIndex((entry) => {
                         if (entry.tile === wt) return true;
+                        // Match "0m" from URL against red five entry (tile="5m", isRed=true)
+                        if (
+                            wt[0] === "0" &&
+                            entry.isRed &&
+                            entry.tile === "5" + wt[1]
+                        )
+                            return true;
+                        // Match "5m" from URL against red five entry
                         if (
                             wt[0] === "5" &&
                             entry.isRed &&
