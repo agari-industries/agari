@@ -29,10 +29,10 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/rysb-dev/agari/releases
 powershell -ExecutionPolicy ByPass -c "irm https://github.com/rysb-dev/agari/releases/latest/download/agari-installer.ps1 | iex"
 ```
 
-### From Source
+### Cargo (crates.io)
 
 ```bash
-cargo install --git https://github.com/rysb-dev/agari
+cargo install agari
 ```
 
 ---
@@ -337,11 +337,10 @@ The web frontend is entirely optional—Agari remains a CLI-first, library-first
 
 Agari can be used as a Rust library for building Mahjong applications, bots, or analysis tools.
 
-### Add to Cargo.toml
+### Add to Your Project
 
-```toml
-[dependencies]
-agari = { git = "https://github.com/rysb-dev/agari" }
+```bash
+cargo add agari
 ```
 
 ### Basic Scoring Example
