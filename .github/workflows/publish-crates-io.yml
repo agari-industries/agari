@@ -1,0 +1,24 @@
+name: Publish to crates.io
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  publish-crates-io:
+    runs-on: ubuntu-22.04
+    if: ${{ !fromJson(inputs.plan).announcement_is_prerelease || fromJson(inputs.plan).publish_prereleases }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Publish to crates.io
+        run: cargo publish -p agari
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

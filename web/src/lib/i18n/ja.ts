@@ -112,6 +112,10 @@ export const ja: Translations = {
   // Language
   language: "言語",
 
+  // Share
+  share: "共有",
+  copiedToClipboard: "リンクをコピーしました！",
+
   // Tile Theme
   tileTheme: "牌",
   tileThemeLight: "白",

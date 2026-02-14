@@ -117,6 +117,10 @@ export interface Translations {
   // Language
   language: string;
 
+  // Share
+  share: string;
+  copiedToClipboard: string;
+
   // Tile Theme
   tileTheme: string;
   tileThemeLight: string;
