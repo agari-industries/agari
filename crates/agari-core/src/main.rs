@@ -19,7 +19,7 @@ use agari::{
     hand::{HandStructure, decompose_hand, decompose_hand_with_melds},
     parse::{TileCounts, parse_hand_with_aka, to_counts, validate_hand, validate_hand_with_melds},
     scoring::{ScoreLevel, ScoringResult, calculate_score},
-    shanten::{ShantenType, calculate_shanten_with_melds, calculate_ukeire},
+    shanten::{ShantenType, calculate_shanten_with_melds, calculate_ukeire_with_melds},
     tile::{Honor, Suit, Tile},
     yaku::{Yaku, YakuResult, detect_yaku_with_context},
 };
@@ -1290,7 +1290,7 @@ fn print_shanten(
 
     // Ukeire (tile acceptance)
     if show_ukeire && result.shanten >= 0 {
-        let ukeire = calculate_ukeire(counts);
+        let ukeire = calculate_ukeire_with_melds(counts, called_melds);
 
         println!("\n{}", "🀄 Ukeire (Tile Acceptance):".yellow().bold());
 
@@ -1347,7 +1347,7 @@ fn print_shanten_json(counts: &agari::parse::TileCounts, called_melds: u8, show_
     };
 
     let ukeire_data = if show_ukeire && result.shanten >= 0 {
-        let ukeire = calculate_ukeire(counts);
+        let ukeire = calculate_ukeire_with_melds(counts, called_melds);
         Some(JsonUkeire {
             tile_count: ukeire.tiles.len(),
             total_available: ukeire.total_count,

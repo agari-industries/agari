@@ -13,7 +13,7 @@ use agari::hand::{HandStructure, decompose_hand, decompose_hand_with_melds};
 use agari::parse::TileCounts;
 use agari::parse::{parse_hand_with_aka, to_counts};
 use agari::scoring::{ScoringResult, calculate_score};
-use agari::shanten::{ShantenResult, UkeireResult, calculate_shanten_with_melds, calculate_ukeire};
+use agari::shanten::{ShantenResult, UkeireResult, calculate_shanten_with_melds, calculate_ukeire_with_melds};
 use agari::tile::{Honor, Tile};
 use agari::yaku::{Yaku, YakuResult, detect_yaku_with_context};
 
@@ -491,7 +491,8 @@ fn calculate_shanten_internal(hand: &str) -> Result<(ShantenResult, String), Str
 fn calculate_ukeire_internal(hand: &str) -> Result<UkeireResult, String> {
     let parsed = parse_hand_with_aka(hand).map_err(|e| e.to_string())?;
     let counts = to_counts(&parsed.tiles);
-    Ok(calculate_ukeire(&counts))
+    let called_melds = parsed.called_melds.len() as u8;
+    Ok(calculate_ukeire_with_melds(&counts, called_melds))
 }
 
 // ============================================================================

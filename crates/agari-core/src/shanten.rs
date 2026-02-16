@@ -448,7 +448,15 @@ pub fn calculate_kokushi_shanten(counts: &TileCounts) -> i8 {
 /// Returns a list of tiles that would improve the hand (reduce shanten)
 /// along with the count of how many of each are available.
 pub fn calculate_ukeire(counts: &TileCounts) -> UkeireResult {
-    let current = calculate_shanten(counts);
+    calculate_ukeire_with_melds(counts, 0)
+}
+
+/// Calculate ukeire (tile acceptance) for a hand with called melds
+///
+/// `called_melds` is the number of complete melds already called (pon, chi, kan).
+/// These melds are not included in `counts` - only the remaining hand tiles are.
+pub fn calculate_ukeire_with_melds(counts: &TileCounts, called_melds: u8) -> UkeireResult {
+    let current = calculate_shanten_with_melds(counts, called_melds);
     let mut accepting_tiles = Vec::new();
     let mut total_count = 0u8;
 
@@ -466,7 +474,7 @@ pub fn calculate_ukeire(counts: &TileCounts) -> UkeireResult {
         let mut test_counts = counts.clone();
         *test_counts.entry(tile).or_insert(0) += 1;
 
-        let new_shanten = calculate_shanten(&test_counts);
+        let new_shanten = calculate_shanten_with_melds(&test_counts, called_melds);
 
         if new_shanten.shanten < current.shanten {
             let available = 4 - current_count;
@@ -660,6 +668,96 @@ mod tests {
         assert_eq!(ukeire.shanten, -1);
         // No tiles improve a complete hand
         assert!(ukeire.tiles.is_empty());
+    }
+
+    // ===== Ukeire with Called Melds Tests =====
+
+    #[test]
+    fn test_ukeire_with_called_pon_tenpai() {
+        // 23678p234567s with called pon of 2z - tenpai
+        // Hand tiles: 2,3,6,7,8p + 2,3,4,5,6,7s (11 tiles)
+        // Called: (222z) = 1 meld
+        // Should be waiting on 1p/4p (shanpon or sequence wait)
+        use crate::parse::parse_hand_with_aka;
+        let parsed = parse_hand_with_aka("23678p234567s(222z)").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds = parsed.called_melds.len() as u8;
+
+        let ukeire = calculate_ukeire_with_melds(&counts, called_melds);
+
+        assert_eq!(ukeire.shanten, 0, "Hand should be tenpai");
+        // A tenpai hand with called melds should have very few waits, not 34
+        assert!(
+            ukeire.tiles.len() <= 5,
+            "Tenpai hand should have at most a few waits, got {}",
+            ukeire.tiles.len()
+        );
+        assert!(
+            ukeire.total_count <= 20,
+            "Total accepting tiles should be reasonable, got {}",
+            ukeire.total_count
+        );
+    }
+
+    #[test]
+    fn test_ukeire_with_two_called_melds_iishanten() {
+        // 234568m with called chi 789p and called pon of white dragons
+        // Hand tiles: 2,3,4,5,6,8m (6 tiles, since 2 called melds = 6 tiles consumed)
+        // Should have a reasonable number of improving tiles, not 34
+        use crate::parse::parse_hand_with_aka;
+        let parsed = parse_hand_with_aka("234568m(789p)(whwhwh)").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds = parsed.called_melds.len() as u8;
+
+        let ukeire = calculate_ukeire_with_melds(&counts, called_melds);
+
+        assert_eq!(ukeire.shanten, 1, "Hand should be iishanten");
+        assert!(
+            ukeire.tiles.len() <= 10,
+            "Iishanten hand with 2 called melds should have limited waits, got {}",
+            ukeire.tiles.len()
+        );
+        assert!(
+            ukeire.total_count <= 40,
+            "Total accepting tiles should be reasonable, got {}",
+            ukeire.total_count
+        );
+    }
+
+    #[test]
+    fn test_ukeire_without_melds_matches_original() {
+        // Verify calculate_ukeire_with_melds(counts, 0) matches calculate_ukeire(counts)
+        let tiles = parse_hand("123m456p789s1112z").unwrap();
+        let counts = to_counts(&tiles);
+
+        let ukeire_original = calculate_ukeire(&counts);
+        let ukeire_with_melds = calculate_ukeire_with_melds(&counts, 0);
+
+        assert_eq!(ukeire_original.shanten, ukeire_with_melds.shanten);
+        assert_eq!(ukeire_original.tiles.len(), ukeire_with_melds.tiles.len());
+        assert_eq!(ukeire_original.total_count, ukeire_with_melds.total_count);
+    }
+
+    #[test]
+    fn test_ukeire_called_melds_vs_no_melds_differ() {
+        // The same tile counts should give different ukeire results
+        // when called_melds is 0 vs > 0
+        use crate::parse::parse_hand_with_aka;
+        let parsed = parse_hand_with_aka("23678p234567s(222z)").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds = parsed.called_melds.len() as u8;
+
+        let ukeire_correct = calculate_ukeire_with_melds(&counts, called_melds);
+        let ukeire_wrong = calculate_ukeire_with_melds(&counts, 0);
+
+        // With 0 called melds, 11 tiles can't form 4 melds + pair,
+        // so shanten will be higher and many more tiles "improve" the hand
+        assert!(
+            ukeire_wrong.tiles.len() > ukeire_correct.tiles.len(),
+            "Ignoring called melds should produce more (incorrect) accepting tiles: wrong={}, correct={}",
+            ukeire_wrong.tiles.len(),
+            ukeire_correct.tiles.len()
+        );
     }
 
     // ===== Index Conversion Tests =====
