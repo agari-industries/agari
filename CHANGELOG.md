@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.18.0]
+
+### Added
+
+- **Shareable URL Support**: Generate shareable URLs that encode the full hand configuration for the web calculator
+- **Crates.io Publishing**: Package is now available on crates.io with `cargo install agari`
+
+### Fixed
+
+- **Ukeire Analysis with Called Melds**: Fixed ukeire (tile acceptance) producing bogus results for hands with open melds — previously showed nearly all 34 tile types as improving tiles instead of the correct few
+- **Red Five in Shared URLs**: Preserved red five (aka dora) notation in the winning tile when generating shareable URLs
+- **Crates.io Publish Job**: Fixed cargo-dist custom publish job configuration for crates.io releases
+
+### Changed
+
+- **GitHub Username Migration**: Updated repository references from `sullenb` to `rysb-dev`
+
 ## [0.17.0]
 
 ### Changed
