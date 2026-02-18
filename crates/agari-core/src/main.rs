@@ -19,7 +19,10 @@ use agari::{
     hand::{HandStructure, decompose_hand, decompose_hand_with_melds},
     parse::{TileCounts, parse_hand_with_aka, to_counts, validate_hand, validate_hand_with_melds},
     scoring::{ScoreLevel, ScoringResult, calculate_score},
-    shanten::{ShantenType, calculate_shanten_with_melds, calculate_ukeire_with_melds},
+    shanten::{
+        ShantenType, calculate_shanten_with_melds, calculate_ukeire_with_melds,
+        calculate_ukeire_with_melds_and_visible,
+    },
     tile::{Honor, Suit, Tile},
     yaku::{Yaku, YakuResult, detect_yaku_with_context},
 };
@@ -51,7 +54,8 @@ EXAMPLES:
     agari 234567m234567p22s -w 5p -t      Pinfu tanyao
     agari "[1111m]222333m555p11z" -t      Hand with closed kan (15 tiles)
     agari "[1111m](2222p)345678s11z" -t   Hand with closed + open kan (16 tiles)
-    agari "123m456p789s(rrr)whwh" -w wh   Open pon of Red dragon, White pair"#;
+    agari "123m456p789s(rrr)whwh" -w wh   Open pon of Red dragon, White pair
+    agari 123m456p789s1112z --ukeire --visible 2z,2z  Practical ukeire with visible tiles"#;
 
 fn styles() -> Styles {
     Styles::styled()
@@ -138,6 +142,11 @@ struct Args {
     /// Show ukeire (tile acceptance) with shanten
     #[arg(long)]
     ukeire: bool,
+
+    /// Visible tiles on the table (comma-separated: 1m,2z,5p)
+    /// Subtract these from ukeire counts for practical acceptance
+    #[arg(long)]
+    visible: Option<String>,
 
     /// Use ASCII output instead of Unicode
     #[arg(long)]
@@ -522,14 +531,39 @@ fn main() {
 
     let use_unicode = !args.ascii;
 
+    // Parse visible tiles for practical ukeire
+    let visible_counts = match args
+        .visible
+        .as_ref()
+        .map(|s| parse_tile_list(s))
+        .transpose()
+    {
+        Ok(tiles) => tiles.map(|t| to_counts(&t)),
+        Err(e) => {
+            eprintln!("{} {}", "❌ Error parsing visible tiles:".red().bold(), e);
+            process::exit(1);
+        }
+    };
+
     // Shanten mode: calculate shanten and optionally ukeire
     if shanten_mode {
         let called_melds_count = parsed.called_melds.len() as u8;
         if args.json {
-            print_shanten_json(&counts, called_melds_count, ukeire_mode);
+            print_shanten_json(
+                &counts,
+                called_melds_count,
+                ukeire_mode,
+                visible_counts.as_ref(),
+            );
         } else {
             print_header(use_unicode);
-            print_shanten(&counts, called_melds_count, ukeire_mode, use_unicode);
+            print_shanten(
+                &counts,
+                called_melds_count,
+                ukeire_mode,
+                use_unicode,
+                visible_counts.as_ref(),
+            );
             print_footer(use_unicode);
         }
         return;
@@ -1244,6 +1278,7 @@ fn print_shanten(
     called_melds: u8,
     show_ukeire: bool,
     use_unicode: bool,
+    visible_counts: Option<&TileCounts>,
 ) {
     let result = calculate_shanten_with_melds(counts, called_melds);
 
@@ -1290,9 +1325,18 @@ fn print_shanten(
 
     // Ukeire (tile acceptance)
     if show_ukeire && result.shanten >= 0 {
-        let ukeire = calculate_ukeire_with_melds(counts, called_melds);
+        let ukeire = if let Some(vc) = visible_counts {
+            calculate_ukeire_with_melds_and_visible(counts, called_melds, vc)
+        } else {
+            calculate_ukeire_with_melds(counts, called_melds)
+        };
 
-        println!("\n{}", "🀄 Ukeire (Tile Acceptance):".yellow().bold());
+        let label = if visible_counts.is_some() {
+            "🀄 Ukeire (Practical — accounting for visible tiles):"
+        } else {
+            "🀄 Ukeire (Tile Acceptance):"
+        };
+        println!("\n{}", label.yellow().bold());
 
         if ukeire.tiles.is_empty() {
             println!("   {}", "No tiles improve this hand.".dimmed());
@@ -1329,7 +1373,12 @@ fn print_shanten(
     }
 }
 
-fn print_shanten_json(counts: &agari::parse::TileCounts, called_melds: u8, show_ukeire: bool) {
+fn print_shanten_json(
+    counts: &agari::parse::TileCounts,
+    called_melds: u8,
+    show_ukeire: bool,
+    visible_counts: Option<&TileCounts>,
+) {
     let result = calculate_shanten_with_melds(counts, called_melds);
 
     let shanten_desc = match result.shanten {
@@ -1347,7 +1396,11 @@ fn print_shanten_json(counts: &agari::parse::TileCounts, called_melds: u8, show_
     };
 
     let ukeire_data = if show_ukeire && result.shanten >= 0 {
-        let ukeire = calculate_ukeire_with_melds(counts, called_melds);
+        let ukeire = if let Some(vc) = visible_counts {
+            calculate_ukeire_with_melds_and_visible(counts, called_melds, vc)
+        } else {
+            calculate_ukeire_with_melds(counts, called_melds)
+        };
         Some(JsonUkeire {
             tile_count: ukeire.tiles.len(),
             total_available: ukeire.total_count,

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.0]
+
+### Added
+
+- **Practical Ukeire (Tile Acceptance)**: New `calculate_ukeire_with_visible` and `calculate_ukeire_with_melds_and_visible` library functions that account for tiles already visible on the table (discard ponds, open melds, dora indicators). Available copies are computed as `4 - hand_count - visible_count` instead of the theoretical `4 - hand_count`.
+- **`--visible` CLI Flag**: New `--visible <TILES>` option for practical ukeire from the command line. Pass comma-separated visible tiles (e.g., `--visible 2z,2z,5p`) to subtract them from the available pool when computing ukeire.
+
+### Changed
+
+- **Ukeire Documentation**: Updated doc comments on all ukeire functions and `UkeireTile::available` to clarify the difference between theoretical and practical ukeire. Updated README with practical ukeire examples for both CLI and library usage.
+
 ## [0.18.0]
 
 ### Added

@@ -162,14 +162,19 @@ The calculator evaluates three hand types and returns the best (lowest) shanten:
 2. **Chiitoitsu**: 7 pairs
 3. **Kokushi**: 13 orphans
 
-**Ukeire** (tile acceptance) shows which tiles would improve the hand, along with how many of each are still available.
+**Ukeire** (tile acceptance) shows which tiles would improve the hand, along with how many of each are still available. By default, ukeire is *theoretical* — it assumes a full 136-tile deck minus only your hand tiles.
+
+For **practical ukeire**, pass `--visible` with tiles already visible on the table (discard ponds, open melds, dora indicators). These are subtracted from the available pool, giving an accurate count of tiles you could actually draw.
 
 ```bash
 # Calculate shanten
 agari 123m456p789s1112z --shanten
 
-# Calculate shanten with ukeire
+# Theoretical ukeire (full deck)
 agari 123m456p789s112z --ukeire
+
+# Practical ukeire (2 copies of South visible on table)
+agari 123m456p789s1112z --ukeire --visible 2z,2z
 ```
 
 ---
@@ -279,6 +284,7 @@ OPTIONS:
     --chiihou             Non-dealer's first draw win
     --shanten             Calculate shanten instead of score
     --ukeire              Show ukeire with shanten
+    --visible <TILES>     Visible tiles on table (e.g., 2z,2z,5p) for practical ukeire
     --ascii               Use ASCII output instead of Unicode
     --no-color            Disable colored output
     --all                 Show all possible interpretations
@@ -421,8 +427,9 @@ fn main() {
 ### Shanten Calculation
 
 ```rust
-use agari::parse::{parse_hand, to_counts};
-use agari::shanten::{calculate_shanten, calculate_ukeire};
+use agari::parse::{parse_hand, to_counts, TileCounts};
+use agari::shanten::{calculate_shanten, calculate_ukeire, calculate_ukeire_with_visible};
+use agari::tile::{Honor, Tile};
 
 fn main() {
     let tiles = parse_hand("123m456p789s1112z").unwrap();
@@ -433,10 +440,18 @@ fn main() {
     println!("Shanten: {}", result.shanten);
     println!("Best type: {:?}", result.best_type);
 
-    // Calculate ukeire (tile acceptance)
+    // Theoretical ukeire (full 136-tile deck)
     let ukeire = calculate_ukeire(&counts);
-    for (tile, count) in &ukeire.tiles {
-        println!("{:?}: {} available", tile, count);
+    for ut in &ukeire.tiles {
+        println!("{:?}: {} available", ut.tile, ut.available);
+    }
+
+    // Practical ukeire (accounting for visible tiles on the table)
+    let mut visible = TileCounts::new();
+    visible.insert(Tile::honor(Honor::South), 2); // 2 copies of South in discard ponds
+    let practical = calculate_ukeire_with_visible(&counts, &visible);
+    for ut in &practical.tiles {
+        println!("{:?}: {} available (practical)", ut.tile, ut.available);
     }
 }
 ```

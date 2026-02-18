@@ -443,19 +443,66 @@ pub fn calculate_kokushi_shanten(counts: &TileCounts) -> i8 {
     13 - unique_terminals - if has_pair { 1 } else { 0 }
 }
 
-/// Calculate ukeire (tile acceptance) for a hand
+/// Calculate theoretical ukeire (tile acceptance) for a hand.
 ///
 /// Returns a list of tiles that would improve the hand (reduce shanten)
-/// along with the count of how many of each are available.
+/// along with the count of how many of each are available. Assumes a full
+/// 136-tile deck — the only tiles subtracted are those in the hand itself.
+/// For a practical calculation that accounts for visible tiles on the table,
+/// see [`calculate_ukeire_with_visible`].
 pub fn calculate_ukeire(counts: &TileCounts) -> UkeireResult {
-    calculate_ukeire_with_melds(counts, 0)
+    calculate_ukeire_inner(counts, 0, None)
 }
 
-/// Calculate ukeire (tile acceptance) for a hand with called melds
+/// Calculate theoretical ukeire (tile acceptance) for a hand with called melds.
 ///
 /// `called_melds` is the number of complete melds already called (pon, chi, kan).
-/// These melds are not included in `counts` - only the remaining hand tiles are.
+/// These melds are not included in `counts` — only the remaining hand tiles are.
+/// Assumes a full 136-tile deck — the only tiles subtracted are those in the hand.
+/// For a practical calculation that accounts for visible tiles on the table,
+/// see [`calculate_ukeire_with_melds_and_visible`].
 pub fn calculate_ukeire_with_melds(counts: &TileCounts, called_melds: u8) -> UkeireResult {
+    calculate_ukeire_inner(counts, called_melds, None)
+}
+
+/// Calculate practical ukeire (tile acceptance) accounting for visible tiles.
+///
+/// Like [`calculate_ukeire`], but subtracts `visible_counts` from the available
+/// tile pool. `visible_counts` should include all tiles the player can see:
+/// all discard ponds, all open melds on the table, dora indicators, etc.
+/// Tiles in the player's own hand should NOT be included in `visible_counts`
+/// (they are already accounted for).
+pub fn calculate_ukeire_with_visible(
+    counts: &TileCounts,
+    visible_counts: &TileCounts,
+) -> UkeireResult {
+    calculate_ukeire_inner(counts, 0, Some(visible_counts))
+}
+
+/// Calculate practical ukeire (tile acceptance) with called melds and visible tiles.
+///
+/// Combines meld-aware shanten calculation with practical tile availability.
+/// `called_melds` is the number of complete melds already called (pon, chi, kan).
+/// `visible_counts` should include all tiles the player can see on the table
+/// (discard ponds, open melds, dora indicators, etc.) — these are subtracted
+/// from the theoretical maximum of 4 per tile type.
+pub fn calculate_ukeire_with_melds_and_visible(
+    counts: &TileCounts,
+    called_melds: u8,
+    visible_counts: &TileCounts,
+) -> UkeireResult {
+    calculate_ukeire_inner(counts, called_melds, Some(visible_counts))
+}
+
+/// Shared ukeire implementation.
+///
+/// When `visible_counts` is `None`, available copies = 4 - hand_count (theoretical).
+/// When `visible_counts` is `Some`, available copies = 4 - hand_count - visible_count (practical).
+fn calculate_ukeire_inner(
+    counts: &TileCounts,
+    called_melds: u8,
+    visible_counts: Option<&TileCounts>,
+) -> UkeireResult {
     let current = calculate_shanten_with_melds(counts, called_melds);
     let mut accepting_tiles = Vec::new();
     let mut total_count = 0u8;
@@ -464,9 +511,13 @@ pub fn calculate_ukeire_with_melds(counts: &TileCounts, called_melds: u8) -> Uke
     for idx in 0..34 {
         let tile = index_to_tile(idx);
 
-        // Skip if already have 4 of this tile
-        let current_count = counts.get(&tile).copied().unwrap_or(0);
-        if current_count >= 4 {
+        let hand_count = counts.get(&tile).copied().unwrap_or(0);
+        let visible_count = visible_counts
+            .and_then(|vc| vc.get(&tile).copied())
+            .unwrap_or(0);
+
+        // Skip if all 4 copies are accounted for (hand + visible)
+        if hand_count + visible_count >= 4 {
             continue;
         }
 
@@ -477,7 +528,7 @@ pub fn calculate_ukeire_with_melds(counts: &TileCounts, called_melds: u8) -> Uke
         let new_shanten = calculate_shanten_with_melds(&test_counts, called_melds);
 
         if new_shanten.shanten < current.shanten {
-            let available = 4 - current_count;
+            let available = 4 - hand_count - visible_count;
             accepting_tiles.push(UkeireTile { tile, available });
             total_count += available;
         }
@@ -506,7 +557,8 @@ pub struct UkeireResult {
 pub struct UkeireTile {
     /// The tile
     pub tile: Tile,
-    /// How many are available (4 - already in hand)
+    /// How many copies are available to draw.
+    /// Theoretical: 4 - hand_count. Practical: 4 - hand_count - visible_count.
     pub available: u8,
 }
 
@@ -757,6 +809,112 @@ mod tests {
             "Ignoring called melds should produce more (incorrect) accepting tiles: wrong={}, correct={}",
             ukeire_wrong.tiles.len(),
             ukeire_correct.tiles.len()
+        );
+    }
+
+    // ===== Ukeire with Visible Tiles Tests =====
+
+    #[test]
+    fn test_ukeire_with_visible_reduces_count() {
+        // Tenpai hand: 123m456p789s1112z — waiting on 2z
+        let tiles = parse_hand("123m456p789s1112z").unwrap();
+        let counts = to_counts(&tiles);
+
+        let theoretical = calculate_ukeire(&counts);
+
+        // Suppose 2 copies of 2z are visible on the table
+        let mut visible = TileCounts::new();
+        visible.insert(Tile::honor(Honor::South), 2);
+
+        let practical = calculate_ukeire_with_visible(&counts, &visible);
+
+        assert_eq!(theoretical.shanten, practical.shanten);
+
+        // Find 2z in both results
+        let theo_2z = theoretical
+            .tiles
+            .iter()
+            .find(|t| t.tile == Tile::honor(Honor::South));
+        let prac_2z = practical
+            .tiles
+            .iter()
+            .find(|t| t.tile == Tile::honor(Honor::South));
+
+        assert!(theo_2z.is_some(), "2z should be a theoretical wait");
+        assert!(prac_2z.is_some(), "2z should still be a practical wait");
+
+        // Theoretical: 4 - 1 (in hand) = 3 available
+        assert_eq!(theo_2z.unwrap().available, 3);
+        // Practical: 4 - 1 (hand) - 2 (visible) = 1 available
+        assert_eq!(prac_2z.unwrap().available, 1);
+
+        assert!(
+            practical.total_count < theoretical.total_count,
+            "Practical total ({}) should be less than theoretical ({})",
+            practical.total_count,
+            theoretical.total_count
+        );
+    }
+
+    #[test]
+    fn test_ukeire_with_visible_removes_tile_when_all_copies_seen() {
+        // Tenpai hand: 123m456p789s1112z — waiting on 2z
+        let tiles = parse_hand("123m456p789s1112z").unwrap();
+        let counts = to_counts(&tiles);
+
+        // All remaining 3 copies of 2z are visible
+        let mut visible = TileCounts::new();
+        visible.insert(Tile::honor(Honor::South), 3);
+
+        let practical = calculate_ukeire_with_visible(&counts, &visible);
+
+        // 2z should NOT appear in results (4 - 1 hand - 3 visible = 0)
+        let prac_2z = practical
+            .tiles
+            .iter()
+            .find(|t| t.tile == Tile::honor(Honor::South));
+        assert!(
+            prac_2z.is_none(),
+            "2z should not appear when all copies are accounted for"
+        );
+    }
+
+    #[test]
+    fn test_ukeire_with_visible_no_visible_matches_theoretical() {
+        let tiles = parse_hand("123m456p789s1112z").unwrap();
+        let counts = to_counts(&tiles);
+
+        let theoretical = calculate_ukeire(&counts);
+        let practical = calculate_ukeire_with_visible(&counts, &TileCounts::new());
+
+        assert_eq!(theoretical.shanten, practical.shanten);
+        assert_eq!(theoretical.tiles.len(), practical.tiles.len());
+        assert_eq!(theoretical.total_count, practical.total_count);
+    }
+
+    #[test]
+    fn test_ukeire_with_melds_and_visible() {
+        // 23678p234567s with called pon of 2z — tenpai
+        use crate::parse::parse_hand_with_aka;
+        let parsed = parse_hand_with_aka("23678p234567s(222z)").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds = parsed.called_melds.len() as u8;
+
+        let theoretical = calculate_ukeire_with_melds(&counts, called_melds);
+
+        // Some waits are visible on the table
+        let mut visible = TileCounts::new();
+        // Imagine 1p has 2 copies in discard ponds
+        visible.insert(Tile::suited(Suit::Pin, 1), 2);
+
+        let practical = calculate_ukeire_with_melds_and_visible(&counts, called_melds, &visible);
+
+        assert_eq!(theoretical.shanten, practical.shanten);
+        assert!(
+            practical.total_count <= theoretical.total_count,
+            "Practical total ({}) should be <= theoretical ({})",
+            practical.total_count,
+            theoretical.total_count
         );
     }
 
