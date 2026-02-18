@@ -516,8 +516,8 @@ fn calculate_ukeire_inner(
             .and_then(|vc| vc.get(&tile).copied())
             .unwrap_or(0);
 
-        // Skip if all 4 copies are accounted for (hand + visible)
-        if hand_count + visible_count >= 4 {
+        // Skip if already have 4 of this tile in hand (can't test adding a 5th)
+        if hand_count >= 4 {
             continue;
         }
 
@@ -528,7 +528,7 @@ fn calculate_ukeire_inner(
         let new_shanten = calculate_shanten_with_melds(&test_counts, called_melds);
 
         if new_shanten.shanten < current.shanten {
-            let available = 4 - hand_count - visible_count;
+            let available = 4u8.saturating_sub(hand_count + visible_count);
             accepting_tiles.push(UkeireTile { tile, available });
             total_count += available;
         }
@@ -857,7 +857,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ukeire_with_visible_removes_tile_when_all_copies_seen() {
+    fn test_ukeire_with_visible_shows_zero_available_when_all_copies_seen() {
         // Tenpai hand: 123m456p789s1112z — waiting on 2z
         let tiles = parse_hand("123m456p789s1112z").unwrap();
         let counts = to_counts(&tiles);
@@ -868,15 +868,16 @@ mod tests {
 
         let practical = calculate_ukeire_with_visible(&counts, &visible);
 
-        // 2z should NOT appear in results (4 - 1 hand - 3 visible = 0)
+        // 2z should still appear as a wait but with 0 available
         let prac_2z = practical
             .tiles
             .iter()
             .find(|t| t.tile == Tile::honor(Honor::South));
         assert!(
-            prac_2z.is_none(),
-            "2z should not appear when all copies are accounted for"
+            prac_2z.is_some(),
+            "2z should still appear as a wait even with 0 available"
         );
+        assert_eq!(prac_2z.unwrap().available, 0);
     }
 
     #[test]

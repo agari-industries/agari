@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.1]
+
+### Fixed
+
+- **Practical Ukeire Zero-Available Waits**: Fixed ukeire excluding valid wait tiles when all copies were accounted for (hand + visible). A tile that improves shanten now always appears in the results even when 0 copies remain in the wall, so players can see their full wait shape.
+
 ## [0.19.0]
 
 ### Added
