@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/agari-core", "crates/agari-wasm"]
+members = ["crates/agari-core", "crates/agari-wasm", "crates/agari-python"]
 resolver = "2"
 
 # The profile that 'dist' will build with

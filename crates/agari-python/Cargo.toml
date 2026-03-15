@@ -1,0 +1,15 @@
+[package]
+name = "agari-python"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Python bindings for Agari Riichi Mahjong scoring engine"
+publish = false
+
+[lib]
+name = "agari_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+agari = { path = "../agari-core" }
+pyo3 = { version = "0.28", features = ["extension-module"] }

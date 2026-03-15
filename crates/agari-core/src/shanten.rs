@@ -148,6 +148,20 @@ fn calculate_standard_shanten_with_melds(counts: &TileCounts, called_melds: u8) 
     best_shanten
 }
 
+/// Convert a 34-element array back to TileCounts.
+///
+/// Index mapping: 0–8 = 1m–9m, 9–17 = 1p–9p, 18–26 = 1s–9s, 27–33 = honors (East…Red).
+/// Zero counts are omitted from the resulting map.
+pub fn array_to_tilecounts(arr: &[u8; 34]) -> TileCounts {
+    let mut counts = TileCounts::new();
+    for (idx, &count) in arr.iter().enumerate() {
+        if count > 0 {
+            counts.insert(index_to_tile(idx), count);
+        }
+    }
+    counts
+}
+
 /// Convert TileCounts to a 34-element array
 fn counts_to_array(counts: &TileCounts) -> [u8; 34] {
     let mut arr = [0u8; 34];
