@@ -75,7 +75,7 @@ fn valid_chi_combinations(hand: Vec<u8>, discarded_tile: u8) -> PyResult<Vec<(u8
         combos.push(((d - 2) as u8, (d - 1) as u8));
     }
     // Discarded tile is the MIDDLE of sequence: (d-1, d, d+1)
-    if val >= 1 && val <= 7 && hand[d - 1] > 0 && hand[d + 1] > 0 {
+    if (1..=7).contains(&val) && hand[d - 1] > 0 && hand[d + 1] > 0 {
         combos.push(((d - 1) as u8, (d + 1) as u8));
     }
     // Discarded tile is the LOW end of sequence: (d, d+1, d+2)
