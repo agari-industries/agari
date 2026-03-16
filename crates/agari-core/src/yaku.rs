@@ -491,26 +491,24 @@ pub fn detect_yaku_with_context(
                     let mut concealed_triplets = 0;
                     for meld in melds {
                         match meld {
-                            Meld::Koutsu(tile, is_open_meld) => {
+                            Meld::Koutsu(tile, is_open_meld)
                                 // A triplet is concealed if:
                                 // 1. It's not an open pon
                                 // 2. For ron, the winning tile did NOT complete this triplet,
                                 //    OR the winning tile could have completed a sequence instead
-                                if !is_open_meld {
-                                    if context.win_type == WinType::Tsumo {
-                                        concealed_triplets += 1;
-                                    } else if let Some(wt) = context.winning_tile
-                                        && (*tile != wt || winning_tile_completes_sequence)
-                                    {
-                                        concealed_triplets += 1;
-                                    }
-                                }
-                            }
-                            Meld::Kan(_, kan_type) => {
-                                // Closed kans count as concealed triplets
-                                if !kan_type.is_open() {
+                                if !is_open_meld =>
+                            {
+                                if context.win_type == WinType::Tsumo {
+                                    concealed_triplets += 1;
+                                } else if let Some(wt) = context.winning_tile
+                                    && (*tile != wt || winning_tile_completes_sequence)
+                                {
                                     concealed_triplets += 1;
                                 }
+                            }
+                            // Closed kans count as concealed triplets
+                            Meld::Kan(_, kan_type) if !kan_type.is_open() => {
+                                concealed_triplets += 1;
                             }
                             _ => {}
                         }
