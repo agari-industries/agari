@@ -8,6 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::hand::KanType;
 use crate::parse::TileCounts;
 use crate::tile::{Honor, KOKUSHI_TILES, Suit, Tile};
 use std::cmp::{max, min};
@@ -162,8 +163,10 @@ pub fn array_to_tilecounts(arr: &[u8; 34]) -> TileCounts {
     counts
 }
 
-/// Convert TileCounts to a 34-element array
-fn counts_to_array(counts: &TileCounts) -> [u8; 34] {
+/// Convert TileCounts to a 34-element array.
+///
+/// Index mapping: 0–8 = 1m–9m, 9–17 = 1p–9p, 18–26 = 1s–9s, 27–33 = honors (East…Red).
+pub fn counts_to_array(counts: &TileCounts) -> [u8; 34] {
     let mut arr = [0u8; 34];
 
     for (&tile, &count) in counts {
@@ -174,8 +177,10 @@ fn counts_to_array(counts: &TileCounts) -> [u8; 34] {
     arr
 }
 
-/// Convert a tile to its array index (0-33)
-fn tile_to_index(tile: Tile) -> usize {
+/// Convert a tile to its array index (0-33).
+///
+/// Man 1–9 → 0–8, Pin 1–9 → 9–17, Sou 1–9 → 18–26, honors → 27–33.
+pub fn tile_to_index(tile: Tile) -> usize {
     match tile {
         Tile::Suited { suit, value } => {
             let base = match suit {
@@ -199,8 +204,8 @@ fn tile_to_index(tile: Tile) -> usize {
     }
 }
 
-/// Convert array index back to tile
-fn index_to_tile(idx: usize) -> Tile {
+/// Convert array index (0–33) back to a [`Tile`].
+pub fn index_to_tile(idx: usize) -> Tile {
     if idx < 27 {
         let suit = match idx / 9 {
             0 => Suit::Man,
@@ -574,6 +579,118 @@ pub struct UkeireTile {
     /// How many copies are available to draw.
     /// Theoretical: 4 - hand_count. Practical: 4 - hand_count - visible_count.
     pub available: u8,
+}
+
+// ============================================================================
+// Chi / Kan utility functions
+// ============================================================================
+
+/// Return all valid chi (sequence call) combinations for a discarded tile.
+///
+/// Given the tiles in a player's hand and a `discarded_tile`, this function
+/// returns every pair of tiles already in the hand that would form a three-tile
+/// sequence together with the discard.  Only suited tiles (man, pin, sou) can
+/// form sequences — honor tiles always produce an empty result.
+///
+/// Each returned `(Tile, Tile)` is the pair of hand tiles used (not the
+/// discard itself), listed in index order.
+pub fn valid_chi_combinations(hand: &TileCounts, discarded_tile: Tile) -> Vec<(Tile, Tile)> {
+    let arr = counts_to_array(hand);
+    let d = tile_to_index(discarded_tile);
+
+    // Honor tiles (index > 26) cannot form sequences
+    if d > 26 {
+        return vec![];
+    }
+
+    let val = d % 9; // position within suit (0-8)
+    let mut combos = Vec::new();
+
+    // Discarded tile is the HIGH end of sequence: (d-2, d-1, d)
+    if val >= 2 && arr[d - 2] > 0 && arr[d - 1] > 0 {
+        combos.push((index_to_tile(d - 2), index_to_tile(d - 1)));
+    }
+    // Discarded tile is the MIDDLE of sequence: (d-1, d, d+1)
+    if (1..=7).contains(&val) && arr[d - 1] > 0 && arr[d + 1] > 0 {
+        combos.push((index_to_tile(d - 1), index_to_tile(d + 1)));
+    }
+    // Discarded tile is the LOW end of sequence: (d, d+1, d+2)
+    if val <= 6 && arr[d + 1] > 0 && arr[d + 2] > 0 {
+        combos.push((index_to_tile(d + 1), index_to_tile(d + 2)));
+    }
+
+    combos
+}
+
+/// Compute the best possible shanten after calling chi with a specific combo.
+///
+/// Removes the two `combo` tiles from the hand, then tries every possible
+/// discard and returns the minimum resulting shanten (with `num_melds + 1`
+/// called melds).
+///
+/// # Panics
+///
+/// Panics if either combo tile is not present in the hand.
+pub fn shanten_after_chi(hand: &TileCounts, combo: (Tile, Tile), num_melds: u8) -> i8 {
+    let mut arr = counts_to_array(hand);
+    let idx0 = tile_to_index(combo.0);
+    let idx1 = tile_to_index(combo.1);
+
+    arr[idx0] = arr[idx0]
+        .checked_sub(1)
+        .expect("combo tile not in hand");
+    arr[idx1] = arr[idx1]
+        .checked_sub(1)
+        .expect("combo tile not in hand");
+
+    let new_melds = num_melds + 1;
+    let mut best = i8::MAX;
+
+    for i in 0..34 {
+        if arr[i] > 0 {
+            arr[i] -= 1;
+            let counts = array_to_tilecounts(&arr);
+            let s = calculate_shanten_with_melds(&counts, new_melds).shanten;
+            if s < best {
+                best = s;
+            }
+            arr[i] += 1;
+        }
+    }
+
+    best
+}
+
+/// Compute shanten after declaring kan.
+///
+/// - [`KanType::Open`] (daiminkan): removes 3 tiles from hand, increments melds.
+/// - [`KanType::Closed`] (ankan): removes 4 tiles from hand, increments melds.
+/// - [`KanType::Added`] (kakan): removes 1 tile from hand, melds unchanged.
+///
+/// # Panics
+///
+/// Panics if the hand does not contain enough copies of `kan_tile`.
+pub fn shanten_after_kan(
+    hand: &TileCounts,
+    kan_tile: Tile,
+    kan_type: KanType,
+    num_melds: u8,
+) -> i8 {
+    let mut arr = counts_to_array(hand);
+    let kt = tile_to_index(kan_tile);
+
+    let (remove, melds) = match kan_type {
+        KanType::Open => (3u8, num_melds + 1),
+        KanType::Closed => (4u8, num_melds + 1),
+        KanType::Added => (1u8, num_melds),
+    };
+
+    arr[kt] = arr[kt]
+        .checked_sub(remove)
+        .expect("not enough tiles in hand for kan");
+
+    let counts = array_to_tilecounts(&arr);
+    calculate_shanten_with_melds(&counts, melds).shanten
 }
 
 // ============================================================================
@@ -1008,5 +1125,175 @@ mod tests {
             "All 6m tiles should be extracted as triplet, but {} remain",
             remaining[5]
         );
+    }
+
+    // ===== Chi Combination Tests =====
+
+    /// Helper: build a TileCounts from a 34-element array.
+    fn counts_from_arr(arr: [u8; 34]) -> TileCounts {
+        array_to_tilecounts(&arr)
+    }
+
+    #[test]
+    fn test_chi_no_combos() {
+        let mut arr = [0u8; 34];
+        arr[5] = 1; // 6m
+        let combos = valid_chi_combinations(&counts_from_arr(arr), index_to_tile(0));
+        assert!(combos.is_empty());
+    }
+
+    #[test]
+    fn test_chi_low_end() {
+        // 2m+3m in hand, discard 1m → combo (2m, 3m)
+        let mut arr = [0u8; 34];
+        arr[1] = 1; // 2m
+        arr[2] = 1; // 3m
+        let combos = valid_chi_combinations(&counts_from_arr(arr), index_to_tile(0));
+        assert_eq!(combos, vec![(index_to_tile(1), index_to_tile(2))]);
+    }
+
+    #[test]
+    fn test_chi_high_end() {
+        // 7m+8m in hand, discard 9m → combo (7m, 8m)
+        let mut arr = [0u8; 34];
+        arr[6] = 1; // 7m
+        arr[7] = 1; // 8m
+        let combos = valid_chi_combinations(&counts_from_arr(arr), index_to_tile(8));
+        assert_eq!(combos, vec![(index_to_tile(6), index_to_tile(7))]);
+    }
+
+    #[test]
+    fn test_chi_two_combos() {
+        // 1m,2m,4m in hand, discard 3m → (1m,2m) and (2m,4m)
+        let mut arr = [0u8; 34];
+        arr[0] = 1; // 1m
+        arr[1] = 1; // 2m
+        arr[3] = 1; // 4m
+        let combos = valid_chi_combinations(&counts_from_arr(arr), index_to_tile(2));
+        assert_eq!(
+            combos,
+            vec![
+                (index_to_tile(0), index_to_tile(1)),
+                (index_to_tile(1), index_to_tile(3)),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_chi_three_combos() {
+        // 3m,4m,6m,7m in hand, discard 5m → (3m,4m), (4m,6m), (6m,7m)
+        let mut arr = [0u8; 34];
+        arr[2] = 1; // 3m
+        arr[3] = 1; // 4m
+        arr[5] = 1; // 6m
+        arr[6] = 1; // 7m
+        let combos = valid_chi_combinations(&counts_from_arr(arr), index_to_tile(4));
+        assert_eq!(
+            combos,
+            vec![
+                (index_to_tile(2), index_to_tile(3)),
+                (index_to_tile(3), index_to_tile(5)),
+                (index_to_tile(5), index_to_tile(6)),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_chi_honor_tile() {
+        let mut arr = [0u8; 34];
+        arr[27] = 3; // East x3
+        let combos = valid_chi_combinations(&counts_from_arr(arr), index_to_tile(27));
+        assert!(combos.is_empty());
+    }
+
+    // ===== Shanten After Chi Tests =====
+
+    #[test]
+    fn test_shanten_after_chi_good() {
+        // Tenpai: 123m 456m 789m 1p 123s (13 tiles, shanten 0)
+        let mut arr = [0u8; 34];
+        arr[..9].fill(1); // 1-9m
+        arr[9] = 1; // 1p
+        arr[18] = 1; // 1s
+        arr[19] = 1; // 2s
+        arr[20] = 1; // 3s
+        let hand = counts_from_arr(arr);
+
+        let before = calculate_shanten(&hand).shanten;
+        assert_eq!(before, 0);
+
+        // Chi 1s from opponent using (2s, 3s)
+        let after = shanten_after_chi(&hand, (index_to_tile(19), index_to_tile(20)), 0);
+        assert!(after <= before, "Expected shanten <= {before} after good chi, got {after}");
+    }
+
+    #[test]
+    fn test_shanten_after_chi_bad() {
+        // Scattered hand: all odd tiles
+        let mut arr = [0u8; 34];
+        for &i in &[0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24] {
+            arr[i] = 1;
+        }
+        let hand = counts_from_arr(arr);
+
+        let before = calculate_shanten(&hand).shanten;
+        // Chi 2m(1) with combo (1m, 3m) = (0, 2)
+        let after = shanten_after_chi(&hand, (index_to_tile(0), index_to_tile(2)), 0);
+        assert!(
+            after >= before - 1,
+            "Unexpectedly good shanten after bad chi: {before} -> {after}"
+        );
+    }
+
+    // ===== Shanten After Kan Tests =====
+
+    #[test]
+    fn test_shanten_after_kan_open() {
+        // 123m 456m 789m EEE 1p (13 tiles, shanten 0)
+        let mut arr = [0u8; 34];
+        arr[..9].fill(1); // 1-9m
+        arr[27] = 3; // East x3
+        arr[9] = 1; // 1p
+        let hand = counts_from_arr(arr);
+
+        let before = calculate_shanten(&hand).shanten;
+        assert_eq!(before, 0);
+
+        // Open kan on East: remove 3, melds 0→1
+        let after = shanten_after_kan(&hand, index_to_tile(27), KanType::Open, 0);
+        assert_eq!(after, 0, "Expected 0 after open kan, got {after}");
+    }
+
+    #[test]
+    fn test_shanten_after_kan_closed() {
+        // 123m 456m EEEE 1p (11 tiles, 0 melds)
+        let mut arr = [0u8; 34];
+        arr[..6].fill(1); // 1-6m
+        arr[27] = 4; // East x4
+        arr[9] = 1; // 1p
+        let hand = counts_from_arr(arr);
+
+        // Closed kan on East: remove 4, melds 0→1
+        // After: 123m 456m 1p (7 tiles) with 1 meld
+        let after = shanten_after_kan(&hand, index_to_tile(27), KanType::Closed, 0);
+        // 7 tiles + 1 meld is quite short of a full hand, so shanten is high
+        assert!(after >= 0, "Shanten should be non-negative after closed kan: {after}");
+    }
+
+    #[test]
+    fn test_shanten_after_kan_added() {
+        // 123m 456m 789m E (10 tiles, 1 meld already — pon of East)
+        let mut arr = [0u8; 34];
+        arr[..9].fill(1); // 1-9m
+        arr[27] = 1; // East (the 4th, adding to existing pon)
+        let hand = counts_from_arr(arr);
+
+        let before = calculate_shanten_with_melds(&hand, 1).shanten;
+        // Added kan: remove 1 East, melds stay at 1
+        let after = shanten_after_kan(&hand, index_to_tile(27), KanType::Added, 1);
+        // After removing the East, hand is 123m 456m 789m with 1 meld
+        // That's 9 tiles + 1 meld, missing a pair → shanten should be reasonable
+        assert!((-1..=2).contains(&after),
+            "Unexpected shanten after added kan: {before} -> {after}");
     }
 }

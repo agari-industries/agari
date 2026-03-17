@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 
+use agari::hand::KanType;
 use agari::parse::TileCounts;
 use agari::shanten;
 
@@ -59,30 +60,13 @@ fn batch_compute_riichi_features(
 
 #[pyfunction]
 fn valid_chi_combinations(hand: Vec<u8>, discarded_tile: u8) -> PyResult<Vec<(u8, u8)>> {
-    if hand.len() != 34 {
-        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            format!("expected 34-element array, got {}", hand.len()),
-        ));
-    }
-    let d = discarded_tile as usize;
-    if d > 26 {
-        return Ok(vec![]);
-    }
-    let val = d % 9;
-    let mut combos = Vec::new();
-    // Discarded tile is the HIGH end of sequence: (d-2, d-1, d)
-    if val >= 2 && hand[d - 2] > 0 && hand[d - 1] > 0 {
-        combos.push(((d - 2) as u8, (d - 1) as u8));
-    }
-    // Discarded tile is the MIDDLE of sequence: (d-1, d, d+1)
-    if (1..=7).contains(&val) && hand[d - 1] > 0 && hand[d + 1] > 0 {
-        combos.push(((d - 1) as u8, (d + 1) as u8));
-    }
-    // Discarded tile is the LOW end of sequence: (d, d+1, d+2)
-    if val <= 6 && hand[d + 1] > 0 && hand[d + 2] > 0 {
-        combos.push(((d + 1) as u8, (d + 2) as u8));
-    }
-    Ok(combos)
+    let counts = vec_to_tilecounts(hand)?;
+    let tile = shanten::index_to_tile(discarded_tile as usize);
+    let combos = shanten::valid_chi_combinations(&counts, tile);
+    Ok(combos
+        .into_iter()
+        .map(|(a, b)| (shanten::tile_to_index(a) as u8, shanten::tile_to_index(b) as u8))
+        .collect())
 }
 
 #[pyfunction]
@@ -92,31 +76,12 @@ fn shanten_after_chi(
     combo: (u8, u8),
     num_melds: u8,
 ) -> PyResult<i8> {
-    let mut arr: [u8; 34] = hand
-        .try_into()
-        .map_err(|v: Vec<u8>| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            format!("expected 34-element array, got {}", v.len()),
-        ))?;
-    arr[combo.0 as usize] = arr[combo.0 as usize].checked_sub(1).ok_or_else(||
-        PyErr::new::<pyo3::exceptions::PyValueError, _>("combo tile not in hand")
-    )?;
-    arr[combo.1 as usize] = arr[combo.1 as usize].checked_sub(1).ok_or_else(||
-        PyErr::new::<pyo3::exceptions::PyValueError, _>("combo tile not in hand")
-    )?;
-    let new_melds = num_melds + 1;
-    let mut best = i8::MAX;
-    for i in 0..34 {
-        if arr[i] > 0 {
-            arr[i] -= 1;
-            let counts = shanten::array_to_tilecounts(&arr);
-            let s = shanten::calculate_shanten_with_melds(&counts, new_melds).shanten;
-            if s < best {
-                best = s;
-            }
-            arr[i] += 1;
-        }
-    }
-    Ok(best)
+    let counts = vec_to_tilecounts(hand)?;
+    let combo_tiles = (
+        shanten::index_to_tile(combo.0 as usize),
+        shanten::index_to_tile(combo.1 as usize),
+    );
+    Ok(shanten::shanten_after_chi(&counts, combo_tiles, num_melds))
 }
 
 #[pyfunction]
@@ -126,25 +91,17 @@ fn shanten_after_kan(
     kan_type: u8,
     num_melds: u8,
 ) -> PyResult<i8> {
-    let mut arr: [u8; 34] = hand
-        .try_into()
-        .map_err(|v: Vec<u8>| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            format!("expected 34-element array, got {}", v.len()),
-        ))?;
-    let kt = kan_tile as usize;
-    let (remove, melds) = match kan_type {
-        0 => (3u8, num_melds + 1), // open (daiminkan)
-        1 => (4u8, num_melds + 1), // closed (ankan)
-        2 => (1u8, num_melds),     // added (kakan)
+    let counts = vec_to_tilecounts(hand)?;
+    let tile = shanten::index_to_tile(kan_tile as usize);
+    let kt = match kan_type {
+        0 => KanType::Open,
+        1 => KanType::Closed,
+        2 => KanType::Added,
         _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
             "kan_type must be 0 (open), 1 (closed), or 2 (added)",
         )),
     };
-    arr[kt] = arr[kt].checked_sub(remove).ok_or_else(||
-        PyErr::new::<pyo3::exceptions::PyValueError, _>("not enough tiles in hand for kan")
-    )?;
-    let counts = shanten::array_to_tilecounts(&arr);
-    Ok(shanten::calculate_shanten_with_melds(&counts, melds).shanten)
+    Ok(shanten::shanten_after_kan(&counts, tile, kt, num_melds))
 }
 
 #[pyfunction]
