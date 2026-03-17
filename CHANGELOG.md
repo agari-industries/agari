@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.20.0]
+
+### Added
+
+- **Python Bindings (agari-python crate)**: New `agari-python` crate providing PyO3-based Python bindings for shanten and ukeire calculations, along with general-purpose mahjong utilities (chi/kan helpers, tile parsing, etc.)
+
+### Changed
+
+- **Chi/Kan Utilities Moved to agari-core**: Chi and kan utility functions previously in `agari-python` have been moved into the `agari-core` library for broader reuse
+
+### Fixed
+
+- **Cargo Clippy Warnings**: Resolved all outstanding `cargo clippy` warnings in `agari-core` and `agari-python`
+
 ## [0.19.1]
 
 ### Fixed
