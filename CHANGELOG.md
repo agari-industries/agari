@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.21.0]
+
+### Fixed
+
+- **Shanten Meld Extraction**: Replaced greedy dual-pass meld extraction with recursive backtracking to fix incorrect shanten values for certain hands (e.g., hands with kanchan taatsu like 46789m were miscounted)
+
 ## [0.20.0]
 
 ### Added
