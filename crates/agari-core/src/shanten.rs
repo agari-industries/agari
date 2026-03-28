@@ -256,107 +256,171 @@ fn count_melds_and_taatsu(tiles: &[u8; 34]) -> (u8, u8) {
     (melds, taatsu)
 }
 
-/// Count melds and taatsu for a single suit
+/// Count melds and taatsu for a single suit using recursive backtracking.
+///
+/// The previous greedy approach (sequences-first vs triplets-first) could miss
+/// the optimal decomposition when a left-to-right sweep picks a suboptimal
+/// sequence. For example, with tiles `4,6,7,8,9` the greedy sweep extracts
+/// `6-7-8` (leaving `4,9` with 0 taatsu) instead of `7-8-9` (leaving `4,6`
+/// with 1 kanchan taatsu). The recursive approach explores all possible meld
+/// extractions and finds the true optimum.
 fn count_suit_melds(tiles: &mut [u8; 34], start: usize) -> (u8, u8) {
-    let mut melds = 0u8;
-    let mut taatsu = 0u8;
+    // Extract the 9-tile suit slice for recursive processing
+    let mut suit = [0u8; 9];
+    suit.copy_from_slice(&tiles[start..start + 9]);
 
-    // First pass: extract complete melds greedily
-    // We try multiple orderings and take the best result
-    let (m1, remaining1) = extract_melds_sequences_first(tiles, start);
-    let (m2, remaining2) = extract_melds_triplets_first(tiles, start);
+    // Find max melds via recursive backtracking
+    let max_melds = find_max_melds(&mut suit, 0);
 
-    // Choose the approach that gives more melds
-    let (best_melds, mut remaining) = if m1 >= m2 {
-        (m1, remaining1)
-    } else {
-        (m2, remaining2)
-    };
-    melds += best_melds;
+    // Now find max taatsu with exactly max_melds extracted.
+    // We need to try all ways of extracting max_melds and pick the one
+    // that leaves the most taatsu.
+    let mut best_taatsu = 0u8;
+    find_best_taatsu_after_melds(&mut suit, 0, 0, max_melds, &mut best_taatsu);
 
-    // Second pass: count taatsu (incomplete melds) from remaining tiles
-    // Pairs
-    for count in remaining.iter_mut().skip(start).take(9) {
-        if *count >= 2 {
-            taatsu += 1;
-            *count -= 2;
-        }
-    }
+    // Clear the suit portion of tiles (melds + taatsu have been counted)
+    tiles[start..start + 9].fill(0);
 
-    // Ryanmen/Penchan (adjacent tiles like 12, 23, 89)
-    for i in start..(start + 8) {
-        if remaining[i] >= 1 && remaining[i + 1] >= 1 {
-            taatsu += 1;
-            remaining[i] -= 1;
-            remaining[i + 1] -= 1;
-        }
-    }
-
-    // Kanchan (gap like 13, 24)
-    for i in start..(start + 7) {
-        if remaining[i] >= 1 && remaining[i + 2] >= 1 {
-            taatsu += 1;
-            remaining[i] -= 1;
-            remaining[i + 2] -= 1;
-        }
-    }
-
-    // Update the original tiles array
-    tiles[start..(start + 9)].copy_from_slice(&remaining[start..(start + 9)]);
-
-    (melds, taatsu)
+    (max_melds, best_taatsu)
 }
 
-/// Extract melds preferring sequences first
-fn extract_melds_sequences_first(tiles: &[u8; 34], start: usize) -> (u8, [u8; 34]) {
-    let mut remaining = *tiles;
-    let mut melds = 0u8;
-
-    // Extract sequences first
-    for i in start..(start + 7) {
-        while remaining[i] >= 1 && remaining[i + 1] >= 1 && remaining[i + 2] >= 1 {
-            melds += 1;
-            remaining[i] -= 1;
-            remaining[i + 1] -= 1;
-            remaining[i + 2] -= 1;
-        }
+/// Recursively find the maximum number of complete melds in a 9-tile suit array.
+fn find_max_melds(suit: &mut [u8; 9], pos: usize) -> u8 {
+    // Skip to next non-zero position
+    let mut p = pos;
+    while p < 9 && suit[p] == 0 {
+        p += 1;
+    }
+    if p >= 9 {
+        return 0;
     }
 
-    // Then triplets
-    for count in remaining.iter_mut().skip(start).take(9) {
-        while *count >= 3 {
-            melds += 1;
-            *count -= 3;
-        }
+    let mut best = 0u8;
+
+    // Try extracting a triplet at position p
+    if suit[p] >= 3 {
+        suit[p] -= 3;
+        best = max(best, 1 + find_max_melds(suit, p));
+        suit[p] += 3;
     }
 
-    (melds, remaining)
+    // Try extracting a sequence starting at position p
+    if p + 2 < 9 && suit[p] >= 1 && suit[p + 1] >= 1 && suit[p + 2] >= 1 {
+        suit[p] -= 1;
+        suit[p + 1] -= 1;
+        suit[p + 2] -= 1;
+        best = max(best, 1 + find_max_melds(suit, p));
+        suit[p] += 1;
+        suit[p + 1] += 1;
+        suit[p + 2] += 1;
+    }
+
+    // Try skipping position p (extract no meld starting here)
+    best = max(best, find_max_melds(suit, p + 1));
+
+    best
 }
 
-/// Extract melds preferring triplets first
-fn extract_melds_triplets_first(tiles: &[u8; 34], start: usize) -> (u8, [u8; 34]) {
-    let mut remaining = *tiles;
-    let mut melds = 0u8;
-
-    // Extract triplets first
-    for count in remaining.iter_mut().skip(start).take(9) {
-        while *count >= 3 {
-            melds += 1;
-            *count -= 3;
-        }
+/// Recursively extract exactly `target_melds` melds, then count max taatsu from remainder.
+fn find_best_taatsu_after_melds(
+    suit: &mut [u8; 9],
+    pos: usize,
+    melds_so_far: u8,
+    target_melds: u8,
+    best_taatsu: &mut u8,
+) {
+    // If we've extracted all target melds, count taatsu from what's left
+    if melds_so_far == target_melds {
+        let t = count_suit_taatsu(suit);
+        *best_taatsu = max(*best_taatsu, t);
+        return;
     }
 
-    // Then sequences
-    for i in start..(start + 7) {
-        while remaining[i] >= 1 && remaining[i + 1] >= 1 && remaining[i + 2] >= 1 {
-            melds += 1;
-            remaining[i] -= 1;
-            remaining[i + 1] -= 1;
-            remaining[i + 2] -= 1;
-        }
+    // Skip to next non-zero position
+    let mut p = pos;
+    while p < 9 && suit[p] == 0 {
+        p += 1;
+    }
+    if p >= 9 {
+        // No more tiles but haven't reached target — this path doesn't work
+        return;
     }
 
-    (melds, remaining)
+    let remaining_melds = target_melds - melds_so_far;
+
+    // Try extracting a triplet at position p
+    if suit[p] >= 3 {
+        suit[p] -= 3;
+        find_best_taatsu_after_melds(suit, p, melds_so_far + 1, target_melds, best_taatsu);
+        suit[p] += 3;
+    }
+
+    // Try extracting a sequence starting at position p
+    if p + 2 < 9 && suit[p] >= 1 && suit[p + 1] >= 1 && suit[p + 2] >= 1 {
+        suit[p] -= 1;
+        suit[p + 1] -= 1;
+        suit[p + 2] -= 1;
+        find_best_taatsu_after_melds(suit, p, melds_so_far + 1, target_melds, best_taatsu);
+        suit[p] += 1;
+        suit[p + 1] += 1;
+        suit[p + 2] += 1;
+    }
+
+    // Try skipping position p (don't extract a meld here)
+    // Only if there could be enough melds in remaining positions
+    if remaining_melds == 0 || p + 1 < 9 {
+        find_best_taatsu_after_melds(suit, p + 1, melds_so_far, target_melds, best_taatsu);
+    }
+}
+
+/// Count taatsu (incomplete melds) in a suit using recursive backtracking.
+fn count_suit_taatsu(suit: &[u8; 9]) -> u8 {
+    let mut suit = *suit;
+    count_suit_taatsu_recursive(&mut suit, 0)
+}
+
+/// Recursively find max taatsu in a suit.
+fn count_suit_taatsu_recursive(suit: &mut [u8; 9], pos: usize) -> u8 {
+    // Skip to next non-zero position
+    let mut p = pos;
+    while p < 9 && suit[p] == 0 {
+        p += 1;
+    }
+    if p >= 9 {
+        return 0;
+    }
+
+    let mut best = 0u8;
+
+    // Try extracting a pair at position p
+    if suit[p] >= 2 {
+        suit[p] -= 2;
+        best = max(best, 1 + count_suit_taatsu_recursive(suit, p));
+        suit[p] += 2;
+    }
+
+    // Try extracting adjacent taatsu (ryanmen/penchan) at p, p+1
+    if p + 1 < 9 && suit[p] >= 1 && suit[p + 1] >= 1 {
+        suit[p] -= 1;
+        suit[p + 1] -= 1;
+        best = max(best, 1 + count_suit_taatsu_recursive(suit, p));
+        suit[p] += 1;
+        suit[p + 1] += 1;
+    }
+
+    // Try extracting kanchan at p, p+2
+    if p + 2 < 9 && suit[p] >= 1 && suit[p + 2] >= 1 {
+        suit[p] -= 1;
+        suit[p + 2] -= 1;
+        best = max(best, 1 + count_suit_taatsu_recursive(suit, p));
+        suit[p] += 1;
+        suit[p + 2] += 1;
+    }
+
+    // Try skipping position p
+    best = max(best, count_suit_taatsu_recursive(suit, p + 1));
+
+    best
 }
 
 /// Calculate shanten value from meld and taatsu counts, accounting for called melds
@@ -1101,29 +1165,70 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_melds_sequences_first_with_remaining_triplet() {
-        // Direct test of the internal meld extraction logic
+    fn test_recursive_meld_extraction_sequences_and_triplet() {
         // Input: 2(x1), 3(x3), 4(x3), 5(x2), 6(x3) in manzu
-        // After extracting sequences 234, 345, 345, we should have 6(x3) left
-        // which should be extracted as a triplet
-        let mut tiles = [0u8; 34];
-        tiles[1] = 1; // 2m
-        tiles[2] = 3; // 3m
-        tiles[3] = 3; // 4m
-        tiles[4] = 2; // 5m
-        tiles[5] = 3; // 6m
+        // Optimal: 234m + 345m + 345m + 666m = 4 melds
+        let mut suit = [0u8; 9];
+        suit[1] = 1; // 2m
+        suit[2] = 3; // 3m
+        suit[3] = 3; // 4m
+        suit[4] = 2; // 5m
+        suit[5] = 3; // 6m
 
-        let (melds, remaining) = extract_melds_sequences_first(&tiles, 0);
-
+        let melds = find_max_melds(&mut suit, 0);
         assert_eq!(
             melds, 4,
-            "Should extract 4 melds (3 sequences + 1 triplet), got {}",
+            "Should find 4 melds (3 sequences + 1 triplet), got {}",
             melds
         );
+    }
+
+    // ===== Greedy Algorithm Regression Tests =====
+
+    #[test]
+    fn test_tenpai_greedy_meld_extraction_order() {
+        // 46789m 66789p 123s — tenpai waiting on 5m (kanchan via 4m-6m)
+        // The greedy left-to-right sequence extraction picks 678m, leaving 4m,9m
+        // (0 taatsu). Optimal picks 789m, leaving 4m,6m (1 kanchan taatsu).
+        // With pair 66p: 3 melds + 1 taatsu + pair = shanten 0.
         assert_eq!(
-            remaining[5], 0,
-            "All 6m tiles should be extracted as triplet, but {} remain",
-            remaining[5]
+            shanten("46789m66789p123s"),
+            0,
+            "46789m 66789p 123s should be tenpai (shanten=0)"
+        );
+    }
+
+    #[test]
+    fn test_tenpai_reported_hand() {
+        // The originally reported hand: 34789m 66789p 123s
+        // Tenpai waiting on 2m or 5m
+        assert_eq!(
+            shanten("34789m66789p123s"),
+            0,
+            "34789m 66789p 123s should be tenpai (shanten=0)"
+        );
+    }
+
+    #[test]
+    fn test_tenpai_kanchan_taatsu_optimization() {
+        // 46m 789p 789s 123s 11z — wait, that's too many sou. Let me use:
+        // 46m 123m 789p 789s 11z = 13 tiles
+        // 123m(meld) + 789p(meld) + 789s(meld) + 11z(pair) + 46m(kanchan) = tenpai for 5m
+        assert_eq!(
+            shanten("12346m789p789s11z"),
+            0,
+            "12346m 789p 789s 11z should be tenpai (shanten=0)"
+        );
+    }
+
+    #[test]
+    fn test_complete_hand_greedy_pattern() {
+        // 456789m 66789p 123s — complete hand
+        // 456m + 789m + 66p(pair) + 789p + 123s = 4 melds + pair
+        assert_eq!(
+            shanten("456789m66789p123s"),
+            -1,
+            "456789m 66789p 123s should be complete (shanten=-1)"
         );
     }
 
