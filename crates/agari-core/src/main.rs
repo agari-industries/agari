@@ -135,6 +135,14 @@ struct Args {
     #[arg(long)]
     chiihou: bool,
 
+    /// Enable local (non-standard) yaku
+    #[arg(long)]
+    local: bool,
+
+    /// Non-dealer's first-turn ron win (requires --local)
+    #[arg(long)]
+    renhou: bool,
+
     /// Calculate shanten (tiles from tenpai) instead of score
     #[arg(long)]
     shanten: bool,
@@ -204,6 +212,10 @@ struct JsonContext {
     tenhou: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     chiihou: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    local_yaku: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    renhou: bool,
 }
 
 #[derive(Serialize)]
@@ -517,6 +529,17 @@ fn main() {
         context = context.chiihou();
     }
 
+    if args.local {
+        context = context.local_yaku();
+    }
+
+    if args.renhou {
+        if !args.local {
+            eprintln!("warning: --renhou has no effect without --local");
+        }
+        context = context.renhou();
+    }
+
     // Convert to tile counts (for hand decomposition)
     let counts = to_counts(&parsed.tiles);
 
@@ -726,6 +749,8 @@ fn main() {
             chankan: context.is_chankan,
             tenhou: context.is_tenhou,
             chiihou: context.is_chiihou,
+            local_yaku: context.local_yaku_enabled,
+            renhou: context.is_renhou,
         };
 
         let output = JsonOutput {
@@ -1463,6 +1488,9 @@ fn yaku_name(yaku: &Yaku) -> &'static str {
         Yaku::Junchan => "Junchan (Terminals in All Groups)",
         Yaku::Ryanpeikou => "Ryanpeikou (Twice Pure Double Sequence)",
         Yaku::Chinitsu => "Chinitsu (Full Flush)",
+
+        // Local yaku
+        Yaku::Renhou => "Renhou (Human Hand)",
 
         // Yakuman
         Yaku::Tenhou => "Tenhou (Heavenly Hand)",

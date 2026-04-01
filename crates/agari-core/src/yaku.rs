@@ -46,6 +46,9 @@ pub enum Yaku {
     // === 6 han ===
     Chinitsu, // Full flush (one suit only)
 
+    // === Local / non-standard yaku (only scored when local_yaku_enabled) ===
+    Renhou, // Non-dealer wins by ron in first go-around (EMA: mangan, 5 han)
+
     // === Yakuman (limit hands) ===
     Tenhou,        // Dealer wins on initial deal
     Chiihou,       // Non-dealer wins on first draw
@@ -105,6 +108,9 @@ impl Yaku {
             // 6 han
             Yaku::Chinitsu => 6,
 
+            // Local yaku (non-standard)
+            Yaku::Renhou => 5,
+
             // Yakuman (13 han equivalent)
             Yaku::Tenhou => 13,
             Yaku::Chiihou => 13,
@@ -129,6 +135,9 @@ impl Yaku {
     /// Han value when hand is open (some yaku lose 1 han)
     pub fn han_open(&self) -> Option<u8> {
         match self {
+            // Local yaku (non-standard) — invalid when open
+            Yaku::Renhou => None,
+
             // These yaku are invalid when open
             Yaku::Riichi => None,
             Yaku::DoubleRiichi => None,
@@ -253,6 +262,18 @@ pub fn detect_yaku_with_context(
     if context.is_chiihou && context.win_type == WinType::Tsumo && !is_open && !context.is_dealer()
     {
         yaku_list.push(Yaku::Chiihou);
+    }
+
+    // === Local yaku (only evaluated when local_yaku_enabled) ===
+
+    // Renhou: Non-dealer wins by ron in first go-around (must be ron, closed, not dealer)
+    if context.local_yaku_enabled
+        && context.is_renhou
+        && context.win_type == WinType::Ron
+        && !is_open
+        && !context.is_dealer()
+    {
+        yaku_list.push(Yaku::Renhou);
     }
 
     // === Structure-based Yakuman ===
@@ -1529,6 +1550,59 @@ mod tests {
         assert!(!has_yaku(&results, Yaku::Tanyao)); // No tanyao with yakuman
         assert!(!has_yaku(&results, Yaku::Riichi)); // No riichi with yakuman
         assert!(!has_yaku(&results, Yaku::MenzenTsumo)); // No menzen tsumo with yakuman
+    }
+
+    // ===== Renhou Tests =====
+
+    #[test]
+    fn test_renhou() {
+        // Non-dealer wins by ron in first go-around
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .local_yaku()
+            .renhou();
+        let results = get_yaku_with_context("123m456p789s11122z", &context);
+        assert!(has_yaku(&results, Yaku::Renhou));
+        assert!(!results[0].is_yakuman); // Renhou is not a yakuman (mangan cap, 5 han)
+        assert_eq!(Yaku::Renhou.han(), 5); // Renhou itself is worth 5 han
+    }
+
+    #[test]
+    fn test_renhou_requires_local_flag() {
+        // Renhou has no effect without local_yaku_enabled
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South).renhou();
+        let results = get_yaku_with_context("123m456p789s11122z", &context);
+        assert!(!has_yaku(&results, Yaku::Renhou));
+    }
+
+    #[test]
+    fn test_renhou_not_for_dealer() {
+        // Dealer cannot get renhou
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .local_yaku()
+            .renhou();
+        let results = get_yaku_with_context("123m456p789s11122z", &context);
+        assert!(!has_yaku(&results, Yaku::Renhou));
+    }
+
+    #[test]
+    fn test_renhou_requires_ron() {
+        // Renhou must be ron — tsumo equivalent is chiihou
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .local_yaku()
+            .renhou();
+        let results = get_yaku_with_context("123m456p789s11122z", &context);
+        assert!(!has_yaku(&results, Yaku::Renhou));
+    }
+
+    #[test]
+    fn test_renhou_not_for_open_hands() {
+        // Renhou is invalid for open hands
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .local_yaku()
+            .renhou()
+            .open();
+        let results = get_yaku_with_context("123m456p789s11122z", &context);
+        assert!(!has_yaku(&results, Yaku::Renhou));
     }
 
     #[test]
