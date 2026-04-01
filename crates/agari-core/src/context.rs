@@ -50,6 +50,12 @@ pub struct GameContext {
     /// Non-dealer's first draw win (chiihou) - for future use
     pub is_chiihou: bool,
 
+    // === Local (non-standard) yaku ===
+    /// Master gate: local yaku are only evaluated when this is true
+    pub local_yaku_enabled: bool,
+    /// Non-dealer's first-turn ron win (renhou) - requires local_yaku_enabled
+    pub is_renhou: bool,
+
     // === Dora ===
     /// Dora indicators (the tile shown, not the actual dora)
     pub dora_indicators: Vec<Tile>,
@@ -78,6 +84,8 @@ impl GameContext {
             is_last_tile: false,
             is_tenhou: false,
             is_chiihou: false,
+            local_yaku_enabled: false,
+            is_renhou: false,
             dora_indicators: Vec::new(),
             ura_dora_indicators: Vec::new(),
             aka_count: 0,
@@ -142,6 +150,18 @@ impl GameContext {
     /// Builder-style: set chiihou (non-dealer first draw win)
     pub fn chiihou(mut self) -> Self {
         self.is_chiihou = true;
+        self
+    }
+
+    /// Builder-style: enable local (non-standard) yaku
+    pub fn local_yaku(mut self) -> Self {
+        self.local_yaku_enabled = true;
+        self
+    }
+
+    /// Builder-style: set renhou (non-dealer first-turn ron win) — requires local_yaku_enabled
+    pub fn renhou(mut self) -> Self {
+        self.is_renhou = true;
         self
     }
 
