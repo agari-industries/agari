@@ -578,6 +578,12 @@ pub fn detect_yaku_with_context(
     // Check for yakuman in final list
     let is_yakuman = yaku_list.iter().any(|y| y.is_yakuman());
 
+    // Renhou: flat mangan per EMA rules — strip all other yaku and dora
+    let has_renhou = yaku_list.contains(&Yaku::Renhou);
+    if has_renhou {
+        yaku_list.retain(|y| *y == Yaku::Renhou);
+    }
+
     // Filter out invalid yaku for open hands and calculate han
     let total_han: u8 = if is_open {
         yaku_list.retain(|y| y.valid_when_open());
@@ -592,10 +598,10 @@ pub fn detect_yaku_with_context(
     YakuResult {
         yaku_list,
         total_han,
-        dora_count: dora.total(),
-        regular_dora: dora.regular,
-        ura_dora: dora.ura,
-        aka_dora: dora.aka,
+        dora_count: if has_renhou { 0 } else { dora.total() },
+        regular_dora: if has_renhou { 0 } else { dora.regular },
+        ura_dora: if has_renhou { 0 } else { dora.ura },
+        aka_dora: if has_renhou { 0 } else { dora.aka },
         is_yakuman,
     }
 }
@@ -1603,6 +1609,63 @@ mod tests {
             .open();
         let results = get_yaku_with_context("123m456p789s11122z", &context);
         assert!(!has_yaku(&results, Yaku::Renhou));
+    }
+
+    #[test]
+    fn test_renhou_not_cumulative_with_dora() {
+        // Renhou + dora should still be flat mangan (EMA rules)
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .local_yaku()
+            .renhou()
+            .with_dora(vec![Tile::suited(Suit::Man, 1)]);
+        // Hand has 222m which gives 3 dora (indicator 1m → 2m is dora)
+        let tiles = parse_hand("222m456p789s11122z").unwrap();
+        let counts = to_counts(&tiles);
+        let structures = decompose_hand(&counts);
+        let result = detect_yaku_with_context(&structures[0], &counts, &context);
+
+        assert!(result.yaku_list.contains(&Yaku::Renhou));
+        assert_eq!(result.yaku_list.len(), 1); // Only Renhou, no other yaku
+        assert_eq!(result.total_han, 5); // Flat 5 han
+        assert_eq!(result.dora_count, 0); // Dora suppressed
+        assert_eq!(result.total_han_with_dora(), 5); // Still 5, not 8
+    }
+
+    #[test]
+    fn test_renhou_not_cumulative_with_other_yaku() {
+        // Renhou + tanyao should still be flat mangan, only Renhou in list
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .local_yaku()
+            .renhou();
+        // All-simples hand (tanyao)
+        let results = get_yaku_with_context("234m345p456567s88p", &context);
+        let result = &results[0];
+
+        assert!(result.yaku_list.contains(&Yaku::Renhou));
+        assert!(!result.yaku_list.contains(&Yaku::Tanyao)); // Tanyao stripped
+        assert_eq!(result.yaku_list.len(), 1);
+        assert_eq!(result.total_han, 5);
+    }
+
+    #[test]
+    fn test_renhou_not_cumulative_with_yaku_and_dora() {
+        // Renhou + tanyao + 3 dora should still be flat mangan
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .local_yaku()
+            .renhou()
+            .with_dora(vec![Tile::suited(Suit::Man, 1)]);
+        // All-simples hand with 222m (3 dora from indicator 1m)
+        let tiles = parse_hand("222m345p456567s88p").unwrap();
+        let counts = to_counts(&tiles);
+        let structures = decompose_hand(&counts);
+        let result = detect_yaku_with_context(&structures[0], &counts, &context);
+
+        assert!(result.yaku_list.contains(&Yaku::Renhou));
+        assert!(!result.yaku_list.contains(&Yaku::Tanyao));
+        assert_eq!(result.yaku_list.len(), 1);
+        assert_eq!(result.total_han, 5);
+        assert_eq!(result.dora_count, 0);
+        assert_eq!(result.total_han_with_dora(), 5); // Not 5 + 1 + 3 = 9 (baiman)
     }
 
     #[test]
