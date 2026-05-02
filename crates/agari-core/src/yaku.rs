@@ -575,14 +575,14 @@ pub fn detect_yaku_with_context(
         }
     }
 
-    // Check for yakuman in final list
-    let is_yakuman = yaku_list.iter().any(|y| y.is_yakuman());
-
     // Renhou: flat mangan per EMA rules — strip all other yaku and dora
     let has_renhou = yaku_list.contains(&Yaku::Renhou);
     if has_renhou {
         yaku_list.retain(|y| *y == Yaku::Renhou);
     }
+
+    // Check for yakuman in final list (after Renhou strip — Renhou caps at mangan)
+    let is_yakuman = yaku_list.iter().any(|y| y.is_yakuman());
 
     // Filter out invalid yaku for open hands and calculate han
     let total_han: u8 = if is_open {
@@ -1666,6 +1666,23 @@ mod tests {
         assert_eq!(result.total_han, 5);
         assert_eq!(result.dora_count, 0);
         assert_eq!(result.total_han_with_dora(), 5); // Not 5 + 1 + 3 = 9 (baiman)
+    }
+
+    #[test]
+    fn test_renhou_overrides_yakuman() {
+        // Regression: issue #20 — Chuuren Poutou + renhou must score as flat mangan,
+        // not yakuman. Previously is_yakuman was captured before the renhou strip,
+        // so the scorer saw 5 han + is_yakuman=true and paid out 32000.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .local_yaku()
+            .renhou();
+        let results = get_yaku_with_context("11112345678999m", &context);
+        let result = &results[0];
+
+        assert!(result.yaku_list.contains(&Yaku::Renhou));
+        assert_eq!(result.yaku_list.len(), 1); // Chuuren stripped
+        assert_eq!(result.total_han, 5);
+        assert!(!result.is_yakuman); // Must NOT be yakuman — renhou caps at mangan
     }
 
     #[test]
