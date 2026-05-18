@@ -14,6 +14,6 @@ opt-level = "z"
 [workspace.package]
 version = "0.21.0"
 edition = "2024"
-repository = "https://github.com/rysb-dev/agari"
-homepage = "https://github.com/rysb-dev/agari"
+repository = "https://github.com/agari-industries/agari"
+homepage = "https://github.com/agari-industries/agari"
 license = "MIT"
