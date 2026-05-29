@@ -1444,9 +1444,11 @@ mod tests {
 
     #[test]
     fn test_true_yakuman_suuankou() {
-        // Suuankou - four concealed triplets (true yakuman)
+        // Suuankou - four concealed triplets (single true yakuman).
+        // Win by tsumo completing a triplet (1m), not the pair, so this is plain
+        // Suuankou rather than the double-yakuman Suuankou Tanki.
         let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
-            .with_winning_tile(Tile::Honor(Honor::White));
+            .with_winning_tile(Tile::suited(Suit::Man, 1));
 
         let results = score_hand("111222333m444p55z", &context);
         let best = best_score(&results);

@@ -112,7 +112,7 @@ impl Yaku {
             Yaku::Suuankou => 13,
             Yaku::Daisangen => 13,
             Yaku::Shousuushii => 13,
-            Yaku::Daisuushii => 13,
+            Yaku::Daisuushii => 26, // Double yakuman (achievable open; still doubles)
             Yaku::Tsuuiisou => 13,
             Yaku::Chinroutou => 13,
             Yaku::Ryuuiisou => 13,
@@ -172,7 +172,7 @@ impl Yaku {
             // Yakuman that can be open
             Yaku::Daisangen => Some(13),
             Yaku::Shousuushii => Some(13),
-            Yaku::Daisuushii => Some(13),
+            Yaku::Daisuushii => Some(26), // Double yakuman; yakuman aren't reduced when open
             Yaku::Tsuuiisou => Some(13),
             Yaku::Chinroutou => Some(13),
             Yaku::Ryuuiisou => Some(13),
@@ -843,7 +843,7 @@ fn check_flush_tiles(tiles: &[Tile]) -> Option<Yaku> {
 
 /// Check for Suuankou (Four Concealed Triplets)
 /// Closed kans count as concealed triplets for suuankou
-fn check_suuankou(melds: &[Meld], _pair: Tile, context: &GameContext) -> Option<Yaku> {
+fn check_suuankou(melds: &[Meld], pair: Tile, context: &GameContext) -> Option<Yaku> {
     // For ron, we need to know the winning tile to determine if suuankou is valid
     // If no winning tile is set for ron, we can't determine suuankou
     if context.win_type == WinType::Ron && context.winning_tile.is_none() {
@@ -885,10 +885,17 @@ fn check_suuankou(melds: &[Meld], _pair: Tile, context: &GameContext) -> Option<
         return None;
     }
 
-    // Tenhou treats all Suuankou as single yakuman, regardless of wait type or win method.
-    // Some rulesets award double yakuman for Suuankou Tanki (tsumo on pair wait),
-    // but we follow Tenhou's rules for compatibility.
-    Some(Yaku::Suuankou)
+    // Suuankou Tanki (winning tile completes the pair) is a double yakuman.
+    // Reaching 4 concealed triplets on a ron implies the ron tile completed the
+    // pair: a ron-completed triplet is excluded from the concealed count above, so
+    // ron-suuankou is inherently tanki. On tsumo it is tanki iff the drawn tile is
+    // the pair (a drawn tile equal to the pair can't have completed a triplet, as
+    // that would need 5+ copies of one tile). Both cases collapse to the same test.
+    if context.winning_tile == Some(pair) {
+        Some(Yaku::SuuankouTanki)
+    } else {
+        Some(Yaku::Suuankou)
+    }
 }
 
 /// Check for Daisangen (Big Three Dragons)
@@ -1724,6 +1731,102 @@ mod tests {
 
         // Sanankou should NOT be awarded - only 2 concealed triplets remain
         assert!(!has_yaku(&results_ron, Yaku::SanAnkou));
+    }
+
+    #[test]
+    fn test_daisuushii_closed_double_yakuman() {
+        // Four wind triplets (East/South/West/North) + a suited pair (9m).
+        // Win by ron completing the East triplet so the hand isn't also suuankou
+        // (only 3 triplets stay concealed), isolating Daisuushii's han value.
+        // Still a closed hand (menzen ron). Suited pair avoids tsuuiisou.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .with_winning_tile(Tile::honor(Honor::East));
+        let results = get_yaku_with_context("111z222z333z444z99m", &context);
+
+        assert!(has_yaku(&results, Yaku::Daisuushii));
+        assert!(!has_yaku(&results, Yaku::Suuankou));
+        let r = results
+            .iter()
+            .find(|r| r.yaku_list.contains(&Yaku::Daisuushii))
+            .unwrap();
+        assert!(r.is_yakuman);
+        assert_eq!(r.total_han, 26, "Daisuushii is a double yakuman");
+    }
+
+    #[test]
+    fn test_daisuushii_open_double_yakuman() {
+        // Daisuushii is achievable open and still scores double (yakuman aren't reduced).
+        use crate::hand::decompose_hand_with_melds;
+        use crate::parse::parse_hand_with_aka;
+
+        // One wind triplet called (open pon), rest concealed: (111z)222z333z444z99m
+        let parsed = parse_hand_with_aka("(111z)222z333z444z99m").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds: Vec<_> = parsed.called_melds.iter().map(|cm| cm.meld.clone()).collect();
+
+        let structures = decompose_hand_with_melds(&counts, &called_melds);
+        assert!(!structures.is_empty());
+
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::East).open();
+        let result = detect_yaku_with_context(&structures[0], &counts, &context);
+
+        assert!(result.yaku_list.contains(&Yaku::Daisuushii));
+        assert!(result.is_yakuman);
+        assert_eq!(result.total_han, 26, "Open Daisuushii still scores double");
+    }
+
+    #[test]
+    fn test_suuankou_tanki_ron_double_yakuman() {
+        // Four concealed triplets + pair (9s). Ron can only reach four concealed
+        // triplets when the ron tile completes the pair, so ron-suuankou is always
+        // tanki -> double yakuman.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .with_winning_tile(Tile::suited(Suit::Sou, 9));
+        let results = get_yaku_with_context("111m333m555p777s99s", &context);
+
+        assert!(has_yaku(&results, Yaku::SuuankouTanki));
+        assert!(!has_yaku(&results, Yaku::Suuankou));
+        let r = results
+            .iter()
+            .find(|r| r.yaku_list.contains(&Yaku::SuuankouTanki))
+            .unwrap();
+        assert!(r.is_yakuman);
+        assert_eq!(r.total_han, 26);
+    }
+
+    #[test]
+    fn test_suuankou_tanki_tsumo_double_yakuman() {
+        // Tsumo drawing the pair tile (9s) is a tanki wait -> double yakuman.
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .with_winning_tile(Tile::suited(Suit::Sou, 9));
+        let results = get_yaku_with_context("111m333m555p777s99s", &context);
+
+        assert!(has_yaku(&results, Yaku::SuuankouTanki));
+        assert!(!has_yaku(&results, Yaku::Suuankou));
+        let r = results
+            .iter()
+            .find(|r| r.yaku_list.contains(&Yaku::SuuankouTanki))
+            .unwrap();
+        assert!(r.is_yakuman);
+        assert_eq!(r.total_han, 26);
+    }
+
+    #[test]
+    fn test_suuankou_tsumo_completing_triplet_single_yakuman() {
+        // Regression: tsumo completing a triplet (winning tile 1m, not the pair)
+        // is plain Suuankou -> single yakuman, NOT Suuankou Tanki.
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .with_winning_tile(Tile::suited(Suit::Man, 1));
+        let results = get_yaku_with_context("111m333m555p777s99s", &context);
+
+        assert!(has_yaku(&results, Yaku::Suuankou));
+        assert!(!has_yaku(&results, Yaku::SuuankouTanki));
+        let r = results
+            .iter()
+            .find(|r| r.yaku_list.contains(&Yaku::Suuankou))
+            .unwrap();
+        assert!(r.is_yakuman);
+        assert_eq!(r.total_han, 13);
     }
 
     #[test]
