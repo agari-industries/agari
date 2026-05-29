@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.22.0]
+
+### Fixed
+
+- **Double Yakuman Scoring**: Daisuushii (Big Four Winds) now scores 26 han (double yakuman) instead of 13, both closed and open. Suuankou Tanki is now emitted on tanki waits: a ron-completed suuankou (inherently tanki) and a tsumo completing the pair both score the double-yakuman `SuuankouTanki` (26 han), while a tsumo completing a triplet remains single `Suuankou` (13 han)
+
 ## [0.21.0]
 
 ### Fixed
