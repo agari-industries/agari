@@ -2,13 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.23.0]
+## [0.22.0]
 
 ### Changed
 
 - **Uncapped Yakuman Stacking**: Combined yakuman hands now stack by unit count with no cap, completing the full-scoring variant (8000 basic points per yakuman unit). A triple yakuman scores 24000 basic (non-dealer ron 96000), a quadruple 32000 (128000), and so on. Single yakuman (8000), the four double-yakuman patterns (16000), and counted/kazoe yakuman (always single, 8000) are unchanged. The `ScoreLevel::Yakuman` / `ScoreLevel::DoubleYakuman` variants are replaced by a single `ScoreLevel::Yakuman(u8)` carrying the unit count.
-
-## [0.22.0]
 
 ### Fixed
 
