@@ -27,10 +27,9 @@ pub enum ScoreLevel {
     Baiman,
     /// 11-12 han
     Sanbaiman,
-    /// 13+ han (or yakuman)
-    Yakuman,
-    /// Double yakuman (26+ han or 2 yakuman)
-    DoubleYakuman,
+    /// Yakuman, stacked by unit count (1 = single, 2 = double, 3 = triple, ...).
+    /// 13+ han counted (kazoe) yakuman is always Yakuman(1) and never stacks.
+    Yakuman(u8),
 }
 
 impl ScoreLevel {
@@ -42,21 +41,23 @@ impl ScoreLevel {
             ScoreLevel::Haneman => 3000,
             ScoreLevel::Baiman => 4000,
             ScoreLevel::Sanbaiman => 6000,
-            ScoreLevel::Yakuman => 8000,
-            ScoreLevel::DoubleYakuman => 16000,
+            ScoreLevel::Yakuman(n) => 8000 * *n as u32,
         }
     }
 
     /// Display name for this level
-    pub fn name(&self) -> &'static str {
+    pub fn name(&self) -> String {
         match self {
-            ScoreLevel::Normal => "",
-            ScoreLevel::Mangan => "Mangan",
-            ScoreLevel::Haneman => "Haneman",
-            ScoreLevel::Baiman => "Baiman",
-            ScoreLevel::Sanbaiman => "Sanbaiman",
-            ScoreLevel::Yakuman => "Yakuman",
-            ScoreLevel::DoubleYakuman => "Double Yakuman",
+            ScoreLevel::Normal => String::new(),
+            ScoreLevel::Mangan => "Mangan".to_string(),
+            ScoreLevel::Haneman => "Haneman".to_string(),
+            ScoreLevel::Baiman => "Baiman".to_string(),
+            ScoreLevel::Sanbaiman => "Sanbaiman".to_string(),
+            ScoreLevel::Yakuman(1) => "Yakuman".to_string(),
+            ScoreLevel::Yakuman(2) => "Double Yakuman".to_string(),
+            ScoreLevel::Yakuman(3) => "Triple Yakuman".to_string(),
+            ScoreLevel::Yakuman(4) => "Quadruple Yakuman".to_string(),
+            ScoreLevel::Yakuman(n) => format!("{n}× Yakuman"),
         }
     }
 }
@@ -419,13 +420,10 @@ fn round_up_to_10(value: u8) -> u8 {
 /// Determine the score level based on han and fu
 pub fn determine_score_level(han: u8, fu: u8, is_yakuman: bool) -> ScoreLevel {
     if is_yakuman {
-        if han >= 26 {
-            ScoreLevel::DoubleYakuman
-        } else {
-            ScoreLevel::Yakuman
-        }
+        // Real yakuman: stack by unit count (13 han per unit), no cap.
+        ScoreLevel::Yakuman((han / 13).max(1))
     } else if han >= 13 {
-        ScoreLevel::Yakuman // Counted yakuman (kazoe yakuman)
+        ScoreLevel::Yakuman(1) // Counted (kazoe) yakuman - flat, never stacks
     } else if han >= 11 {
         ScoreLevel::Sanbaiman
     } else if han >= 8 {
@@ -536,9 +534,8 @@ pub fn calculate_score(
     let payment = calculate_payment(basic_points, is_dealer, context.win_type);
 
     // Counted yakuman: reached yakuman level (13+ han) without actual yakuman yaku
-    let is_counted_yakuman = (score_level == ScoreLevel::Yakuman
-        || score_level == ScoreLevel::DoubleYakuman)
-        && !yaku_result.is_yakuman;
+    let is_counted_yakuman =
+        matches!(score_level, ScoreLevel::Yakuman(_)) && !yaku_result.is_yakuman;
 
     ScoringResult {
         fu,
@@ -1097,8 +1094,8 @@ mod tests {
 
     #[test]
     fn test_score_level_yakuman() {
-        assert_eq!(determine_score_level(13, 30, false), ScoreLevel::Yakuman);
-        assert_eq!(determine_score_level(13, 30, true), ScoreLevel::Yakuman);
+        assert_eq!(determine_score_level(13, 30, false), ScoreLevel::Yakuman(1));
+        assert_eq!(determine_score_level(13, 30, true), ScoreLevel::Yakuman(1));
     }
 
     // ===== Basic Points Tests =====
@@ -1241,7 +1238,7 @@ mod tests {
         let results = score_hand("234m456p789s11122z", &context);
         let best = best_score(&results);
 
-        assert_eq!(best.score_level, ScoreLevel::Yakuman);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(1));
         assert_eq!(best.han, 13);
         // Dealer yakuman tsumo = 16000 all = 48000 total
         assert_eq!(best.payment.total, 48000);
@@ -1425,7 +1422,7 @@ mod tests {
 
         // Riichi(1) + Ippatsu(1) + Menzen Tsumo(1) + Pinfu(1) + Ryanpeikou(3) + Chinitsu(6) + Dora(2) = 15 han
         assert!(best.han >= 13);
-        assert_eq!(best.score_level, ScoreLevel::Yakuman);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(1));
         assert!(best.is_counted_yakuman); // Reached yakuman through counting, not yakuman yaku
     }
 
@@ -1438,7 +1435,7 @@ mod tests {
         let results = score_hand("19m19p19s12345677z", &context);
         let best = best_score(&results);
 
-        assert_eq!(best.score_level, ScoreLevel::Yakuman);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(1));
         assert!(!best.is_counted_yakuman); // True yakuman, not counted
     }
 
@@ -1453,7 +1450,7 @@ mod tests {
         let results = score_hand("111222333m444p55z", &context);
         let best = best_score(&results);
 
-        assert_eq!(best.score_level, ScoreLevel::Yakuman);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(1));
         assert!(!best.is_counted_yakuman); // True yakuman, not counted
     }
 
@@ -1467,7 +1464,7 @@ mod tests {
         let results = score_hand("234m456p789s11122z", &context);
         let best = best_score(&results);
 
-        assert_eq!(best.score_level, ScoreLevel::Yakuman);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(1));
         assert!(!best.is_counted_yakuman); // True yakuman, not counted
     }
 
@@ -1485,6 +1482,209 @@ mod tests {
         assert!(best.han < 13);
         assert_eq!(best.score_level, ScoreLevel::Baiman);
         assert!(!best.is_counted_yakuman);
+    }
+
+    // ========================================================================
+    // Combined (Stacked) Yakuman Tests
+    // ========================================================================
+
+    #[test]
+    fn test_score_level_yakuman_stacking() {
+        // Real yakuman stacks by unit (13 han each); kazoe never does.
+        assert_eq!(determine_score_level(13, 30, true), ScoreLevel::Yakuman(1));
+        assert_eq!(determine_score_level(26, 30, true), ScoreLevel::Yakuman(2));
+        assert_eq!(determine_score_level(39, 30, true), ScoreLevel::Yakuman(3));
+        assert_eq!(determine_score_level(52, 30, true), ScoreLevel::Yakuman(4));
+        assert_eq!(determine_score_level(65, 30, true), ScoreLevel::Yakuman(5));
+        assert_eq!(determine_score_level(78, 30, true), ScoreLevel::Yakuman(6));
+        // Kazoe (counted) yakuman stays single regardless of han.
+        assert_eq!(determine_score_level(13, 30, false), ScoreLevel::Yakuman(1));
+        assert_eq!(determine_score_level(99, 30, false), ScoreLevel::Yakuman(1));
+    }
+
+    #[test]
+    fn test_yakuman_basic_points() {
+        assert_eq!(ScoreLevel::Yakuman(1).basic_points(), 8000);
+        assert_eq!(ScoreLevel::Yakuman(2).basic_points(), 16000);
+        assert_eq!(ScoreLevel::Yakuman(3).basic_points(), 24000);
+        assert_eq!(ScoreLevel::Yakuman(4).basic_points(), 32000);
+        assert_eq!(ScoreLevel::Yakuman(5).basic_points(), 40000);
+        assert_eq!(ScoreLevel::Yakuman(6).basic_points(), 48000);
+    }
+
+    #[test]
+    fn test_yakuman_names() {
+        assert_eq!(ScoreLevel::Yakuman(1).name(), "Yakuman");
+        assert_eq!(ScoreLevel::Yakuman(2).name(), "Double Yakuman");
+        assert_eq!(ScoreLevel::Yakuman(3).name(), "Triple Yakuman");
+        assert_eq!(ScoreLevel::Yakuman(4).name(), "Quadruple Yakuman");
+        assert_eq!(ScoreLevel::Yakuman(5).name(), "5× Yakuman");
+        assert_eq!(ScoreLevel::Yakuman(6).name(), "6× Yakuman");
+    }
+
+    #[test]
+    fn test_combined_yakuman_payouts() {
+        // Non-dealer ron payout is basic_points * 4 for each unit count.
+        let ron = |han| {
+            calculate_payment(calculate_basic_points(han, 30, true), false, WinType::Ron).total
+        };
+        assert_eq!(ron(39), 96000); // 24000 * 4
+        assert_eq!(ron(52), 128000); // 32000 * 4
+        assert_eq!(ron(65), 160000); // 40000 * 4
+        assert_eq!(ron(78), 192000); // 48000 * 4
+    }
+
+    #[test]
+    fn test_double_yakuman_suuankou_tanki() {
+        // Suuankou Tanki with mixed suits and no honor pair, so neither Tsuuiisou
+        // nor Daisuushii contaminate it: a clean double yakuman (26 han).
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 9));
+
+        let results = score_hand("111m333m555p777s99s", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.han, 26);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(2));
+        assert_eq!(best.payment.total, 64000); // 16000 * 4
+    }
+
+    #[test]
+    fn test_triple_yakuman_suuankou_tanki_tsuuiisou() {
+        // Suuankou Tanki (26) + Tsuuiisou (13) = 39 han, triple yakuman.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::honor(Honor::Green));
+
+        let results = score_hand("11122233355566z", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.han, 39);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(3));
+        assert_eq!(best.payment.total, 96000); // 24000 * 4
+    }
+
+    #[test]
+    fn test_quadruple_yakuman_suuankou_tanki_daisangen_tsuuiisou() {
+        // Suuankou Tanki (26) + Daisangen (13) + Tsuuiisou (13) = 52 han.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::honor(Honor::North));
+
+        let results = score_hand("11144555666777z", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.han, 52);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(4));
+        assert_eq!(best.payment.total, 128000); // 32000 * 4
+    }
+
+    #[test]
+    fn test_quintuple_yakuman_suuankou_tanki_daisuushii_tsuuiisou() {
+        // Suuankou Tanki (26) + Daisuushii (26) + Tsuuiisou (13) = 65 han.
+        // Exercises the format!("{n}× Yakuman") name branch.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::honor(Honor::White));
+
+        let results = score_hand("11122233344455z", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.han, 65);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(5));
+        assert_eq!(best.payment.total, 160000); // 40000 * 4
+    }
+
+    #[test]
+    fn test_sextuple_yakuman_pure_functions() {
+        // The natural 6-unit hand is four kans (e.g. rr[eeee][ssss][wwww][nnnn]).
+        // It is not testable via score_hand: parse_hand flattens called melds into
+        // a raw tile list and score_hand calls the meld-unaware decompose_hand,
+        // which returns no structures. The kan path is covered end-to-end by the
+        // existing Suukantsu tests; a true 6-unit end-to-end test would need a
+        // meld-aware helper (parse_hand_with_aka + decompose_hand_with_melds).
+        // Cover unit 6 with the pure scoring functions here.
+        assert_eq!(determine_score_level(78, 30, true), ScoreLevel::Yakuman(6));
+        assert_eq!(ScoreLevel::Yakuman(6).basic_points(), 48000);
+        assert_eq!(ScoreLevel::Yakuman(6).name(), "6× Yakuman");
+        assert_eq!(
+            calculate_payment(calculate_basic_points(78, 30, true), false, WinType::Ron).total,
+            192000 // 48000 * 4
+        );
+    }
+
+    #[test]
+    fn test_double_yakuman_daisangen_tsuuiisou() {
+        // Daisangen (13) + Tsuuiisou (13) = 26. Must be Ron: by tsumo the win
+        // completes the East triplet, concealing all four triplets and adding
+        // Suuankou (13) for 39 han / Yakuman(3). Ron keeps East unconcealed.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::honor(Honor::East));
+
+        let results = score_hand("55566677711122z", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.han, 26);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(2));
+        assert_eq!(best.payment.total, 64000); // 16000 * 4
+    }
+
+    #[test]
+    fn test_double_yakuman_shousuushii_tsuuiisou() {
+        // Shousuushii (13) + Tsuuiisou (13) = 26. Must be Ron: by tsumo the win
+        // completes the White triplet, concealing all four triplets and adding
+        // Suuankou (13) for 39 han / Yakuman(3). Ron keeps White unconcealed.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::honor(Honor::White));
+
+        let results = score_hand("11122233344555z", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.han, 26);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(2));
+        assert_eq!(best.payment.total, 64000); // 16000 * 4
+    }
+
+    #[test]
+    fn test_triple_yakuman_ryuuiisou_suuankou_tanki() {
+        // Ryuuiisou (13) + Suuankou Tanki (26) = 39. Tanki on the green pair.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::honor(Honor::Green));
+
+        let results = score_hand("222333444888s66z", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.han, 39);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(3));
+        assert_eq!(best.payment.total, 96000); // 24000 * 4
+    }
+
+    #[test]
+    fn test_triple_yakuman_chinroutou_suuankou_tanki() {
+        // Chinroutou (13) + Suuankou Tanki (26) = 39. Tanki on the 9s pair.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::suited(Suit::Sou, 9));
+
+        let results = score_hand("111999m111p11199s", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.han, 39);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(3));
+        assert_eq!(best.payment.total, 96000); // 24000 * 4
+    }
+
+    #[test]
+    fn test_quadruple_yakuman_shousuushii_tsuuiisou_suuankou_tanki() {
+        // Shousuushii (13) + Tsuuiisou (13) + Suuankou Tanki (26) = 52.
+        // Same tile set as test_double_yakuman_shousuushii_tsuuiisou, but winning
+        // on North (tanki on the North pair) instead of White (ron completing a
+        // triplet) flips it from 26 to 52 - a deliberate wait-dependence check.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+            .with_winning_tile(Tile::honor(Honor::North));
+
+        let results = score_hand("11122233344555z", &context);
+        let best = best_score(&results);
+
+        assert_eq!(best.han, 52);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(4));
+        assert_eq!(best.payment.total, 128000); // 32000 * 4
     }
 
     // ========================================================================
@@ -1518,7 +1718,7 @@ mod tests {
         );
 
         // Both are yakuman, but Ryanpeikou has more han
-        assert_eq!(best.score_level, ScoreLevel::Yakuman);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(1));
     }
 
     #[test]

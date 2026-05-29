@@ -1178,16 +1178,16 @@ fn print_score(score: &ScoringResult) {
     // Score level
     if score.score_level != ScoreLevel::Normal {
         let level_emoji = match score.score_level {
-            ScoreLevel::Mangan => "🔥",
-            ScoreLevel::Haneman => "🔥🔥",
-            ScoreLevel::Baiman => "🔥🔥🔥",
-            ScoreLevel::Sanbaiman => "💎",
-            ScoreLevel::Yakuman => "👑",
-            ScoreLevel::DoubleYakuman => "👑👑",
-            ScoreLevel::Normal => "",
+            ScoreLevel::Mangan => "🔥".to_string(),
+            ScoreLevel::Haneman => "🔥🔥".to_string(),
+            ScoreLevel::Baiman => "🔥🔥🔥".to_string(),
+            ScoreLevel::Sanbaiman => "💎".to_string(),
+            // One crown per yakuman unit, so the emoji scales with the text label.
+            ScoreLevel::Yakuman(n) => "👑".repeat(n as usize),
+            ScoreLevel::Normal => String::new(),
         };
         let level_name = if score.is_counted_yakuman {
-            "Counted Yakuman"
+            "Counted Yakuman".to_string()
         } else {
             score.score_level.name()
         };
@@ -1196,7 +1196,7 @@ fn print_score(score: &ScoringResult) {
             ScoreLevel::Haneman => level_name.yellow().bold(),
             ScoreLevel::Baiman => level_name.bright_yellow().bold(),
             ScoreLevel::Sanbaiman => level_name.magenta().bold(),
-            ScoreLevel::Yakuman | ScoreLevel::DoubleYakuman => level_name.bright_magenta().bold(),
+            ScoreLevel::Yakuman(_) => level_name.bright_magenta().bold(),
             ScoreLevel::Normal => level_name.normal(),
         };
         println!("   {} {}", level_emoji, colored_level);
