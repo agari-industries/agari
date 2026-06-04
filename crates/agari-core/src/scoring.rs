@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::context::{GameContext, WinType};
-use crate::hand::{HandStructure, Meld};
+use crate::hand::{HandStructure, Meld, winning_tile_in_closed_sequence};
 use crate::tile::{Honor, Tile};
 use crate::wait::{best_wait_type_for_scoring, is_pinfu};
 use crate::yaku::YakuResult;
@@ -308,41 +308,6 @@ fn meld_fu_with_context(meld: &Meld, all_melds: &[Meld], context: &GameContext) 
             if kan_type.is_open() { base } else { base * 2 }
         }
     }
-}
-
-/// Check if a tile appears in any CLOSED sequence in the hand.
-/// Used to detect nobetan patterns where the winning tile could complete
-/// either a triplet or a sequence.
-///
-/// Only closed sequences count because open/called sequences were already
-/// complete before the wait - they don't represent alternative interpretations
-/// of the waiting shape.
-fn winning_tile_in_closed_sequence(tile: Tile, melds: &[Meld]) -> bool {
-    // Honor tiles can never be in sequences
-    let (suit, value) = match tile {
-        Tile::Suited { suit, value } => (suit, value),
-        Tile::Honor(_) => return false,
-    };
-
-    for meld in melds {
-        // Only check CLOSED sequences (is_open = false)
-        if let Meld::Shuntsu(start_tile, is_open) = meld {
-            if *is_open {
-                continue; // Skip open/called sequences
-            }
-            if let Tile::Suited {
-                suit: seq_suit,
-                value: start_val,
-            } = start_tile
-            {
-                // Check if tile is part of this sequence (start, start+1, start+2)
-                if *seq_suit == suit && value >= *start_val && value <= start_val + 2 {
-                    return true;
-                }
-            }
-        }
-    }
-    false
 }
 
 /// Calculate fu for a single meld (without context, used in tests)

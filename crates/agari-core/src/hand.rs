@@ -400,6 +400,40 @@ pub fn is_winning_hand(counts: &TileCounts) -> bool {
     check_kokushi(counts).is_some() || is_chiitoitsu(counts) || is_standard_hand(counts)
 }
 
+/// Whether the winning tile is part of a concealed (closed) sequence in the hand.
+///
+/// Only closed sequences count. An open called sequence (chi) was completed turns
+/// before the win, so the winning tile can never be the tile that completed it. This
+/// distinguishes a genuine multi-way wait (the winning tile could finish a concealed
+/// sequence instead of a same-value triplet, leaving that triplet concealed) from a
+/// triplet that was truly completed by the winning tile.
+pub(crate) fn winning_tile_in_closed_sequence(tile: Tile, melds: &[Meld]) -> bool {
+    // Honor tiles can never be part of a sequence.
+    let (suit, value) = match tile {
+        Tile::Suited { suit, value } => (suit, value),
+        Tile::Honor(_) => return false,
+    };
+
+    for meld in melds {
+        if let Meld::Shuntsu(start_tile, is_open) = meld {
+            if *is_open {
+                continue; // Open called sequences were already complete before the wait.
+            }
+            if let Tile::Suited {
+                suit: seq_suit,
+                value: start_val,
+            } = start_tile
+                && *seq_suit == suit
+                && value >= *start_val
+                && value <= start_val + 2
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
