@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.23.0]
+
+### Fixed
+
+- **San Ankou on ron**: A triplet completed by the winning tile on a ron is an open meld (minko) and no longer counts toward San Ankou when the only sequence covering the winning tile is an open called chi. Previously an open hand such as `111777m999p55z` with a called `(678m)` chi, ron on `7m`, was wrongly scored as San Ankou; it is now correctly yakuless. The legitimate case where the winning tile could instead complete a concealed sequence (leaving the same-value triplet concealed) still scores San Ankou. Suuankou is unaffected.
+
 ## [0.22.0]
 
 ### Changed
