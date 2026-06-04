@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::context::{GameContext, WinType, count_dora_detailed};
-use crate::hand::{HandStructure, Meld};
+use crate::hand::{HandStructure, Meld, winning_tile_in_closed_sequence};
 use crate::parse::TileCounts;
 use crate::tile::{Honor, Suit, Tile};
 use crate::wait::is_pinfu;
@@ -458,35 +458,16 @@ pub fn detect_yaku_with_context(
                 // San Ankou (three concealed triplets)
                 // Note: Closed kans count as concealed triplets for san ankou
                 {
-                    // First, check if the winning tile could complete a sequence in this hand.
-                    // If it can, then triplets matching the winning tile remain concealed
-                    // (the player could have won on the sequence instead).
-                    let winning_tile_completes_sequence = if let Some(wt) = context.winning_tile {
-                        melds.iter().any(|m| {
-                            if let Meld::Shuntsu(start, _) = m {
-                                // Check if winning tile is part of this sequence
-                                if let (
-                                    Tile::Suited {
-                                        suit: ws,
-                                        value: wv,
-                                    },
-                                    Tile::Suited {
-                                        suit: ss,
-                                        value: sv,
-                                    },
-                                ) = (wt, start)
-                                {
-                                    ws == *ss && wv >= *sv && wv <= sv + 2
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
-                            }
-                        })
-                    } else {
-                        false
-                    };
+                    // A triplet completed by ron is an open meld (minko), not concealed.
+                    // It still counts toward san ankou only if the winning tile could
+                    // instead have completed a concealed sequence, in which case the
+                    // triplet was already concealed in hand. An open called sequence can
+                    // never be the group the winning tile completed, so only concealed
+                    // sequences keep the triplet concealed.
+                    let winning_tile_completes_sequence = context
+                        .winning_tile
+                        .map(|wt| winning_tile_in_closed_sequence(wt, melds))
+                        .unwrap_or(false);
 
                     let mut concealed_triplets = 0;
                     for meld in melds {
@@ -1734,6 +1715,63 @@ mod tests {
     }
 
     #[test]
+    fn san_ankou_not_awarded_when_triplet_completed_by_ron_with_open_chi() {
+        use crate::hand::decompose_hand_with_melds;
+        use crate::parse::parse_hand_with_aka;
+
+        // A triplet completed by ron is an open meld (minko), not concealed, so it
+        // does not count toward san ankou. An open called sequence can never be the
+        // group the winning tile completed, so it does not keep the triplet concealed.
+        //
+        // Hand: 111m 777m 999p 55z + open chi (678m), ron on 7m.
+        // The 7m completes 777m into a minko; the only sequence containing 7m is the
+        // open (678m) chi, melded earlier. Only 111m and 999p stay concealed -> two
+        // concealed triplets, no san ankou, and the hand is yakuless.
+        let parsed = parse_hand_with_aka("111777m999p55z(678m)").unwrap();
+        let counts = to_counts(&parsed.tiles);
+        let called_melds: Vec<_> = parsed
+            .called_melds
+            .iter()
+            .map(|cm| cm.meld.clone())
+            .collect();
+
+        let structures = decompose_hand_with_melds(&counts, &called_melds);
+        assert!(!structures.is_empty());
+
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .with_winning_tile(Tile::suited(Suit::Man, 7))
+            .open();
+
+        for structure in &structures {
+            let result = detect_yaku_with_context(structure, &counts, &context);
+            assert!(
+                !result.yaku_list.contains(&Yaku::SanAnkou),
+                "open chi must not keep the ron-completed triplet concealed"
+            );
+            assert!(
+                result.yaku_list.is_empty(),
+                "hand is yakuless: an open hand with no yakuhai and only two concealed triplets"
+            );
+        }
+    }
+
+    #[test]
+    fn san_ankou_awarded_when_ron_tile_also_completes_concealed_sequence() {
+        // Counterpart to the open-chi case: when the ron tile could instead complete a
+        // CONCEALED sequence, the same-value triplet was already concealed in hand, so
+        // san ankou stands. This guards against the fix over-correcting by dropping the
+        // concealed-sequence allowance entirely.
+        //
+        // Hand: 111m 222p 333s 345s 77z (fully concealed), ron on 3s.
+        // The 3s can complete the concealed 345s sequence, leaving 333s concealed.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .with_winning_tile(Tile::suited(Suit::Sou, 3));
+        let results = get_yaku_with_context("111m222p333345s77z", &context);
+
+        assert!(has_yaku(&results, Yaku::SanAnkou));
+    }
+
+    #[test]
     fn test_daisuushii_closed_double_yakuman() {
         // Four wind triplets (East/South/West/North) + a suited pair (9m).
         // Win by ron completing the East triplet so the hand isn't also suuankou
@@ -1827,6 +1865,23 @@ mod tests {
             .unwrap();
         assert!(r.is_yakuman);
         assert_eq!(r.total_han, 13);
+    }
+
+    #[test]
+    fn suuankou_not_awarded_on_shanpon_ron() {
+        // Lock-in for the shared concealed-sequence predicate: a four-triplet hand has
+        // no sequences, so a shanpon ron that completes the fourth triplet opens it
+        // (minko). The hand falls back to san ankou + toitoi, not suuankou.
+        //
+        // Hand: 111m 333m 555p 777s 99s on a 7s/9s shanpon, ron on 7s.
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .with_winning_tile(Tile::suited(Suit::Sou, 7));
+        let results = get_yaku_with_context("111m333m555p777s99s", &context);
+
+        assert!(!has_yaku(&results, Yaku::Suuankou));
+        assert!(!has_yaku(&results, Yaku::SuuankouTanki));
+        assert!(has_yaku(&results, Yaku::SanAnkou));
+        assert!(has_yaku(&results, Yaku::Toitoi));
     }
 
     #[test]
