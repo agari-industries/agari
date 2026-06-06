@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.24.0]
+
+### Fixed
+
+- **Ryanpeikou with four identical sequences**: A closed hand of four identical sequences (for example `777788889999m11p`, four `789m` sequences plus an `11p` pair) now scores ryanpeikou (3 han) instead of iipeikou (1 han). Four copies of the same sequence form two identical-sequence pairs, so the hand is ryanpeikou. The san ankou and other peikou cases are unaffected.
+
 ## [0.23.0]
 
 ### Fixed
