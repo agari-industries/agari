@@ -12,7 +12,7 @@ lto = "thin"
 opt-level = "z"
 
 [workspace.package]
-version = "0.23.0"
+version = "0.24.0"
 edition = "2024"
 repository = "https://github.com/agari-industries/agari"
 homepage = "https://github.com/agari-industries/agari"
