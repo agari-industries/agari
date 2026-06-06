@@ -620,7 +620,10 @@ fn check_peikou(melds: &[Meld]) -> Option<Yaku> {
         *seq_counts.entry(*t).or_insert(0) += 1;
     }
 
-    let pairs_of_sequences = seq_counts.values().filter(|&&c| c >= 2).count();
+    // Count identical-sequence pairs, not distinct sequence types: four copies
+    // of the same sequence form two pairs (ryanpeikou), so each type contributes
+    // floor(count / 2).
+    let pairs_of_sequences: u8 = seq_counts.values().map(|&c| c / 2).sum();
 
     if pairs_of_sequences >= 2 {
         Some(Yaku::Ryanpeikou)
@@ -1183,6 +1186,15 @@ mod tests {
     #[test]
     fn test_ryanpeikou() {
         let results = get_yaku("112233m112233p55s");
+        assert!(has_yaku(&results, Yaku::Ryanpeikou));
+        assert!(!has_yaku(&results, Yaku::Iipeikou));
+    }
+
+    #[test]
+    fn test_ryanpeikou_four_identical_sequences() {
+        // Four copies of the same sequence form two identical-sequence pairs,
+        // so this is ryanpeikou, not iipeikou.
+        let results = get_yaku("777788889999m11p");
         assert!(has_yaku(&results, Yaku::Ryanpeikou));
         assert!(!has_yaku(&results, Yaku::Iipeikou));
     }
