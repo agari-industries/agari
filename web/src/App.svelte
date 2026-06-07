@@ -1769,6 +1769,9 @@
     .tile-placeholder {
         width: 40px;
         height: 56px;
+        /* Mirror the 2px transparent border on filled tiles' .tile-wrapper so
+           empty slots share the same footprint and inter-tile spacing. */
+        margin: 2px;
         border: 1px dashed var(--border);
         background: var(--bg-elevated);
     }
