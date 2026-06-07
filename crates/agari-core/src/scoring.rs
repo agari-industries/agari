@@ -355,8 +355,7 @@ fn pair_fu(pair: Tile, context: &GameContext) -> u8 {
                 // Dragons always give 2 fu
                 Honor::White | Honor::Green | Honor::Red => 2,
 
-                // Winds give 2 fu if they're value winds
-                // Double wind (both round and seat) gives 2 fu (some rules say 4)
+                // Value wind pair = 2 fu; a double wind (both round AND seat) sums to 4 fu (2 + 2)
                 wind => {
                     let mut fu = 0;
                     if wind == context.round_wind {
