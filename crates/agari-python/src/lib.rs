@@ -1,8 +1,25 @@
 use pyo3::prelude::*;
 
-use agari::hand::KanType;
+use agari::context::{GameContext, WinType};
+use agari::hand::{decompose_hand_with_melds, KanType, Meld};
 use agari::parse::TileCounts;
 use agari::shanten;
+use agari::tile::Honor;
+use agari::yaku::detect_yaku_with_context;
+
+fn honor_from_index(i: u8) -> PyResult<Honor> {
+    Ok(match i {
+        0 => Honor::East,
+        1 => Honor::South,
+        2 => Honor::West,
+        3 => Honor::North,
+        _ => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "wind index must be 0..3 (E,S,W,N)",
+            ))
+        }
+    })
+}
 
 fn vec_to_tilecounts(arr: Vec<u8>) -> PyResult<TileCounts> {
     let arr: [u8; 34] = arr
@@ -132,8 +149,84 @@ fn is_permanent_furiten(hand: Vec<u8>, own_discards: Vec<u8>, num_melds: u8) -> 
     Ok(false)
 }
 
+/// Does this open tenpai hand have a (non-situational) yaku on at least one
+/// winning tile? Uses the real agari scoring engine (decompose + detect_yaku).
+///
+/// closed: 34 concealed-tile counts (excludes called-meld tiles, excludes the
+///   winning tile). meld_kinds[i]/meld_tiles[i] describe each called meld:
+///   kind 0=chi(open run, tile=lowest), 1=pon(open triplet), 2=daiminkan(open),
+///   3=ankan(closed kan), 4=kakan(added kan). bakaze/seat are wind indices
+///   0..3 (E,S,W,N). Situational yaku (riichi/ippatsu/tsumo/haitei/houtei/
+///   rinshan/chankan) are intentionally NOT credited: this answers "can this
+///   hand legitimately declare a win by its own shape", i.e. is it NOT a dead
+///   open hand.
+#[pyfunction]
+fn hand_has_yaku(
+    closed: Vec<u8>,
+    meld_kinds: Vec<u8>,
+    meld_tiles: Vec<u8>,
+    bakaze: u8,
+    seat: u8,
+) -> PyResult<bool> {
+    if meld_kinds.len() != meld_tiles.len() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "meld_kinds and meld_tiles must have the same length",
+        ));
+    }
+    let round_wind = honor_from_index(bakaze)?;
+    let seat_wind = honor_from_index(seat)?;
+
+    let mut called: Vec<Meld> = Vec::with_capacity(meld_kinds.len());
+    for (k, t) in meld_kinds.iter().zip(meld_tiles.iter()) {
+        let tile = shanten::index_to_tile(*t as usize);
+        called.push(match k {
+            0 => Meld::shuntsu_open(tile),
+            1 => Meld::koutsu_open(tile),
+            2 => Meld::kan(tile, KanType::Open),
+            3 => Meld::kan(tile, KanType::Closed),
+            4 => Meld::kan(tile, KanType::Added),
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "meld kind must be 0..4 (chi,pon,daiminkan,ankan,kakan)",
+                ))
+            }
+        });
+    }
+    let num_melds = called.len() as u8;
+
+    let mut arr: [u8; 34] = closed.try_into().map_err(|v: Vec<u8>| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "expected 34-element closed array, got {}",
+            v.len()
+        ))
+    })?;
+
+    for w in 0..34usize {
+        if arr[w] >= 4 {
+            continue;
+        }
+        arr[w] += 1;
+        let counts = shanten::array_to_tilecounts(&arr);
+        if shanten::calculate_shanten_with_melds(&counts, num_melds).shanten == -1 {
+            let winning_tile = shanten::index_to_tile(w);
+            let ctx = GameContext::new(WinType::Ron, round_wind, seat_wind)
+                .with_winning_tile(winning_tile)
+                .open();
+            for structure in decompose_hand_with_melds(&counts, &called) {
+                let res = detect_yaku_with_context(&structure, &counts, &ctx);
+                if res.is_yakuman || res.total_han >= 1 {
+                    return Ok(true);
+                }
+            }
+        }
+        arr[w] -= 1;
+    }
+    Ok(false)
+}
+
 #[pymodule]
 fn agari_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(hand_has_yaku, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_shanten, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_ukeire, m)?)?;
     m.add_function(wrap_pyfunction!(compute_riichi_features, m)?)?;
