@@ -2,7 +2,7 @@
 
 Agari is a comprehensive Riichi Mahjong scoring engine written in idiomatic, modern Rust. It transforms raw hand notations into detailed scoring results, handling the complex interplay between hand decomposition, wait patterns, situational yaku, and minipoint (fu) calculation.
 
-**[🎮 Live Demo](https://agari.org/)** — Try the web interface for agari-core
+**[🎮 Live Demo](https://agari.org/)**: try the web interface for agari-core
 
 <img width="648" height="891" alt="image" src="https://github.com/user-attachments/assets/a48ae09d-927f-4d74-b263-a2f1eefcc63f" />
 
@@ -39,7 +39,7 @@ cargo install agari
 
 ## Core Architecture & Module Breakdown
 
-The system is designed as a pipeline, moving from string parsing to recursive decomposition, and finally to mathematical scoring.
+The system is designed as a pipeline, moving from string parsing to recursive decomposition, and finally to mathematical scoring. All modules live in `crates/agari-core/src/`.
 
 | Module | Primary Responsibility | Key Data Structures |
 | --- | --- | --- |
@@ -92,7 +92,7 @@ You can use intuitive letter-based notation for honor tiles instead of the numer
 - `g` = Green Dragon (6z)
 - `r` = Red Dragon (7z)
 
-This notation works everywhere—hand strings, called melds, winning tile, dora, and ura dora:
+This notation works everywhere: hand strings, called melds, winning tile, dora, and ura dora:
 
 ```bash
 # Before (numeric z notation)
@@ -162,7 +162,7 @@ The calculator evaluates three hand types and returns the best (lowest) shanten:
 2. **Chiitoitsu**: 7 pairs
 3. **Kokushi**: 13 orphans
 
-**Ukeire** (tile acceptance) shows which tiles would improve the hand, along with how many of each are still available. By default, ukeire is *theoretical* — it assumes a full 136-tile deck minus only your hand tiles.
+**Ukeire** (tile acceptance) shows which tiles would improve the hand, along with how many of each are still available. By default, ukeire is *theoretical*. It assumes a full 136-tile deck minus only your hand tiles.
 
 For **practical ukeire**, pass `--visible` with tiles already visible on the table (discard ponds, open melds, dora indicators). These are subtracted from the available pool, giving an accurate count of tiles you could actually draw.
 
@@ -202,7 +202,7 @@ All final payments are rounded up to the nearest 100 points.
 
 ### Recursive Decomposition (`hand.rs`)
 
-The decomposition logic is robust. It sorts tiles to ensure consistent processing and uses a "pick-a-triplet-or-sequence" branching strategy. This is essential for hands like `111222333m`, which the code correctly identifies as either three triplets or three identical sequences.
+The decomposition logic sorts tiles to ensure consistent processing and uses a "pick-a-triplet-or-sequence" branching strategy. This is essential for hands like `111222333m`, which it identifies as either three triplets or three identical sequences.
 
 ### Kan Support (`hand.rs`, `parse.rs`)
 
@@ -230,15 +230,15 @@ The `is_pinfu` function is a strict implementation of the four traditional requi
 
 The shanten calculator uses a 34-element array representation for fast computation. For standard hands, it:
 1. Converts tile counts to the array format
-2. Tries extracting each possible pair
-3. Counts complete melds and incomplete melds (taatsu) for each suit
-4. Applies the formula: `shanten = 8 - 2×melds - taatsu - (1 if pair)`
+2. Tries each possible pair extraction (and no pair)
+3. Uses recursive backtracking per suit to find the best mix of complete melds and incomplete melds (taatsu)
+4. Applies the formula: `shanten = 8 - 2×melds - min(taatsu, 4 - melds) - (1 if pair)`, where called melds count toward `melds`
 
 Special handling exists for Chiitoitsu (counting pairs and unique tiles) and Kokushi (counting terminal/honor coverage).
 
-### Elegant Display (`display.rs`)
+### Unicode Display (`display.rs`)
 
-The code includes a sophisticated Unicode mapper. Instead of just printing "1m", it can output the actual Mahjong tile characters (🀇, 🀐, 🀙), making the CLI output significantly more readable for players.
+Instead of just printing "1m", the CLI can output the actual Mahjong tile characters (🀇, 🀐, 🀙), with an ASCII fallback via `--ascii`.
 
 ---
 
@@ -329,13 +329,13 @@ Production files are output to `web/dist/` and can be deployed to any static hos
 
 ### Features
 
-- **Tile palette** — Click to build your hand visually
-- **Real-time shanten** — See how far from tenpai as you add tiles
-- **Dora indicators** — Add dora and ura dora
-- **Full context options** — Riichi, tsumo/ron, winds, ippatsu, etc.
-- **Detailed results** — Yaku breakdown, fu calculation, and payment
+- **Tile palette**: click to build your hand visually
+- **Real-time shanten**: see how far from tenpai as you add tiles
+- **Dora indicators**: add dora and ura dora
+- **Full context options**: riichi, tsumo/ron, winds, ippatsu, etc.
+- **Detailed results**: yaku breakdown, fu calculation, and payment
 
-The web frontend is entirely optional—Agari remains a CLI-first, library-first project. The WASM/web code lives in separate crates (`crates/agari-wasm`) and doesn't affect the core library.
+The web frontend is entirely optional. Agari remains a CLI-first, library-first project. The WASM/web code lives in separate crates (`crates/agari-wasm`) and doesn't affect the core library.
 
 ---
 
@@ -473,6 +473,7 @@ fn main() {
 ```rust
 let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
     .riichi()                              // Declare riichi
+    .double_riichi()                       // Double riichi (implies riichi)
     .ippatsu()                             // Ippatsu enabled
     .with_winning_tile(tile)               // Set agari tile
     .with_dora(vec![indicator1, indicator2]) // Dora indicators
