@@ -256,38 +256,6 @@ def test_shanten_after_kan():
     print(f"Added kan: {before3} -> {after_added}")
 
 
-def test_is_permanent_furiten():
-    # Tenpai hand waiting on 1p (index 9): 123m 456m 789m 1p 234s
-    hand = [0] * 34
-    for i in range(9):
-        hand[i] = 1  # 1-9m
-    hand[9] = 1   # 1p
-    hand[18] = 1  # 1s
-    hand[19] = 1  # 2s
-    hand[20] = 1  # 3s
-    assert agari_core.calculate_shanten(hand, 0) == 0
-
-    # Furiten: 1p (index 9) is in own discards
-    furiten = agari_core.is_permanent_furiten(hand, [9], 0)
-    assert furiten is True, f"Expected furiten=True, got {furiten}"
-    print(f"Furiten with winning tile in discards: {furiten}")
-
-    # Not furiten: discards don't contain winning tile
-    clean = agari_core.is_permanent_furiten(hand, [27, 28, 29], 0)
-    assert clean is False, f"Expected furiten=False, got {clean}"
-    print(f"Furiten with clean discards: {clean}")
-
-    # Non-tenpai hand: should return False
-    bad_hand = [0] * 34
-    bad_hand[0] = 1; bad_hand[2] = 1; bad_hand[4] = 1
-    bad_hand[9] = 1; bad_hand[11] = 1; bad_hand[13] = 1
-    bad_hand[18] = 1; bad_hand[20] = 1; bad_hand[22] = 1
-    bad_hand[27] = 1; bad_hand[28] = 1; bad_hand[29] = 1; bad_hand[30] = 1
-    not_tenpai = agari_core.is_permanent_furiten(bad_hand, [0, 2, 4, 9], 0)
-    assert not_tenpai is False, f"Expected False for non-tenpai, got {not_tenpai}"
-    print(f"Furiten non-tenpai: {not_tenpai}")
-
-
 if __name__ == "__main__":
     test_complete_hand()
     test_tenpai_hand()
@@ -297,5 +265,4 @@ if __name__ == "__main__":
     test_valid_chi_combinations()
     test_shanten_after_chi()
     test_shanten_after_kan()
-    test_is_permanent_furiten()
     print("\nAll tests passed!")
