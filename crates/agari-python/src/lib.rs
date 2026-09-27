@@ -121,34 +121,6 @@ fn shanten_after_kan(
     Ok(shanten::shanten_after_kan(&counts, tile, kt, num_melds))
 }
 
-#[pyfunction]
-fn is_permanent_furiten(hand: Vec<u8>, own_discards: Vec<u8>, num_melds: u8) -> PyResult<bool> {
-    let arr: [u8; 34] = hand
-        .try_into()
-        .map_err(|v: Vec<u8>| PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            format!("expected 34-element array, got {}", v.len()),
-        ))?;
-    let counts = shanten::array_to_tilecounts(&arr);
-    let s = shanten::calculate_shanten_with_melds(&counts, num_melds).shanten;
-    if s != 0 {
-        return Ok(false);
-    }
-    // Find winning tiles: adding tile i makes shanten == -1
-    for i in 0..34u8 {
-        let mut test_arr = arr;
-        if test_arr[i as usize] >= 4 {
-            continue; // can't have more than 4 of a tile
-        }
-        test_arr[i as usize] += 1;
-        let tc = shanten::array_to_tilecounts(&test_arr);
-        let sh = shanten::calculate_shanten_with_melds(&tc, num_melds).shanten;
-        if sh == -1 && own_discards.contains(&i) {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
 /// Does this open tenpai hand have a (non-situational) yaku on at least one
 /// winning tile? Uses the real agari scoring engine (decompose + detect_yaku).
 ///
@@ -234,6 +206,5 @@ fn agari_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(valid_chi_combinations, m)?)?;
     m.add_function(wrap_pyfunction!(shanten_after_chi, m)?)?;
     m.add_function(wrap_pyfunction!(shanten_after_kan, m)?)?;
-    m.add_function(wrap_pyfunction!(is_permanent_furiten, m)?)?;
     Ok(())
 }
