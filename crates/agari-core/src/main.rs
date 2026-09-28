@@ -18,6 +18,7 @@ use agari::{
     },
     hand::{HandStructure, decompose_hand, decompose_hand_with_melds},
     parse::{TileCounts, parse_hand_with_aka, to_counts, validate_hand, validate_hand_with_melds},
+    rules::Renhou,
     scoring::{ScoreLevel, ScoringResult, calculate_score},
     shanten::{
         ShantenType, calculate_shanten_with_melds, calculate_ukeire_with_melds,
@@ -139,6 +140,11 @@ struct Args {
     #[arg(long)]
     chiihou: bool,
 
+    /// Non-dealer's ron before their first draw, scored as mangan, yakuman
+    /// or a number of han (local yaku)
+    #[arg(long, value_name = "VALUE", value_parser = parse_renhou)]
+    renhou: Option<Renhou>,
+
     /// Calculate shanten (tiles from tenpai) instead of score
     #[arg(long)]
     shanten: bool,
@@ -210,6 +216,8 @@ struct JsonContext {
     tenhou: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     chiihou: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    renhou: Option<Renhou>,
 }
 
 #[derive(Serialize)]
@@ -458,6 +466,16 @@ fn main() {
         eprintln!("{} {}", "⚠️  Warning:".yellow().bold(), warning);
     }
 
+    if args.renhou.is_some() {
+        for warning in validate_renhou(
+            args.tsumo,
+            seat_wind == Honor::East,
+            has_open_melds || args.open,
+        ) {
+            eprintln!("{} {}", "⚠️  Warning:".yellow().bold(), warning);
+        }
+    }
+
     // Parse winning tile
     let winning_tile = match args
         .winning_tile
@@ -526,6 +544,11 @@ fn main() {
 
     if args.chiihou {
         context = context.chiihou();
+    }
+
+    if let Some(value) = args.renhou {
+        let rules = context.rules.renhou(Some(value));
+        context = context.renhou().with_rules(rules);
     }
 
     // Convert to tile counts (for hand decomposition)
@@ -738,6 +761,7 @@ fn main() {
             chankan: context.is_chankan,
             tenhou: context.is_tenhou,
             chiihou: context.is_chiihou,
+            renhou: context.rules.renhou.filter(|_| context.is_renhou),
         };
 
         let output = JsonOutput {
@@ -819,6 +843,42 @@ fn validate_riichi_dependencies(
     }
 
     warnings
+}
+
+/// Renhou only applies to a closed non-dealer ron, so say why it was not scored.
+fn validate_renhou(tsumo: bool, dealer: bool, open: bool) -> Vec<String> {
+    let mut warnings = Vec::new();
+    if tsumo {
+        warnings.push(
+            "Renhou (--renhou) specified with --tsumo. Renhou only applies to a win by ron."
+                .to_string(),
+        );
+    }
+    if dealer {
+        warnings.push(
+            "Renhou (--renhou) specified for the dealer seat. Renhou only applies to a non-dealer."
+                .to_string(),
+        );
+    }
+    if open {
+        warnings.push(
+            "Renhou (--renhou) specified with an open hand. Renhou requires a closed hand."
+                .to_string(),
+        );
+    }
+    warnings
+}
+
+fn parse_renhou(s: &str) -> Result<Renhou, String> {
+    let expected = || format!("expected mangan, yakuman or a number of han of at least 1, got {s}");
+    match s.to_lowercase().as_str() {
+        "mangan" => Ok(Renhou::Mangan),
+        "yakuman" => Ok(Renhou::Yakuman),
+        n => match n.parse::<u8>() {
+            Ok(0) | Err(_) => Err(expected()),
+            Ok(han) => Ok(Renhou::Han(han)),
+        },
+    }
 }
 
 fn parse_single_tile(s: &str) -> Result<Tile, String> {
@@ -1479,6 +1539,7 @@ fn yaku_name(yaku: &Yaku) -> &'static str {
         // Local
         Yaku::OpenRiichi => "Open Riichi",
         Yaku::OpenDoubleRiichi => "Open Double Riichi",
+        Yaku::Renhou(_) => "Renhou (Hand of Man)",
 
         // Yakuman
         Yaku::Tenhou => "Tenhou (Heavenly Hand)",
@@ -1818,5 +1879,23 @@ mod tests {
 
         let warnings = validate_riichi_dependencies(false, false, false, false, true);
         assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn test_validate_renhou() {
+        assert!(validate_renhou(false, false, false).is_empty());
+        assert!(validate_renhou(true, false, false)[0].contains("--tsumo"));
+        assert!(validate_renhou(false, true, false)[0].contains("dealer"));
+        assert!(validate_renhou(false, false, true)[0].contains("closed hand"));
+        assert_eq!(validate_renhou(true, true, true).len(), 3);
+    }
+
+    #[test]
+    fn test_parse_renhou() {
+        assert_eq!(parse_renhou("Mangan"), Ok(Renhou::Mangan));
+        assert_eq!(parse_renhou("yakuman"), Ok(Renhou::Yakuman));
+        assert_eq!(parse_renhou("5"), Ok(Renhou::Han(5)));
+        assert!(parse_renhou("0").is_err());
+        assert!(parse_renhou("baiman").is_err());
     }
 }

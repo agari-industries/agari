@@ -53,6 +53,9 @@ pub struct GameContext {
     pub is_tenhou: bool,
     /// Non-dealer's first draw win (chiihou) - for future use
     pub is_chiihou: bool,
+    /// Non-dealer's ron before their first draw (renhou); scored only under `Rules::renhou`
+    #[serde(default)]
+    pub is_renhou: bool,
 
     // === Dora ===
     /// Dora indicators (the tile shown, not the actual dora)
@@ -88,6 +91,7 @@ impl GameContext {
             is_last_tile: false,
             is_tenhou: false,
             is_chiihou: false,
+            is_renhou: false,
             dora_indicators: Vec::new(),
             ura_dora_indicators: Vec::new(),
             aka_count: 0,
@@ -160,6 +164,12 @@ impl GameContext {
     /// Builder-style: set chiihou (non-dealer first draw win)
     pub fn chiihou(mut self) -> Self {
         self.is_chiihou = true;
+        self
+    }
+
+    /// Builder-style: set renhou (non-dealer ron before their first draw)
+    pub fn renhou(mut self) -> Self {
+        self.is_renhou = true;
         self
     }
 
@@ -424,10 +434,12 @@ mod tests {
         let mut json = serde_json::to_value(&context).unwrap();
         let fields = json.as_object_mut().unwrap();
         fields.remove("is_open_riichi");
+        fields.remove("is_renhou");
         fields.remove("rules");
 
         let restored: GameContext = serde_json::from_value(json).unwrap();
         assert!(!restored.is_open_riichi);
+        assert!(!restored.is_renhou);
         assert_eq!(restored.rules, Rules::default());
     }
 }

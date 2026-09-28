@@ -6,6 +6,7 @@ use crate::context::{GameContext, WinType, count_dora_detailed};
 use crate::hand::{HandStructure, Meld, winning_tile_in_closed_sequence};
 use crate::local_yaku;
 use crate::parse::TileCounts;
+use crate::rules::Renhou;
 use crate::tile::{Honor, Suit, Tile};
 use crate::wait::is_pinfu;
 use std::collections::HashMap;
@@ -70,6 +71,9 @@ pub enum Yaku {
     // Last, so the variants above keep their indices in positional formats
     OpenRiichi,       // Riichi with the hand shown (2 han)
     OpenDoubleRiichi, // Double riichi with the hand shown (3 han)
+    /// Non-dealer ron before their first draw. Carries its value because
+    /// rulesets disagree on it; `han()` and `is_yakuman()` follow the value.
+    Renhou(Renhou),
 }
 
 impl Yaku {
@@ -114,6 +118,9 @@ impl Yaku {
             // Local
             Yaku::OpenRiichi => 2,
             Yaku::OpenDoubleRiichi => 3,
+            Yaku::Renhou(Renhou::Mangan) => 5,
+            Yaku::Renhou(Renhou::Yakuman) => 13,
+            Yaku::Renhou(Renhou::Han(n)) => *n,
 
             // Yakuman (13 han equivalent)
             Yaku::Tenhou => 13,
@@ -144,6 +151,7 @@ impl Yaku {
             Yaku::DoubleRiichi => None,
             Yaku::OpenRiichi => None,
             Yaku::OpenDoubleRiichi => None,
+            Yaku::Renhou(_) => None,
             Yaku::Ippatsu => None,
             Yaku::MenzenTsumo => None,
             Yaku::Pinfu => None,
@@ -216,13 +224,17 @@ impl Yaku {
                 | Yaku::ChuurenPoutou
                 | Yaku::JunseiChuurenPoutou
                 | Yaku::SuuKantsu
+                | Yaku::Renhou(Renhou::Yakuman)
         )
     }
 
     /// Check if this is a local yaku, scored only when switched on in
     /// [`Rules`](crate::rules::Rules)
     pub fn is_local(&self) -> bool {
-        matches!(self, Yaku::OpenRiichi | Yaku::OpenDoubleRiichi)
+        matches!(
+            self,
+            Yaku::OpenRiichi | Yaku::OpenDoubleRiichi | Yaku::Renhou(_)
+        )
     }
 }
 
