@@ -12,6 +12,7 @@ use agari::context::{GameContext, WinType};
 use agari::hand::{HandStructure, decompose_hand, decompose_hand_with_melds};
 use agari::parse::TileCounts;
 use agari::parse::{parse_hand_with_aka, to_counts};
+use agari::rules::Rules;
 use agari::scoring::{ScoringResult, calculate_score};
 use agari::shanten::{ShantenResult, UkeireResult, calculate_shanten_with_melds, calculate_ukeire_with_melds};
 use agari::tile::{Honor, Tile};
@@ -60,6 +61,15 @@ pub struct ScoreRequest {
     pub is_tenhou: bool,
     /// Whether chiihou (non-dealer first draw win)
     pub is_chiihou: bool,
+    /// Whether riichi was declared with the hand shown (open riichi)
+    #[serde(default)]
+    pub is_open_riichi: bool,
+    /// Whether a non-dealer won by ron before their first draw (renhou)
+    #[serde(default)]
+    pub is_renhou: bool,
+    /// Optional rules to score under; the default is standard scoring
+    #[serde(default)]
+    pub rules: Rules,
 }
 
 /// Scoring result returned to JavaScript
@@ -340,6 +350,13 @@ fn score_hand_internal(request: &ScoreRequest) -> Result<ScoringOutput, String> 
     if request.is_chiihou {
         context = context.chiihou();
     }
+    if request.is_open_riichi {
+        context = context.open_riichi();
+    }
+    if request.is_renhou {
+        context = context.renhou();
+    }
+    context = context.with_rules(request.rules);
 
     // Parse dora indicators
     let dora_indicators = parse_tile_list(&request.dora_indicators)?;
@@ -673,6 +690,9 @@ mod tests {
             is_chankan: false,
             is_tenhou: false,
             is_chiihou: false,
+            is_open_riichi: false,
+            is_renhou: false,
+            rules: Rules::default(),
         }
     }
 
@@ -692,6 +712,38 @@ mod tests {
         let output = result.unwrap();
         assert!(output.payment.total > 0);
         assert!(!output.yaku.is_empty());
+    }
+
+    #[test]
+    fn test_score_request_with_rules() {
+        let mut request = make_request("123m456p789s33322z");
+        request.winning_tile = Some("1m".to_string());
+        request.seat_wind = "south".to_string();
+        request.is_open_riichi = true;
+        request.rules = Rules::default().open_riichi(true);
+
+        let output = score_hand_internal(&request).unwrap();
+
+        assert_eq!(output.yaku.len(), 1);
+        assert_eq!(output.yaku[0].name, "Open Riichi");
+        assert_eq!(output.yaku[0].han, 2);
+    }
+
+    #[test]
+    fn test_score_request_without_rules_is_standard() {
+        let json = r#"{
+            "hand": "123m456p789s33322z", "winning_tile": "1m", "is_tsumo": false,
+            "is_riichi": true, "is_double_riichi": false, "is_ippatsu": false,
+            "round_wind": "east", "seat_wind": "south",
+            "dora_indicators": [], "ura_dora_indicators": [],
+            "is_last_tile": false, "is_rinshan": false, "is_chankan": false,
+            "is_tenhou": false, "is_chiihou": false
+        }"#;
+        let request: ScoreRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(request.rules, Rules::default());
+
+        let output = score_hand_internal(&request).unwrap();
+        assert_eq!(output.yaku[0].name, "Riichi");
     }
 
     #[test]
