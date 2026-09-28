@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::context::{GameContext, WinType, count_dora_detailed};
 use crate::hand::{HandStructure, Meld, winning_tile_in_closed_sequence};
+use crate::local_yaku;
 use crate::parse::TileCounts;
 use crate::tile::{Honor, Suit, Tile};
 use crate::wait::is_pinfu;
@@ -64,6 +65,11 @@ pub enum Yaku {
     Kokushi13Wait,       // Kokushi with 13-sided wait
     SuuankouTanki,       // Suuankou with tanki wait
     JunseiChuurenPoutou, // Pure nine gates (9-sided wait)
+
+    // === Local yaku, scored only when switched on in Rules ===
+    // Last, so the variants above keep their indices in positional formats
+    OpenRiichi,       // Riichi with the hand shown (2 han)
+    OpenDoubleRiichi, // Double riichi with the hand shown (3 han)
 }
 
 impl Yaku {
@@ -105,6 +111,10 @@ impl Yaku {
             // 6 han
             Yaku::Chinitsu => 6,
 
+            // Local
+            Yaku::OpenRiichi => 2,
+            Yaku::OpenDoubleRiichi => 3,
+
             // Yakuman (13 han equivalent)
             Yaku::Tenhou => 13,
             Yaku::Chiihou => 13,
@@ -132,6 +142,8 @@ impl Yaku {
             // These yaku are invalid when open
             Yaku::Riichi => None,
             Yaku::DoubleRiichi => None,
+            Yaku::OpenRiichi => None,
+            Yaku::OpenDoubleRiichi => None,
             Yaku::Ippatsu => None,
             Yaku::MenzenTsumo => None,
             Yaku::Pinfu => None,
@@ -205,6 +217,12 @@ impl Yaku {
                 | Yaku::JunseiChuurenPoutou
                 | Yaku::SuuKantsu
         )
+    }
+
+    /// Check if this is a local yaku, scored only when switched on in
+    /// [`Rules`](crate::rules::Rules)
+    pub fn is_local(&self) -> bool {
+        matches!(self, Yaku::OpenRiichi | Yaku::OpenDoubleRiichi)
     }
 }
 
@@ -549,15 +567,18 @@ pub fn detect_yaku_with_context(
     // Count dora with breakdown
     let dora = count_dora_detailed(counts, context);
 
-    YakuResult {
-        yaku_list,
-        total_han,
-        dora_count: dora.total(),
-        regular_dora: dora.regular,
-        ura_dora: dora.ura,
-        aka_dora: dora.aka,
-        is_yakuman,
-    }
+    local_yaku::apply(
+        YakuResult {
+            yaku_list,
+            total_han,
+            dora_count: dora.total(),
+            regular_dora: dora.regular,
+            ura_dora: dora.ura,
+            aka_dora: dora.aka,
+            is_yakuman,
+        },
+        context,
+    )
 }
 
 /// Detect yaku without game context (backwards compatibility)

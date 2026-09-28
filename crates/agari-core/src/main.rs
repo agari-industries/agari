@@ -99,6 +99,10 @@ struct Args {
     #[arg(long)]
     ippatsu: bool,
 
+    /// Open riichi, scored one han above riichi (local yaku)
+    #[arg(long)]
+    open_riichi: bool,
+
     /// Round wind: e/s/w/n
     #[arg(long, default_value = "e")]
     round: String,
@@ -186,6 +190,8 @@ struct JsonContext {
     double_riichi: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     ippatsu: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    open_riichi: bool,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     dora_indicators: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -364,7 +370,7 @@ fn main() {
     // Extract arguments
     let shanten_mode = args.shanten || args.ukeire;
     let ukeire_mode = args.ukeire;
-    let riichi = args.riichi || args.double_riichi;
+    let riichi = args.riichi || args.double_riichi || args.open_riichi;
 
     // Parse the hand
     let parsed = match parse_hand_with_aka(&args.hand) {
@@ -491,6 +497,11 @@ fn main() {
         context = context.double_riichi();
     } else if riichi {
         context = context.riichi();
+    }
+
+    if args.open_riichi {
+        let rules = context.rules.open_riichi(true);
+        context = context.open_riichi().with_rules(rules);
     }
 
     if args.ippatsu {
@@ -709,6 +720,7 @@ fn main() {
             riichi: context.is_riichi,
             double_riichi: context.is_double_riichi,
             ippatsu: context.is_ippatsu,
+            open_riichi: context.is_open_riichi,
             dora_indicators: context
                 .dora_indicators
                 .iter()
@@ -1463,6 +1475,10 @@ fn yaku_name(yaku: &Yaku) -> &'static str {
         Yaku::Junchan => "Junchan (Terminals in All Groups)",
         Yaku::Ryanpeikou => "Ryanpeikou (Twice Pure Double Sequence)",
         Yaku::Chinitsu => "Chinitsu (Full Flush)",
+
+        // Local
+        Yaku::OpenRiichi => "Open Riichi",
+        Yaku::OpenDoubleRiichi => "Open Double Riichi",
 
         // Yakuman
         Yaku::Tenhou => "Tenhou (Heavenly Hand)",

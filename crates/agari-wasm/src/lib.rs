@@ -621,6 +621,8 @@ fn yaku_name(yaku: &Yaku) -> String {
         Yaku::Junchan => "Junchan".to_string(),
         Yaku::Ryanpeikou => "Ryanpeikou".to_string(),
         Yaku::Chinitsu => "Chinitsu".to_string(),
+        Yaku::OpenRiichi => "Open Riichi".to_string(),
+        Yaku::OpenDoubleRiichi => "Open Double Riichi".to_string(),
         Yaku::Tenhou => "Tenhou".to_string(),
         Yaku::Chiihou => "Chiihou".to_string(),
         Yaku::KokushiMusou => "Kokushi Musou".to_string(),
