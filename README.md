@@ -50,6 +50,8 @@ The system is designed as a pipeline, moving from string parsing to recursive de
 | **`yaku.rs`** | Pattern matching for scoring conditions (Tanyao, Honitsu, etc.). | `Yaku`, `YakuResult` |
 | **`scoring.rs`** | The final calculator for Fu, Han, and point payouts. | `ScoringResult`, `Payment` |
 | **`context.rs`** | Tracking game metadata (winds, dora indicators, win type). | `GameContext` |
+| **`rules.rs`** | Optional rule switches, off by default. | `Rules`, `Renhou` |
+| **`local_yaku.rs`** | Local yaku, scored only when switched on in `Rules`. | N/A |
 | **`shanten.rs`** | Shanten calculator and ukeire (tile acceptance) analysis. | `ShantenResult`, `UkeireResult` |
 | **`display.rs`** | Pretty-printing tiles using Unicode Mahjong glyphs (🀄). | N/A |
 
@@ -263,6 +265,10 @@ agari 123m456p789s1112z --shanten
 # Ukeire (tile acceptance) analysis  
 agari 123m456p789s112z --ukeire
 
+# Local yaku: open riichi, renhou
+agari 234m567p345789s11z -w 9s --seat s -r --open-riichi
+agari 234m567p345789s11z -w 9s --seat s --renhou mangan
+
 # All options
 agari <HAND> [OPTIONS]
 
@@ -273,6 +279,7 @@ OPTIONS:
     -r, --riichi          Riichi declared
     --double-riichi       Double riichi (first turn)
     --ippatsu             Ippatsu (win within one turn of riichi)
+    --open-riichi         Open riichi (local yaku)
     --round <WIND>        Round wind: e/s/w/n (default: e)
     --seat <WIND>         Seat wind: e/s/w/n (default: e)
     -d, --dora <TILES>    Dora indicators (e.g., 58m or 5m,8m)
@@ -282,6 +289,7 @@ OPTIONS:
     --chankan             Ron on another player's added kan
     --tenhou              Dealer's first draw win
     --chiihou             Non-dealer's first draw win
+    --renhou <VALUE>      Renhou (local yaku): mangan, yakuman, or a number of han (at least 1)
     --shanten             Calculate shanten instead of score
     --ukeire              Show ukeire with shanten
     --visible <TILES>     Visible tiles on table (e.g., 2z,2z,5p) for practical ukeire
@@ -290,6 +298,7 @@ OPTIONS:
     --all                 Show all possible interpretations
     --json                Output results as JSON
     -h, --help            Show help message
+    -V, --version         Show version
 ```
 
 ---
@@ -465,6 +474,7 @@ fn main() {
 | `HandStructure` | Decomposed hand (Standard, Chiitoitsu, or Kokushi) |
 | `Meld` | A group of tiles (Shuntsu, Koutsu, or Kan) |
 | `GameContext` | Win type, winds, dora, riichi status, etc. |
+| `Rules` | Optional rules such as local yaku, off by default |
 | `YakuResult` | Detected yaku with han breakdown |
 | `ScoringResult` | Final score with fu, han, payment |
 
@@ -484,8 +494,29 @@ let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
     .rinshan()                             // Rinshan kaihou
     .chankan()                             // Chankan
     .tenhou()                              // Tenhou (dealer first draw)
-    .chiihou();                            // Chiihou (non-dealer first draw)
+    .chiihou()                             // Chiihou (non-dealer first draw)
+    .open_riichi()                         // Open riichi (implies riichi)
+    .renhou()                              // Renhou (non-dealer ron before first draw)
+    .with_rules(rules);                    // Optional rules, see below
 ```
+
+### Local Yaku
+
+Local yaku are off by default, so standard scoring is unchanged unless you switch them on with `Rules`:
+
+```rust
+use agari::rules::{Renhou, Rules};
+
+let rules = Rules::default()
+    .open_riichi(true)                 // Open riichi 2 han, open double riichi 3 han
+    .renhou(Some(Renhou::Mangan));     // or Renhou::Yakuman, or Renhou::Han(n)
+
+let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
+    .open_riichi()
+    .with_rules(rules);
+```
+
+`Renhou::Mangan` follows the EMA, WRC and JPML rules: renhou alone is a mangan and does not combine with other yaku or dora, but a hand worth more without it keeps its normal score.
 
 ---
 

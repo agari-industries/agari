@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::parse::TileCounts;
+use crate::rules::Rules;
 use crate::tile::{Honor, Tile};
 
 /// How the hand was won
@@ -37,6 +38,9 @@ pub struct GameContext {
     pub is_riichi: bool,
     pub is_double_riichi: bool,
     pub is_ippatsu: bool,
+    /// Riichi declared with the hand shown; scored only under `Rules::open_riichi`
+    #[serde(default)]
+    pub is_open_riichi: bool,
 
     // === Situational yaku ===
     /// Won on kan replacement tile (rinshan kaihou)
@@ -49,6 +53,9 @@ pub struct GameContext {
     pub is_tenhou: bool,
     /// Non-dealer's first draw win (chiihou) - for future use
     pub is_chiihou: bool,
+    /// Non-dealer's ron before their first draw (renhou); scored only under `Rules::renhou`
+    #[serde(default)]
+    pub is_renhou: bool,
 
     // === Dora ===
     /// Dora indicators (the tile shown, not the actual dora)
@@ -59,6 +66,11 @@ pub struct GameContext {
     // === Akadora (red fives) ===
     /// Number of red fives in the winning hand
     pub aka_count: u8,
+
+    // === Rules ===
+    /// Optional rules in effect; the default is standard scoring
+    #[serde(default)]
+    pub rules: Rules,
 }
 
 impl GameContext {
@@ -73,14 +85,17 @@ impl GameContext {
             is_riichi: false,
             is_double_riichi: false,
             is_ippatsu: false,
+            is_open_riichi: false,
             is_rinshan: false,
             is_chankan: false,
             is_last_tile: false,
             is_tenhou: false,
             is_chiihou: false,
+            is_renhou: false,
             dora_indicators: Vec::new(),
             ura_dora_indicators: Vec::new(),
             aka_count: 0,
+            rules: Rules::default(),
         }
     }
 
@@ -105,6 +120,13 @@ impl GameContext {
     /// Builder-style: set double riichi
     pub fn double_riichi(mut self) -> Self {
         self.is_double_riichi = true;
+        self.is_riichi = true;
+        self
+    }
+
+    /// Builder-style: set open riichi (riichi with the hand shown)
+    pub fn open_riichi(mut self) -> Self {
+        self.is_open_riichi = true;
         self.is_riichi = true;
         self
     }
@@ -145,6 +167,12 @@ impl GameContext {
         self
     }
 
+    /// Builder-style: set renhou (non-dealer ron before their first draw)
+    pub fn renhou(mut self) -> Self {
+        self.is_renhou = true;
+        self
+    }
+
     /// Builder-style: add dora indicator(s)
     pub fn with_dora(mut self, indicators: Vec<Tile>) -> Self {
         self.dora_indicators = indicators;
@@ -160,6 +188,12 @@ impl GameContext {
     /// Builder-style: set aka (red five) count
     pub fn with_aka(mut self, count: u8) -> Self {
         self.aka_count = count;
+        self
+    }
+
+    /// Builder-style: set the optional rules to score under
+    pub fn with_rules(mut self, rules: Rules) -> Self {
+        self.rules = rules;
         self
     }
 
@@ -392,5 +426,20 @@ mod tests {
             .with_winning_tile(Tile::suited(Suit::Man, 5));
 
         assert_eq!(context.winning_tile, Some(Tile::suited(Suit::Man, 5)));
+    }
+
+    #[test]
+    fn game_context_deserializes_without_rules() {
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::South).riichi();
+        let mut json = serde_json::to_value(&context).unwrap();
+        let fields = json.as_object_mut().unwrap();
+        fields.remove("is_open_riichi");
+        fields.remove("is_renhou");
+        fields.remove("rules");
+
+        let restored: GameContext = serde_json::from_value(json).unwrap();
+        assert!(!restored.is_open_riichi);
+        assert!(!restored.is_renhou);
+        assert_eq!(restored.rules, Rules::default());
     }
 }
