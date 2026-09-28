@@ -2,8 +2,8 @@
 name = "agari"
 version = "0.24.0"
 edition = "2024"
-repository = "https://github.com/agari-industries/agari"
-homepage = "https://github.com/agari-industries/agari"
+repository.workspace = true
+homepage = "https://agari.org/"
 description = "A Riichi Mahjong hand calculator and scoring engine"
 license = "MIT"
 keywords = ["mahjong", "riichi", "scoring", "japanese-mahjong"]
