@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.25.0]
+
+### Added
+
+- **Optional rules**: `Rules` holds switches for local yaku and is carried on `GameContext` (`with_rules`). `Rules::default()` scores exactly as before, and a golden digest test over 100,000 generated hands pins standard scoring. The WASM `ScoreRequest` accepts `rules`, `is_open_riichi` and `is_renhou`.
+- **Open riichi**: With `Rules::open_riichi`, a closed hand marked with `GameContext::open_riichi()` scores `OpenRiichi` (2 han) in place of riichi, or `OpenDoubleRiichi` (3 han) in place of double riichi. CLI: `--open-riichi`.
+- **Renhou**: `Rules::renhou` sets what renhou is worth for a closed non-dealer ron marked with `GameContext::renhou()`: `Renhou::Mangan` (without other yaku or dora, unless the hand scores more without renhou, as in EMA, WRC and JPML rules), `Renhou::Yakuman`, or `Renhou::Han(n)` (at least 1), which combines with other yaku and dora. CLI: `--renhou <mangan|yakuman|N>`.
+- **`Yaku::is_local()`**: Marks the local yaku so callers can list them separately.
+
+### Changed
+
+- **New `Yaku` variants and `GameContext` fields**: `Yaku` gains the local yaku `OpenRiichi`, `OpenDoubleRiichi` and `Renhou(Renhou)` after its existing variants, which keep their indices in positional formats, and `GameContext` gains `is_open_riichi`, `is_renhou` and `rules`. Exhaustive matches on `Yaku` and struct literals of `GameContext` need updating; `GameContext::new` and previously serialized contexts are unaffected.
+
 ## [0.24.0]
 
 ### Fixed
