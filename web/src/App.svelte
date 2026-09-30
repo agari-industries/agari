@@ -65,6 +65,8 @@
     let showUraDoraPicker = $state(false);
 
     // Context options
+    let isSanma = $state(false);
+    let nukidora = $state(0);
     let isTsumo = $state(false);
     let isRiichi = $state(false);
     let isDoubleRiichi = $state(false);
@@ -177,6 +179,7 @@
                 redFiveCounts[countTile]--;
             }
         }
+        counts["4z"] -= nukidora;
 
         // Add red five counts to the return object (keyed as "red5m", "red5p", "red5s")
         return {
@@ -250,6 +253,8 @@
         }
         return undefined;
     });
+
+    const maxNukidora = $derived(nukidora + tileCounts["4z"]);
 
     // Check if hand has open melds
     const hasOpenMelds = $derived(melds.some((m) => m.type !== "ankan"));
@@ -575,6 +580,27 @@
         clearUrlParams();
     }
 
+    function setSanma(sanma: boolean) {
+        if (sanma === isSanma) return;
+        isSanma = sanma;
+        clearHand();
+        cancelMeldBuilder();
+        showDoraPicker = false;
+        showUraDoraPicker = false;
+        nukidora = 0;
+        isTsumo = false;
+        isRiichi = false;
+        isDoubleRiichi = false;
+        isIppatsu = false;
+        roundWind = "east";
+        seatWind = "east";
+        isLastTile = false;
+        isRinshan = false;
+        isChankan = false;
+        isTenhou = false;
+        isChiihou = false;
+    }
+
     // Share hand via URL
     async function shareHand() {
         // Compute winning tile with red five notation for URL
@@ -587,6 +613,8 @@
         }
 
         const url = serializeToUrl({
+            isSanma,
+            nukidora,
             handTiles,
             melds,
             winningTile: urlWinningTile,
@@ -687,7 +715,9 @@
                 is_chankan: isChankan,
                 is_tenhou: isTenhou,
                 is_chiihou: isChiihou,
+                nukidora,
             };
+            if (isSanma) request.rules = { variant: "Sanma" };
 
             const response = scoreHand(request);
 
@@ -747,6 +777,7 @@
             // Restore state from URL if present (shared link)
             const urlState = deserializeFromUrl();
             if (urlState) {
+                isSanma = urlState.isSanma;
                 handTiles = urlState.handTiles;
                 melds = urlState.melds;
                 doraIndicators = urlState.doraIndicators;
@@ -762,6 +793,13 @@
                 isChankan = urlState.isChankan;
                 isTenhou = urlState.isTenhou;
                 isChiihou = urlState.isChiihou;
+                const northsUsed = [
+                    ...handTiles,
+                    ...melds.flatMap((m) => m.tiles),
+                    ...doraIndicators,
+                    ...uraDoraIndicators,
+                ].filter((e) => e.tile === "4z").length;
+                nukidora = Math.min(urlState.nukidora, Math.max(0, 4 - northsUsed));
 
                 // Update ID counters to avoid collisions
                 const maxTileId = Math.max(
@@ -875,16 +913,19 @@
                             {tileCounts}
                             showRedFives={true}
                             disabledTiles={meldBuilderDisabledTiles}
+                            sanma={isSanma}
                         />
 
                         <!-- Meld Builder Buttons -->
                         <div class="meld-buttons">
                             <span class="meld-label">{$t.addMeld}</span>
-                            <button
-                                class="btn btn-sm"
-                                onclick={() => startMeldBuilder("chi")}
-                                disabled={showMeldBuilder}>{$t.chi}</button
-                            >
+                            {#if !isSanma}
+                                <button
+                                    class="btn btn-sm"
+                                    onclick={() => startMeldBuilder("chi")}
+                                    disabled={showMeldBuilder}>{$t.chi}</button
+                                >
+                            {/if}
                             <button
                                 class="btn btn-sm"
                                 onclick={() => startMeldBuilder("pon")}
@@ -1190,6 +1231,7 @@
                                 }}
                                 onClose={() => (showDoraPicker = false)}
                                 disabledTiles={doraDisabledTiles}
+                                sanma={isSanma}
                             />
                         {/if}
 
@@ -1202,6 +1244,7 @@
                                 }}
                                 onClose={() => (showUraDoraPicker = false)}
                                 disabledTiles={doraDisabledTiles}
+                                sanma={isSanma}
                             />
                         {/if}
                     </div>
@@ -1213,6 +1256,7 @@
                             result={scoreResult}
                             error={scoreError}
                             loading={isCalculating}
+                            sanma={isSanma}
                         />
                     </div>
                 </div>
@@ -1223,6 +1267,10 @@
                     <div class="card">
                         <h2 class="card-title">{$t.options}</h2>
                         <ContextOptions
+                            {isSanma}
+                            bind:nukidora
+                            {maxNukidora}
+                            onSanmaChange={setSanma}
                             bind:isTsumo
                             bind:isRiichi
                             bind:isDoubleRiichi
@@ -1890,6 +1938,7 @@
 
     /* Results Card */
     .results-card {
+        flex: 1;
         min-height: 200px;
     }
 

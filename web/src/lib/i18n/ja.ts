@@ -56,11 +56,13 @@ export const ja: Translations = {
   fu: "符",
   pts: "点",
   all: "オール",
+  twoPayers: "(2人)",
   dealer: "親",
   dealerOya: "親",
   yaku: "役",
   ura: "裏",
   aka: "赤",
+  nukidora: "抜きドラ",
   fuBreakdown: "符計算",
   fuBase: "基本",
   fuMenzenRon: "門前ロン",
@@ -74,6 +76,9 @@ export const ja: Translations = {
 
   // Options
   options: "オプション",
+  game: "対局",
+  fourPlayers: "四人",
+  threePlayers: "三人",
   winType: "和了方法",
   ron: "ロン",
   tsumo: "ツモ",

@@ -13,14 +13,16 @@ export function calculate_shanten_js(hand) {
 }
 
 /**
- * Calculate ukeire (tile acceptance) for a hand
+ * Calculate ukeire (tile acceptance) for a hand; with `sanma`, 2m-8m are
+ * left out and a hand holding them is refused
  * @param {string} hand
+ * @param {boolean | null} [sanma]
  * @returns {any}
  */
-export function calculate_ukeire_js(hand) {
+export function calculate_ukeire_js(hand, sanma) {
     const ptr0 = passStringToWasm0(hand, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.calculate_ukeire_js(ptr0, len0);
+    const ret = wasm.calculate_ukeire_js(ptr0, len0, isLikeNone(sanma) ? 0xFFFFFF : sanma ? 1 : 0);
     return ret;
 }
 
@@ -60,6 +62,10 @@ function __wbg_get_imports() {
         __proto__: null,
         __wbg_Error_8c4e43fe74559d73: function(arg0, arg1) {
             const ret = Error(getStringFromWasm0(arg0, arg1));
+            return ret;
+        },
+        __wbg_Number_04624de7d0e8332d: function(arg0) {
+            const ret = Number(arg0);
             return ret;
         },
         __wbg_String_8f0eb39a4a4c2f66: function(arg0, arg1) {
@@ -131,6 +137,10 @@ function __wbg_get_imports() {
             const ret = arg0.done;
             return ret;
         },
+        __wbg_entries_58c7934c745daac7: function(arg0) {
+            const ret = Object.entries(arg0);
+            return ret;
+        },
         __wbg_get_9b94d73e6221f75c: function(arg0, arg1) {
             const ret = arg0[arg1 >>> 0];
             return ret;
@@ -165,6 +175,10 @@ function __wbg_get_imports() {
         },
         __wbg_isArray_d314bb98fcf08331: function(arg0) {
             const ret = Array.isArray(arg0);
+            return ret;
+        },
+        __wbg_isSafeInteger_bfbc7332a9768d2a: function(arg0) {
+            const ret = Number.isSafeInteger(arg0);
             return ret;
         },
         __wbg_iterator_6ff6560ca1568e55: function() {

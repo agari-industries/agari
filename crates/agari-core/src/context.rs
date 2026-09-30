@@ -43,7 +43,7 @@ pub struct GameContext {
     pub is_open_riichi: bool,
 
     // === Situational yaku ===
-    /// Won on kan replacement tile (rinshan kaihou)
+    /// Won on a kan or pulled-North replacement tile (rinshan kaihou)
     pub is_rinshan: bool,
     /// Ron on another player's added kan tile (chankan)
     pub is_chankan: bool,
@@ -68,9 +68,15 @@ pub struct GameContext {
     pub aka_count: u8,
 
     // === Rules ===
-    /// Optional rules in effect; the default is standard scoring
+    /// Rules in effect; the default is standard four-player scoring
     #[serde(default)]
     pub rules: Rules,
+
+    // === Nukidora ===
+    /// Norths pulled and set aside in sanma, each one dora. They are not
+    /// hand tiles, and a ron on one is a plain ron, not chankan.
+    #[serde(default)]
+    pub nukidora: u8,
 }
 
 impl GameContext {
@@ -96,6 +102,7 @@ impl GameContext {
             ura_dora_indicators: Vec::new(),
             aka_count: 0,
             rules: Rules::default(),
+            nukidora: 0,
         }
     }
 
@@ -191,7 +198,13 @@ impl GameContext {
         self
     }
 
-    /// Builder-style: set the optional rules to score under
+    /// Builder-style: set how many Norths were pulled as nukidora
+    pub fn with_nukidora(mut self, count: u8) -> Self {
+        self.nukidora = count;
+        self
+    }
+
+    /// Builder-style: set the rules to score under
     pub fn with_rules(mut self, rules: Rules) -> Self {
         self.rules = rules;
         self
@@ -213,7 +226,8 @@ impl GameContext {
     }
 }
 
-/// Calculate what tile is dora given a dora indicator
+/// Calculate what tile is dora given a dora indicator, in four-player
+/// mahjong; `Rules::dora_for` covers other variants.
 ///
 /// Dora indicator -> Actual dora:
 /// - Suited: indicator + 1 (wraps 9 -> 1)
@@ -248,11 +262,14 @@ pub struct DoraCount {
     pub regular: u8,
     pub ura: u8,
     pub aka: u8,
+    /// Pulled Norths, one each; dora or ura on North count them again
+    #[serde(default)]
+    pub nuki: u8,
 }
 
 impl DoraCount {
     pub fn total(&self) -> u8 {
-        self.regular + self.ura + self.aka
+        self.regular + self.ura + self.aka + self.nuki
     }
 }
 
@@ -264,23 +281,35 @@ pub fn count_dora(counts: &TileCounts, context: &GameContext) -> u8 {
 /// Count dora with detailed breakdown by type
 pub fn count_dora_detailed(counts: &TileCounts, context: &GameContext) -> DoraCount {
     let mut result = DoraCount::default();
+    let nukidora = if context.rules.allows_nukidora() {
+        context.nukidora
+    } else {
+        0
+    };
+    let held = |tile: Tile| {
+        let pulled = if tile == Tile::honor(Honor::North) {
+            nukidora
+        } else {
+            0
+        };
+        counts.get(&tile).copied().unwrap_or(0) + pulled
+    };
 
     // Count regular dora
     for indicator in &context.dora_indicators {
-        let dora = indicator_to_dora(*indicator);
-        result.regular += counts.get(&dora).copied().unwrap_or(0);
+        result.regular += held(context.rules.dora_for(*indicator));
     }
 
     // Count ura dora (only if riichi)
     if context.is_riichi {
         for indicator in &context.ura_dora_indicators {
-            let dora = indicator_to_dora(*indicator);
-            result.ura += counts.get(&dora).copied().unwrap_or(0);
+            result.ura += held(context.rules.dora_for(*indicator));
         }
     }
 
     // Add akadora count
     result.aka = context.aka_count;
+    result.nuki = nukidora;
 
     result
 }
@@ -371,6 +400,38 @@ mod tests {
     }
 
     #[test]
+    fn sanma_dora_skips_the_missing_manzu() {
+        let tiles = parse_hand("111999m123p456s11z").unwrap();
+        let counts = to_counts(&tiles);
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .riichi()
+            .with_rules(Rules::sanma())
+            .with_dora(vec![Tile::suited(Suit::Man, 1)])
+            .with_ura_dora(vec![Tile::suited(Suit::Man, 1)]);
+
+        let dora = count_dora_detailed(&counts, &context);
+        assert_eq!((dora.regular, dora.ura), (3, 3));
+    }
+
+    #[test]
+    fn pulled_norths_count_again_when_north_is_dora() {
+        let tiles = parse_hand("111999m123p456s11z").unwrap();
+        let counts = to_counts(&tiles);
+        let west = Tile::honor(Honor::West);
+
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .riichi()
+            .with_rules(Rules::sanma())
+            .with_nukidora(2)
+            .with_dora(vec![west])
+            .with_ura_dora(vec![west]);
+
+        let dora = count_dora_detailed(&counts, &context);
+        assert_eq!((dora.regular, dora.ura, dora.nuki), (2, 2, 2));
+    }
+
+    #[test]
     fn test_count_dora_ura_only_with_riichi() {
         let tiles = parse_hand("222m555p789s11122z").unwrap();
         let counts = to_counts(&tiles);
@@ -436,10 +497,12 @@ mod tests {
         fields.remove("is_open_riichi");
         fields.remove("is_renhou");
         fields.remove("rules");
+        fields.remove("nukidora");
 
         let restored: GameContext = serde_json::from_value(json).unwrap();
         assert!(!restored.is_open_riichi);
         assert!(!restored.is_renhou);
         assert_eq!(restored.rules, Rules::default());
+        assert_eq!(restored.nukidora, 0);
     }
 }

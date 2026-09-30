@@ -56,11 +56,13 @@ export const en: Translations = {
   fu: "fu",
   pts: "pts",
   all: "all",
+  twoPayers: "(2 players)",
   dealer: "Dealer",
   dealerOya: "Dealer (Oya)",
   yaku: "Yaku",
   ura: "Ura",
   aka: "Aka",
+  nukidora: "Nukidora",
   fuBreakdown: "Fu Breakdown",
   fuBase: "Base",
   fuMenzenRon: "Menzen Ron",
@@ -74,6 +76,9 @@ export const en: Translations = {
 
   // Options
   options: "Options",
+  game: "Game",
+  fourPlayers: "4 Players",
+  threePlayers: "3 Players",
   winType: "Win Type",
   ron: "Ron",
   tsumo: "Tsumo",

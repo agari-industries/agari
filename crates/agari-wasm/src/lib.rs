@@ -11,10 +11,12 @@ use wasm_bindgen::prelude::*;
 use agari::context::{GameContext, WinType};
 use agari::hand::{HandStructure, decompose_hand, decompose_hand_with_melds};
 use agari::parse::TileCounts;
-use agari::parse::{parse_hand_with_aka, to_counts};
+use agari::parse::{parse_hand_with_aka, to_counts, validate_hand_with_context};
 use agari::rules::Rules;
 use agari::scoring::{ScoringResult, calculate_score};
-use agari::shanten::{ShantenResult, UkeireResult, calculate_shanten_with_melds, calculate_ukeire_with_melds};
+use agari::shanten::{
+    ShantenResult, UkeireResult, calculate_shanten_with_melds, calculate_ukeire_with_rules,
+};
 use agari::tile::{Honor, Tile};
 use agari::yaku::{Yaku, YakuResult, detect_yaku_with_context};
 
@@ -43,9 +45,9 @@ pub struct ScoreRequest {
     pub is_double_riichi: bool,
     /// Whether ippatsu (win within one turn of riichi)
     pub is_ippatsu: bool,
-    /// Round wind: "east", "south", "west", "north"
+    /// Round wind: "east", "south", "west", "north" ("north" is refused in sanma)
     pub round_wind: String,
-    /// Seat wind: "east", "south", "west", "north"
+    /// Seat wind: "east", "south", "west", "north" ("north" is refused in sanma)
     pub seat_wind: String,
     /// Dora indicator tiles (e.g., ["1m", "5z"])
     pub dora_indicators: Vec<String>,
@@ -67,9 +69,12 @@ pub struct ScoreRequest {
     /// Whether a non-dealer won by ron before their first draw (renhou)
     #[serde(default)]
     pub is_renhou: bool,
-    /// Optional rules to score under; the default is standard scoring
+    /// Rules to score under; the default is standard four-player scoring
     #[serde(default)]
     pub rules: Rules,
+    /// Norths pulled as nukidora (sanma only)
+    #[serde(default)]
+    pub nukidora: u8,
 }
 
 /// Scoring result returned to JavaScript
@@ -124,6 +129,7 @@ pub struct DoraInfo {
     pub regular: u8,
     pub ura: u8,
     pub aka: u8,
+    pub nuki: u8,
     pub total: u8,
 }
 
@@ -236,10 +242,16 @@ pub fn calculate_shanten_js(hand: &str) -> JsValue {
     }
 }
 
-/// Calculate ukeire (tile acceptance) for a hand
+/// Calculate ukeire (tile acceptance) for a hand; with `sanma`, 2m-8m are
+/// left out and a hand holding them or a chi is refused
 #[wasm_bindgen]
-pub fn calculate_ukeire_js(hand: &str) -> JsValue {
-    match calculate_ukeire_internal(hand) {
+pub fn calculate_ukeire_js(hand: &str, sanma: Option<bool>) -> JsValue {
+    let rules = if sanma.unwrap_or(false) {
+        Rules::sanma()
+    } else {
+        Rules::default()
+    };
+    match calculate_ukeire_internal(hand, &rules) {
         Ok(result) => {
             let tiles: Vec<UkeireTileInfo> = result
                 .tiles
@@ -365,6 +377,7 @@ fn score_hand_internal(request: &ScoreRequest) -> Result<ScoringOutput, String> 
     context = context.with_dora(dora_indicators);
     context = context.with_ura_dora(ura_dora_indicators);
     context = context.with_aka(parsed.aka_count);
+    context = context.with_nukidora(request.nukidora);
 
     // Parse winning tile if provided, otherwise we'll infer it
     let explicit_winning_tile = if let Some(ref wt) = request.winning_tile {
@@ -374,6 +387,8 @@ fn score_hand_internal(request: &ScoreRequest) -> Result<ScoringOutput, String> 
     } else {
         false
     };
+
+    validate_hand_with_context(&parsed, &context)?;
 
     // Decompose the hand
     let structures = if parsed.called_melds.is_empty() {
@@ -459,6 +474,7 @@ fn score_hand_internal(request: &ScoreRequest) -> Result<ScoringOutput, String> 
             regular: yaku.regular_dora,
             ura: yaku.ura_dora,
             aka: yaku.aka_dora,
+            nuki: yaku.nuki_dora,
             total: yaku.dora_count,
         },
         total_han,
@@ -505,11 +521,17 @@ fn calculate_shanten_internal(hand: &str) -> Result<(ShantenResult, String), Str
     Ok((result, description))
 }
 
-fn calculate_ukeire_internal(hand: &str) -> Result<UkeireResult, String> {
+fn calculate_ukeire_internal(hand: &str, rules: &Rules) -> Result<UkeireResult, String> {
     let parsed = parse_hand_with_aka(hand).map_err(|e| e.to_string())?;
+    agari::parse::validate_tiles_and_calls(&parsed, rules)?;
     let counts = to_counts(&parsed.tiles);
     let called_melds = parsed.called_melds.len() as u8;
-    Ok(calculate_ukeire_with_melds(&counts, called_melds))
+    Ok(calculate_ukeire_with_rules(
+        &counts,
+        called_melds,
+        None,
+        rules,
+    ))
 }
 
 // ============================================================================
@@ -693,6 +715,7 @@ mod tests {
             is_open_riichi: false,
             is_renhou: false,
             rules: Rules::default(),
+            nukidora: 0,
         }
     }
 
@@ -727,6 +750,45 @@ mod tests {
         assert_eq!(output.yaku.len(), 1);
         assert_eq!(output.yaku[0].name, "Open Riichi");
         assert_eq!(output.yaku[0].han, 2);
+    }
+
+    #[test]
+    fn sanma_request_scores_nukidora_and_refuses_manzu() {
+        let mut request = make_request("111999m123p456s11z");
+        request.winning_tile = Some("1p".to_string());
+        request.is_tsumo = true;
+        request.seat_wind = "south".to_string();
+        request.dora_indicators = vec!["3z".to_string()];
+        request.rules = Rules::sanma();
+        request.nukidora = 2;
+
+        let output = score_hand_internal(&request).unwrap();
+        assert_eq!((output.dora.regular, output.dora.nuki), (2, 2));
+        assert_eq!(output.payment.total, 6000);
+
+        request.hand = "111999m123p456s22m".to_string();
+        assert_eq!(
+            score_hand_internal(&request).unwrap_err(),
+            "2m is not used in sanma"
+        );
+        assert_eq!(
+            calculate_ukeire_internal("19m456p789s11223z", &Rules::sanma())
+                .unwrap()
+                .tiles
+                .iter()
+                .filter(|t| t.tile.to_string().ends_with('m'))
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn score_request_checks_the_tile_count_first() {
+        let request = make_request("123m456p789s1122z");
+        assert_eq!(
+            score_hand_internal(&request).unwrap_err(),
+            "Hand with 0 kan(s) must have 14 tiles, got 13"
+        );
     }
 
     #[test]
@@ -872,7 +934,7 @@ mod tests {
 
     #[test]
     fn test_ukeire_api_success() {
-        let result = calculate_ukeire_internal("123m456p789s234m5p").unwrap();
+        let result = calculate_ukeire_internal("123m456p789s234m5p", &Rules::default()).unwrap();
 
         assert_eq!(result.shanten, 0);
         assert!(!result.tiles.is_empty());
@@ -881,7 +943,7 @@ mod tests {
 
     #[test]
     fn test_ukeire_api_complete_hand() {
-        let result = calculate_ukeire_internal("123m456p789s234m55p").unwrap();
+        let result = calculate_ukeire_internal("123m456p789s234m55p", &Rules::default()).unwrap();
 
         assert_eq!(result.shanten, -1);
         assert!(result.tiles.is_empty());

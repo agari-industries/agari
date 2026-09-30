@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hand::KanType;
 use crate::parse::TileCounts;
+use crate::rules::Rules;
 use crate::tile::{Honor, KOKUSHI_TILES, Suit, Tile};
 use std::cmp::{max, min};
 
@@ -534,7 +535,7 @@ pub fn calculate_kokushi_shanten(counts: &TileCounts) -> i8 {
 /// For a practical calculation that accounts for visible tiles on the table,
 /// see [`calculate_ukeire_with_visible`].
 pub fn calculate_ukeire(counts: &TileCounts) -> UkeireResult {
-    calculate_ukeire_inner(counts, 0, None)
+    calculate_ukeire_inner(counts, 0, None, &Rules::default())
 }
 
 /// Calculate theoretical ukeire (tile acceptance) for a hand with called melds.
@@ -545,7 +546,7 @@ pub fn calculate_ukeire(counts: &TileCounts) -> UkeireResult {
 /// For a practical calculation that accounts for visible tiles on the table,
 /// see [`calculate_ukeire_with_melds_and_visible`].
 pub fn calculate_ukeire_with_melds(counts: &TileCounts, called_melds: u8) -> UkeireResult {
-    calculate_ukeire_inner(counts, called_melds, None)
+    calculate_ukeire_inner(counts, called_melds, None, &Rules::default())
 }
 
 /// Calculate practical ukeire (tile acceptance) accounting for visible tiles.
@@ -559,7 +560,7 @@ pub fn calculate_ukeire_with_visible(
     counts: &TileCounts,
     visible_counts: &TileCounts,
 ) -> UkeireResult {
-    calculate_ukeire_inner(counts, 0, Some(visible_counts))
+    calculate_ukeire_inner(counts, 0, Some(visible_counts), &Rules::default())
 }
 
 /// Calculate practical ukeire (tile acceptance) with called melds and visible tiles.
@@ -574,7 +575,25 @@ pub fn calculate_ukeire_with_melds_and_visible(
     called_melds: u8,
     visible_counts: &TileCounts,
 ) -> UkeireResult {
-    calculate_ukeire_inner(counts, called_melds, Some(visible_counts))
+    calculate_ukeire_inner(
+        counts,
+        called_melds,
+        Some(visible_counts),
+        &Rules::default(),
+    )
+}
+
+/// Calculate ukeire under the given rules, counting only tiles that are in
+/// the wall (no 2m-8m in sanma). `visible_counts` is optional and works as in
+/// [`calculate_ukeire_with_melds_and_visible`]. The hand should already hold
+/// only such tiles; see `parse::validate_tiles_and_calls`.
+pub fn calculate_ukeire_with_rules(
+    counts: &TileCounts,
+    called_melds: u8,
+    visible_counts: Option<&TileCounts>,
+    rules: &Rules,
+) -> UkeireResult {
+    calculate_ukeire_inner(counts, called_melds, visible_counts, rules)
 }
 
 /// Shared ukeire implementation.
@@ -585,6 +604,7 @@ fn calculate_ukeire_inner(
     counts: &TileCounts,
     called_melds: u8,
     visible_counts: Option<&TileCounts>,
+    rules: &Rules,
 ) -> UkeireResult {
     let current = calculate_shanten_with_melds(counts, called_melds);
     let mut accepting_tiles = Vec::new();
@@ -599,8 +619,8 @@ fn calculate_ukeire_inner(
             .and_then(|vc| vc.get(&tile).copied())
             .unwrap_or(0);
 
-        // Skip if already have 4 of this tile in hand (can't test adding a 5th)
-        if hand_count >= 4 {
+        // Skip tiles not in the wall, and ones already held four times
+        if hand_count >= 4 || !rules.in_wall(tile) {
             continue;
         }
 
@@ -657,7 +677,8 @@ pub struct UkeireTile {
 /// form sequences — honor tiles always produce an empty result.
 ///
 /// Each returned `(Tile, Tile)` is the pair of hand tiles used (not the
-/// discard itself), listed in index order.
+/// discard itself), listed in index order. Sanma has no chi, which callers
+/// check with `Rules::allows_chi`.
 pub fn valid_chi_combinations(hand: &TileCounts, discarded_tile: Tile) -> Vec<(Tile, Tile)> {
     let arr = counts_to_array(hand);
     let d = tile_to_index(discarded_tile);
@@ -1400,5 +1421,25 @@ mod tests {
         // That's 9 tiles + 1 meld, missing a pair → shanten should be reasonable
         assert!((-1..=2).contains(&after),
             "Unexpected shanten after added kan: {before} -> {after}");
+    }
+
+    #[test]
+    fn sanma_ukeire_skips_tiles_missing_from_the_wall() {
+        let counts = to_counts(&parse_hand("19m456p789s11223z").unwrap());
+        let manzu = |r: &UkeireResult| -> Vec<Tile> {
+            r.tiles
+                .iter()
+                .map(|u| u.tile)
+                .filter(|t| matches!(t, Tile::Suited { suit: Suit::Man, .. }))
+                .collect()
+        };
+
+        let yonma = calculate_ukeire_with_rules(&counts, 0, None, &Rules::default());
+        let sanma = calculate_ukeire_with_rules(&counts, 0, None, &Rules::sanma());
+        assert!(manzu(&yonma).contains(&Tile::suited(Suit::Man, 2)));
+        assert_eq!(
+            manzu(&sanma),
+            vec![Tile::suited(Suit::Man, 1), Tile::suited(Suit::Man, 9)]
+        );
     }
 }

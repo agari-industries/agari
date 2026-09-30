@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Sanma**: `Rules::sanma()` scores three-player mahjong. 2m-8m are left out of the wall, so a 1m dora indicator points to 9m, and there is no chi and no North seat or round. A tsumo is paid by the two other players at their usual share, so it pays less than at four players (tsumo loss). `Rules::players()` gives the table size. CLI: `--sanma`.
+- **Nukidora**: `GameContext::with_nukidora(n)` sets the Norths pulled in sanma. Each is one han, reported apart as `DoraCount::nuki` and `YakuResult::nuki_dora`, and counts again when a dora or ura indicator points at North. Pulled Norths are never hand tiles and count toward a counted yakuman. CLI: `--nuki <N>`.
+- **Rules-aware validation**: `validate_hand_with_context` checks a hand and its context against the rules before scoring, and `validate_tiles_and_calls` checks the tiles and calls of a hand of any size. Under sanma rules both refuse 2m-8m (including a red 5m) and chi, and `validate_hand_with_context` also refuses a North seat or round and a fifth North; under four-player rules it refuses nukidora. `Rules::in_wall`, `Rules::allows_chi`, `Rules::allows_nukidora` and `Rules::has_wind` answer the same questions directly, and `Rules::dora_for` gives the dora an indicator points to.
+- **Sanma ukeire**: `calculate_ukeire_with_rules` counts only tiles in the wall. The CLI's `--shanten` and `--ukeire` take `--sanma`.
+- **WASM**: `ScoreRequest` takes `nukidora`, and `rules` selects sanma with `{"variant": "Sanma"}`; the response's `dora` gains `nuki`. `calculate_ukeire_js` takes an optional `sanma` flag.
+- **Web UI**: A 4 Players / 3 Players toggle leads the options. Three-player mode drops 2m-8m, chi and the North seat and round from the choices and adds a nukidora counter, and shareable URLs carry the mode and the nukidora count.
+- A second digest test pins sanma scoring: 100,000 generated hands, hashed to one value. The standard digest is unchanged.
+
+### Changed
+
+- **New public fields**: `Rules` gains `variant`, `GameContext` gains `nukidora`, `DoraCount` gains `nuki` and `YakuResult` gains `nuki_dora`, each after the existing fields and defaulted when deserializing, so previously serialized values read as four-player scoring. Struct literals of `GameContext`, `DoraCount` and `YakuResult` need updating; `GameContext::new` and previously serialized values are unaffected.
+- **WASM validation**: `score_hand` now checks the tile count and copies before scoring, so a wrong-sized hand gets a clear error instead of "No valid hand structure found", and a hand holding a fifth copy of a tile is refused where it used to score.
+
 ## [0.25.0]
 
 ### Added
