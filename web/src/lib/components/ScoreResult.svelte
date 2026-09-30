@@ -25,14 +25,16 @@
     result: ScoringOutput | null;
     error?: string | null;
     loading?: boolean;
+    sanma?: boolean;
   }
 
-  let { result, error = null, loading = false }: Props = $props();
+  let { result, error = null, loading = false, sanma = false }: Props = $props();
 
   const formatPayment = (payment: ScoringOutput['payment'], isDealer: boolean, isTsumoWin: boolean): string => {
     if (isTsumoWin) {
       if (isDealer) {
-        return `${payment.from_non_dealer?.toLocaleString()} ${$t.all}`;
+        const all = `${payment.from_non_dealer?.toLocaleString()} ${$t.all}`;
+        return sanma ? `${all} ${$t.twoPayers}` : all;
       } else {
         return `${payment.from_non_dealer?.toLocaleString()} / ${payment.from_dealer?.toLocaleString()}`;
       }
@@ -141,6 +143,12 @@
               <div class="dora-item">
                 <span class="dora-name">{$t.aka}</span>
                 <span class="dora-han aka">{result.dora.aka}</span>
+              </div>
+            {/if}
+            {#if result.dora.nuki > 0}
+              <div class="dora-item">
+                <span class="dora-name">{$t.nukidora}</span>
+                <span class="dora-han">{result.dora.nuki}</span>
               </div>
             {/if}
           </div>

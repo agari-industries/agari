@@ -2,6 +2,10 @@
   import { t, locale, getWindNames } from '../i18n';
 
   interface Props {
+    isSanma: boolean;
+    nukidora: number;
+    maxNukidora: number;
+    onSanmaChange: (sanma: boolean) => void;
     isTsumo: boolean;
     isRiichi: boolean;
     isDoubleRiichi: boolean;
@@ -18,6 +22,10 @@
   }
 
   let {
+    isSanma,
+    nukidora = $bindable(),
+    maxNukidora,
+    onSanmaChange,
     isTsumo = $bindable(),
     isRiichi = $bindable(),
     isDoubleRiichi = $bindable(),
@@ -41,7 +49,11 @@
     }
   });
 
-  const winds = ['east', 'south', 'west', 'north'] as const;
+  const winds = $derived(
+    isSanma
+      ? (['east', 'south', 'west'] as const)
+      : (['east', 'south', 'west', 'north'] as const),
+  );
   const windSymbols = { east: '東', south: '南', west: '西', north: '北' };
   const windNames = $derived(getWindNames($locale));
 
@@ -64,6 +76,29 @@
 </script>
 
 <div class="context-options">
+  <!-- Game -->
+  <div class="option-section">
+    <h3 class="section-title">{$t.game}</h3>
+    <div class="toggle-group">
+      <button
+        type="button"
+        class="toggle-btn"
+        class:active={!isSanma}
+        onclick={() => onSanmaChange(false)}
+      >
+        {$t.fourPlayers}
+      </button>
+      <button
+        type="button"
+        class="toggle-btn"
+        class:active={isSanma}
+        onclick={() => onSanmaChange(true)}
+      >
+        {$t.threePlayers}
+      </button>
+    </div>
+  </div>
+
   <!-- Win Type -->
   <div class="option-section">
     <h3 class="section-title">{$t.winType}</h3>
@@ -128,6 +163,34 @@
       <div class="dealer-badge">{$t.dealerOya}</div>
     {/if}
   </div>
+
+  {#if isSanma}
+    <!-- Nukidora -->
+    <div class="option-section">
+      <h3 class="section-title">{$t.nukidora}</h3>
+      <div class="toggle-group nuki-counter" role="group" aria-label={$t.nukidora}>
+        <button
+          type="button"
+          class="toggle-btn"
+          disabled={nukidora <= 0}
+          aria-label="{$t.nukidora} −1"
+          onclick={() => { nukidora--; onChange(); }}
+        >
+          −
+        </button>
+        <span class="nuki-count">{nukidora}</span>
+        <button
+          type="button"
+          class="toggle-btn"
+          disabled={nukidora >= maxNukidora}
+          aria-label="{$t.nukidora} +1"
+          onclick={() => { nukidora++; onChange(); }}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  {/if}
 
   <!-- Riichi Options -->
   <div class="option-section">
@@ -281,6 +344,21 @@
   .toggle-btn.active {
     background: var(--accent);
     color: white;
+  }
+
+  .toggle-btn:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .nuki-count {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    text-align: center;
   }
 
   /* Wind Buttons */

@@ -249,6 +249,9 @@ pub struct YakuResult {
     pub ura_dora: u8,
     pub aka_dora: u8,
     pub is_yakuman: bool,
+    /// Pulled Norths (nukidora), shown apart from the other dora
+    #[serde(default)]
+    pub nuki_dora: u8,
 }
 
 impl YakuResult {
@@ -588,6 +591,7 @@ pub fn detect_yaku_with_context(
             ura_dora: dora.ura,
             aka_dora: dora.aka,
             is_yakuman,
+            nuki_dora: dora.nuki,
         },
         context,
     )

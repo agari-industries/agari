@@ -2,7 +2,7 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const calculate_shanten_js: (a: number, b: number) => any;
-export const calculate_ukeire_js: (a: number, b: number) => any;
+export const calculate_ukeire_js: (a: number, b: number, c: number) => any;
 export const init: () => void;
 export const score_hand: (a: any) => any;
 export const validate_hand: (a: number, b: number) => any;

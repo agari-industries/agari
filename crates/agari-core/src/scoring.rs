@@ -86,7 +86,8 @@ pub struct FuBreakdown {
 /// Payment structure for a winning hand
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Payment {
-    /// Total points won
+    /// Total points won. A sanma tsumo has one payer fewer, so it is
+    /// less than the same tsumo at four players.
     pub total: u32,
     /// If tsumo: what each non-dealer pays (None for ron)
     pub from_non_dealer: Option<u32>,
@@ -419,15 +420,27 @@ pub fn calculate_basic_points(han: u8, fu: u8, is_yakuman: bool) -> u32 {
     basic.min(2000)
 }
 
-/// Calculate final payment based on basic points, dealer status, and win type
+/// Payment at a four-player table from basic points, dealer status and win
+/// type; `calculate_score` handles sanma
 pub fn calculate_payment(basic_points: u32, is_dealer: bool, win_type: WinType) -> Payment {
+    payment_at_table(basic_points, is_dealer, win_type, 4)
+}
+
+/// Each payer's share does not depend on the table size, so with fewer
+/// players a tsumo is simply worth less (tsumo loss in sanma).
+fn payment_at_table(
+    basic_points: u32,
+    is_dealer: bool,
+    win_type: WinType,
+    players: u32,
+) -> Payment {
     match win_type {
         WinType::Tsumo => {
             if is_dealer {
                 // Dealer tsumo: each non-dealer pays basic × 2
                 let from_each = round_up_to_100(basic_points * 2);
                 Payment {
-                    total: from_each * 3,
+                    total: from_each * (players - 1),
                     from_non_dealer: Some(from_each),
                     from_dealer: None, // Dealer is the winner
                     from_discarder: None,
@@ -437,7 +450,7 @@ pub fn calculate_payment(basic_points: u32, is_dealer: bool, win_type: WinType) 
                 let from_dealer = round_up_to_100(basic_points * 2);
                 let from_non_dealer = round_up_to_100(basic_points);
                 Payment {
-                    total: from_dealer + (from_non_dealer * 2),
+                    total: from_dealer + from_non_dealer * (players - 2),
                     from_non_dealer: Some(from_non_dealer),
                     from_dealer: Some(from_dealer),
                     from_discarder: None,
@@ -495,7 +508,12 @@ pub fn calculate_score(
 
     // Calculate payment
     let is_dealer = context.is_dealer();
-    let payment = calculate_payment(basic_points, is_dealer, context.win_type);
+    let payment = payment_at_table(
+        basic_points,
+        is_dealer,
+        context.win_type,
+        context.rules.players(),
+    );
 
     // Counted yakuman: reached yakuman level (13+ han) without actual yakuman yaku
     let is_counted_yakuman =
@@ -535,6 +553,9 @@ pub fn format_score(result: &ScoringResult, yaku_result: &YakuResult) -> String 
             "  • Red Fives (Akadora) ({} han)\n",
             yaku_result.aka_dora
         ));
+    }
+    if yaku_result.nuki_dora > 0 {
+        output.push_str(&format!("  • Nukidora ({} han)\n", yaku_result.nuki_dora));
     }
 
     // Han and Fu
@@ -1134,6 +1155,24 @@ mod tests {
 
         assert_eq!(payment.from_discarder, Some(8000));
         assert_eq!(payment.total, 8000);
+    }
+
+    #[test]
+    fn sanma_tsumo_loses_the_missing_players_share() {
+        // (basic points, dealer, win) -> (from dealer, from non-dealer, total)
+        let cases = [
+            (480, false, WinType::Tsumo, Some(1000), Some(500), 1500),
+            (2000, false, WinType::Tsumo, Some(4000), Some(2000), 6000),
+            (2000, true, WinType::Tsumo, None, Some(4000), 8000),
+            (2000, false, WinType::Ron, None, None, 8000),
+        ];
+        for (basic, dealer, win, from_dealer, from_non_dealer, total) in cases {
+            let payment = payment_at_table(basic, dealer, win, 3);
+            let case = format!("{basic} {dealer} {win:?}");
+            assert_eq!(payment.from_dealer, from_dealer, "{case}");
+            assert_eq!(payment.from_non_dealer, from_non_dealer, "{case}");
+            assert_eq!(payment.total, total, "{case}");
+        }
     }
 
     #[test]
@@ -2310,5 +2349,23 @@ mod tests {
             best_no_dora.payment.total,
             best_dora.payment.total
         );
+    }
+
+    #[test]
+    fn pulled_norths_reach_counted_yakuman() {
+        // Riichi and tsumo are 2 han; two West indicators make each of the
+        // four pulled Norths worth 3, for 14.
+        let west = Tile::honor(Honor::West);
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+            .riichi()
+            .with_winning_tile(Tile::suited(Suit::Pin, 1))
+            .with_rules(crate::rules::Rules::sanma())
+            .with_nukidora(4)
+            .with_dora(vec![west, west]);
+
+        let results = score_hand("111999m123p456s11z", &context);
+        let best = best_score(&results);
+        assert_eq!(best.score_level, ScoreLevel::Yakuman(1));
+        assert_eq!(best.payment.total, 16000 + 8000);
     }
 }

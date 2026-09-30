@@ -7,9 +7,10 @@
 export function calculate_shanten_js(hand: string): any;
 
 /**
- * Calculate ukeire (tile acceptance) for a hand
+ * Calculate ukeire (tile acceptance) for a hand; with `sanma`, 2m-8m are
+ * left out and a hand holding them is refused
  */
-export function calculate_ukeire_js(hand: string): any;
+export function calculate_ukeire_js(hand: string, sanma?: boolean | null): any;
 
 /**
  * Initialize panic hook for better error messages in the browser console
@@ -33,7 +34,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly calculate_shanten_js: (a: number, b: number) => any;
-    readonly calculate_ukeire_js: (a: number, b: number) => any;
+    readonly calculate_ukeire_js: (a: number, b: number, c: number) => any;
     readonly init: () => void;
     readonly score_hand: (a: any) => any;
     readonly validate_hand: (a: number, b: number) => any;

@@ -1,4 +1,6 @@
+use crate::context::GameContext;
 use crate::hand::{KanType, Meld};
+use crate::rules::Rules;
 use crate::tile::{Honor, Suit, Tile};
 use std::collections::HashMap;
 
@@ -457,6 +459,79 @@ pub fn validate_hand_with_melds(parsed: &ParsedHand) -> Result<(), String> {
     Ok(())
 }
 
+/// Check that a hand, of any size, holds only tiles in the wall and makes no
+/// call the rules forbid (sanma: no 2m-8m, no chi).
+pub fn validate_tiles_and_calls(parsed: &ParsedHand, rules: &Rules) -> Result<(), String> {
+    let tiles = parsed
+        .tiles
+        .iter()
+        .chain(parsed.called_melds.iter().flat_map(|m| &m.tiles));
+    for tile in tiles {
+        if !rules.in_wall(*tile) {
+            return Err(format!("{} is not used in sanma", tile));
+        }
+    }
+
+    let has_chi = parsed
+        .called_melds
+        .iter()
+        .any(|m| matches!(m.meld, Meld::Shuntsu(_, true)));
+    if has_chi && !rules.allows_chi() {
+        return Err("Chi is not allowed in sanma".to_string());
+    }
+    Ok(())
+}
+
+/// Validate a hand and its context against the rules in play: the tile
+/// counts of `validate_hand_with_melds`, plus the tiles, calls and seats
+/// that sanma leaves out. A chi is only seen when written as a called
+/// meld. Scoring assumes a hand that passes this.
+pub fn validate_hand_with_context(
+    parsed: &ParsedHand,
+    context: &GameContext,
+) -> Result<(), String> {
+    validate_hand_with_melds(parsed)?;
+    let rules = &context.rules;
+    validate_tiles_and_calls(parsed, rules)?;
+
+    let context_tiles = context
+        .winning_tile
+        .iter()
+        .chain(&context.dora_indicators)
+        .chain(&context.ura_dora_indicators);
+    for tile in context_tiles {
+        if !rules.in_wall(*tile) {
+            return Err(format!("{} is not used in sanma", tile));
+        }
+    }
+
+    if context.nukidora > 0 {
+        if !rules.allows_nukidora() {
+            return Err("Nukidora is only used in sanma".to_string());
+        }
+        let north = Tile::honor(Honor::North);
+        let norths = parsed
+            .tiles
+            .iter()
+            .chain(parsed.called_melds.iter().flat_map(|m| &m.tiles))
+            .filter(|&&t| t == north)
+            .count()
+            + context.nukidora as usize;
+        if norths > 4 {
+            return Err(format!("North appears {} times (max 4)", norths));
+        }
+    }
+
+    if !rules.has_wind(context.seat_wind) {
+        return Err("North is not a seat in sanma".to_string());
+    }
+    if !rules.has_wind(context.round_wind) {
+        return Err("There is no North round in sanma".to_string());
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -803,5 +878,84 @@ mod tests {
         // Digits followed by honor letter should fail (digits need a suit)
         let result = parse_hand_with_aka("123e");
         assert!(result.is_err());
+    }
+
+    use crate::context::WinType;
+
+    fn check(hand: &str, context: GameContext) -> Result<(), String> {
+        validate_hand_with_context(&parse_hand_with_aka(hand).unwrap(), &context)
+    }
+
+    fn sanma(round: Honor, seat: Honor) -> GameContext {
+        GameContext::new(WinType::Ron, round, seat).with_rules(Rules::sanma())
+    }
+
+    #[test]
+    fn sanma_accepts_terminal_manzu_red_fives_north_and_a_west_round() {
+        let context = sanma(Honor::West, Honor::West);
+        assert!(check("11m406p406s444z(999m)", context).is_ok());
+    }
+
+    #[test]
+    fn sanma_rejects_missing_tiles_chi_and_north_seats() {
+        let hand = "111999m123p456s11z";
+        let three_man = vec![Tile::suited(Suit::Man, 3)];
+        let cases = [
+            (
+                "123p456s789s11z(234m)",
+                sanma(Honor::East, Honor::South),
+                "2m is not used in sanma",
+            ),
+            (
+                "110m123p456p789s11z",
+                sanma(Honor::East, Honor::South),
+                "5m is not used in sanma",
+            ),
+            (
+                hand,
+                sanma(Honor::East, Honor::South).with_dora(three_man),
+                "3m is not used in sanma",
+            ),
+            (
+                "111999m456p11z(123p)",
+                sanma(Honor::East, Honor::South),
+                "Chi is not allowed in sanma",
+            ),
+            (
+                hand,
+                sanma(Honor::East, Honor::North),
+                "North is not a seat in sanma",
+            ),
+            (
+                hand,
+                sanma(Honor::North, Honor::South),
+                "There is no North round in sanma",
+            ),
+        ];
+        for (hand, context, error) in cases {
+            assert_eq!(check(hand, context), Err(error.to_string()), "{hand}");
+        }
+    }
+
+    #[test]
+    fn nukidora_needs_sanma_and_a_fifth_north_is_refused() {
+        let hand = "111999m123p456s44z";
+        let yonma = GameContext::new(WinType::Ron, Honor::East, Honor::South).with_nukidora(1);
+        let five_norths = sanma(Honor::East, Honor::South).with_nukidora(3);
+        assert_eq!(
+            check(hand, yonma),
+            Err("Nukidora is only used in sanma".to_string())
+        );
+        assert_eq!(
+            check(hand, five_norths),
+            Err("North appears 5 times (max 4)".to_string())
+        );
+    }
+
+    #[test]
+    fn yonma_keeps_2m_to_8m_chi_and_north() {
+        let context = GameContext::new(WinType::Ron, Honor::North, Honor::North)
+            .with_dora(vec![Tile::suited(Suit::Man, 3)]);
+        assert!(check("111999m456p11z(234m)", context).is_ok());
     }
 }

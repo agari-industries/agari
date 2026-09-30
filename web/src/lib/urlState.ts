@@ -24,6 +24,8 @@ export interface Meld {
 export type Wind = "east" | "south" | "west" | "north";
 
 export interface AppState {
+  isSanma: boolean;
+  nukidora: number;
   handTiles: TileEntry[];
   melds: Meld[];
   winningTile?: string;
@@ -106,6 +108,9 @@ function buildTileList(tiles: TileEntry[]): string {
 export function serializeToUrl(state: AppState): string {
   const params = new URLSearchParams();
 
+  if (state.isSanma) params.set("p", "3");
+  if (state.nukidora > 0) params.set("nk", String(state.nukidora));
+
   // Hand + melds
   const hand = buildHandString(state.handTiles) + buildMeldNotation(state.melds);
   if (hand) params.set("h", hand);
@@ -164,14 +169,22 @@ export function deserializeFromUrl(): AppState | null {
   const doraIndicators = parseTileList(params.get("d"), nextId);
   const uraDoraIndicators = parseTileList(params.get("u"), nextId);
 
-  // Parse winds
-  const roundWind = CODE_TO_WIND[params.get("rw") || ""] || "east";
-  const seatWind = CODE_TO_WIND[params.get("sw") || ""] || "east";
+  // Parse winds; sanma has no North seat or round
+  const isSanma = params.get("p") === "3";
+  const parseWind = (code: string | null): Wind => {
+    const wind = CODE_TO_WIND[code || ""] || "east";
+    return isSanma && wind === "north" ? "east" : wind;
+  };
+  const roundWind = parseWind(params.get("rw"));
+  const seatWind = parseWind(params.get("sw"));
+  const nukidora = Number.parseInt(params.get("nk") || "", 10);
 
   // Parse boolean flags
   const hasFlag = (key: string) => params.has(key);
 
   return {
+    isSanma,
+    nukidora: isSanma && nukidora > 0 ? Math.min(nukidora, 4) : 0,
     handTiles: parsed.tiles,
     melds: parsed.melds,
     winningTile,

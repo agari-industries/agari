@@ -50,7 +50,7 @@ The system is designed as a pipeline, moving from string parsing to recursive de
 | **`yaku.rs`** | Pattern matching for scoring conditions (Tanyao, Honitsu, etc.). | `Yaku`, `YakuResult` |
 | **`scoring.rs`** | The final calculator for Fu, Han, and point payouts. | `ScoringResult`, `Payment` |
 | **`context.rs`** | Tracking game metadata (winds, dora indicators, win type). | `GameContext` |
-| **`rules.rs`** | Optional rule switches, off by default. | `Rules`, `Renhou` |
+| **`rules.rs`** | The game variant (four or three players) and optional rule switches, off by default. | `Rules`, `Variant`, `Renhou` |
 | **`local_yaku.rs`** | Local yaku, scored only when switched on in `Rules`. | N/A |
 | **`shanten.rs`** | Shanten calculator and ukeire (tile acceptance) analysis. | `ShantenResult`, `UkeireResult` |
 | **`display.rs`** | Pretty-printing tiles using Unicode Mahjong glyphs (🀄). | N/A |
@@ -145,7 +145,7 @@ The engine follows a linear transformation of data to ensure that hands with mul
 1. **Parsing & Counting:** The input string (e.g., `123m456p0s...`) is parsed into a `TileCounts` map. It explicitly handles **Akadora** (red fives) using the `0` notation, which is stored in the `GameContext`.
 2. **Decomposition:** The `decompose_hand` function uses recursive backtracking to identify every possible way to form 4 melds and 1 pair (or 7 pairs for Chiitoitsu). When called melds are present, `decompose_hand_with_melds` is used to incorporate pre-declared kans, pons, and chis.
 3. **Wait Detection:** For every valid structure, the engine checks how the `winning_tile` fits. This determines if the wait was "difficult" (2 fu for Kanchan/Penchan/Tanki) or "ideal" (0 fu for Ryanmen).
-4. **Yaku & Dora:** The engine iterates through the yaku list. It handles han-reduction for open hands (e.g., Honitsu drops from 3 han to 2) and calculates the total Han by adding regular Dora, Ura Dora, and Akadora.
+4. **Yaku & Dora:** The engine iterates through the yaku list. It handles han-reduction for open hands (e.g., Honitsu drops from 3 han to 2) and calculates the total Han by adding regular Dora, Ura Dora, Akadora and, in sanma, Nukidora.
 5. **Fu Calculation:** Minipoints are summed based on triplets (simple vs. terminal/honor), kans (closed vs. open, simple vs. terminal/honor), the wait type, and the pair type, then rounded up to the nearest 10 (with the 25-fu Chiitoitsu exception).
 
 ---
@@ -164,7 +164,7 @@ The calculator evaluates three hand types and returns the best (lowest) shanten:
 2. **Chiitoitsu**: 7 pairs
 3. **Kokushi**: 13 orphans
 
-**Ukeire** (tile acceptance) shows which tiles would improve the hand, along with how many of each are still available. By default, ukeire is *theoretical*. It assumes a full 136-tile deck minus only your hand tiles.
+**Ukeire** (tile acceptance) shows which tiles would improve the hand, along with how many of each are still available. By default, ukeire is *theoretical*. It assumes a full deck (136 tiles, or 108 in sanma) minus only your hand tiles.
 
 For **practical ukeire**, pass `--visible` with tiles already visible on the table (discard ponds, open melds, dora indicators). These are subtracted from the available pool, giving an accurate count of tiles you could actually draw.
 
@@ -193,10 +193,10 @@ Once basic points are established, the `Payment` struct applies the necessary mu
 
 * **Ron (Dealer):** basic × 6 (paid by discarder).
 * **Ron (Non-dealer):** basic × 4 (paid by discarder).
-* **Tsumo (Dealer):** basic × 2 from each of the 3 players.
+* **Tsumo (Dealer):** basic × 2 from each other player.
 * **Tsumo (Non-dealer):** basic × 2 from the Dealer, basic × 1 from the other Non-dealers.
 
-All final payments are rounded up to the nearest 100 points.
+All final payments are rounded up to the nearest 100 points. In sanma each payer pays the same share, but there is one payer fewer, so a tsumo pays less than it would at four players (tsumo loss).
 
 ---
 
@@ -269,6 +269,9 @@ agari 123m456p789s112z --ukeire
 agari 234m567p345789s11z -w 9s --seat s -r --open-riichi
 agari 234m567p345789s11z -w 9s --seat s --renhou mangan
 
+# Sanma: three players, two Norths pulled
+agari 111999m123p456s11z -w 1p -t --sanma --nuki 2 --seat s
+
 # All options
 agari <HAND> [OPTIONS]
 
@@ -290,6 +293,8 @@ OPTIONS:
     --tenhou              Dealer's first draw win
     --chiihou             Non-dealer's first draw win
     --renhou <VALUE>      Renhou (local yaku): mangan, yakuman, or a number of han (at least 1)
+    --sanma               Three-player mahjong (no 2m-8m, no chi, no North seat, tsumo loss)
+    --nuki <N>            Norths pulled as nukidora (sanma)
     --shanten             Calculate shanten instead of score
     --ukeire              Show ukeire with shanten
     --visible <TILES>     Visible tiles on table (e.g., 2z,2z,5p) for practical ukeire
@@ -474,7 +479,7 @@ fn main() {
 | `HandStructure` | Decomposed hand (Standard, Chiitoitsu, or Kokushi) |
 | `Meld` | A group of tiles (Shuntsu, Koutsu, or Kan) |
 | `GameContext` | Win type, winds, dora, riichi status, etc. |
-| `Rules` | Optional rules such as local yaku, off by default |
+| `Rules` | The variant (four or three players) and optional rules such as local yaku |
 | `YakuResult` | Detected yaku with han breakdown |
 | `ScoringResult` | Final score with fu, han, payment |
 
@@ -497,7 +502,8 @@ let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
     .chiihou()                             // Chiihou (non-dealer first draw)
     .open_riichi()                         // Open riichi (implies riichi)
     .renhou()                              // Renhou (non-dealer ron before first draw)
-    .with_rules(rules);                    // Optional rules, see below
+    .with_nukidora(2)                      // Norths pulled (sanma)
+    .with_rules(rules);                    // Rules, see below
 ```
 
 ### Local Yaku
@@ -517,6 +523,28 @@ let context = GameContext::new(WinType::Ron, Honor::East, Honor::South)
 ```
 
 `Renhou::Mangan` follows the EMA, WRC and JPML rules: renhou alone is a mangan and does not combine with other yaku or dora, but a hand worth more without it keeps its normal score.
+
+### Sanma
+
+`Rules::sanma()` scores three-player mahjong:
+
+- 2m-8m are not in the wall, so a 1m dora indicator points to 9m.
+- There is no chi, and no North seat or round.
+- Norths pulled and set aside (nukidora) are passed with `with_nukidora(n)`. Each is one han, reported as `nuki_dora`, and counts again when an indicator points at North. They are never hand tiles, so they do not affect tanyao or the hand's shape.
+- A tsumo is paid by the two other players at their usual share (tsumo loss).
+- North held in the hand is a guest wind: never yakuhai, no pair fu.
+
+Scoring trusts its input, so check the hand first with `validate_hand_with_context`, which refuses what sanma leaves out. For ukeire, `calculate_ukeire_with_rules` skips 2m-8m.
+
+```rust
+use agari::parse::validate_hand_with_context;
+use agari::rules::Rules;
+
+let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::South)
+    .with_rules(Rules::sanma())
+    .with_nukidora(2);
+validate_hand_with_context(&parsed, &context)?;
+```
 
 ---
 

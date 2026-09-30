@@ -17,13 +17,13 @@ use agari::{
         tile_to_ascii, tile_to_unicode,
     },
     hand::{HandStructure, decompose_hand, decompose_hand_with_melds},
-    parse::{TileCounts, parse_hand_with_aka, to_counts, validate_hand, validate_hand_with_melds},
-    rules::Renhou,
-    scoring::{ScoreLevel, ScoringResult, calculate_score},
-    shanten::{
-        ShantenType, calculate_shanten_with_melds, calculate_ukeire_with_melds,
-        calculate_ukeire_with_melds_and_visible,
+    parse::{
+        TileCounts, parse_hand_with_aka, to_counts, validate_hand, validate_hand_with_context,
+        validate_hand_with_melds, validate_tiles_and_calls,
     },
+    rules::{Renhou, Rules, Variant},
+    scoring::{ScoreLevel, ScoringResult, calculate_score},
+    shanten::{ShantenType, calculate_shanten_with_melds, calculate_ukeire_with_rules},
     tile::{Honor, Suit, Tile},
     yaku::{Yaku, YakuResult, detect_yaku_with_context},
 };
@@ -56,6 +56,7 @@ EXAMPLES:
     agari "[1111m]222333m555p11z" -t      Hand with closed kan (15 tiles)
     agari "[1111m](2222p)345678s11z" -t   Hand with closed + open kan (16 tiles)
     agari "123m456p789s(rrr)whwh" -w wh   Open pon of Red dragon, White pair
+    agari 111999m123p456s11z -w 1p -t --sanma --nuki 2 --seat s   Sanma, two pulled Norths
     agari 123m456p789s1112z --ukeire --visible 2z,2z  Practical ukeire with visible tiles"#;
 
 fn styles() -> Styles {
@@ -145,6 +146,14 @@ struct Args {
     #[arg(long, value_name = "VALUE", value_parser = parse_renhou)]
     renhou: Option<Renhou>,
 
+    /// Three-player mahjong: no 2m-8m, no chi, no North seat, tsumo loss
+    #[arg(long)]
+    sanma: bool,
+
+    /// Norths pulled and set aside as nukidora (sanma)
+    #[arg(long, value_name = "N", default_value_t = 0, conflicts_with_all = ["shanten", "ukeire"])]
+    nuki: u8,
+
     /// Calculate shanten (tiles from tenpai) instead of score
     #[arg(long)]
     shanten: bool,
@@ -218,6 +227,10 @@ struct JsonContext {
     chiihou: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     renhou: Option<Renhou>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    sanma: bool,
+    #[serde(skip_serializing_if = "is_zero")]
+    nukidora: u8,
 }
 
 #[derive(Serialize)]
@@ -249,6 +262,8 @@ struct JsonDora {
     ura: u8,
     #[serde(skip_serializing_if = "is_zero")]
     aka: u8,
+    #[serde(skip_serializing_if = "is_zero")]
+    nuki: u8,
     total: u8,
 }
 
@@ -499,7 +514,12 @@ fn main() {
     let mut context = GameContext::new(win_type, round_wind, seat_wind)
         .with_dora(dora_indicators)
         .with_ura_dora(ura_indicators)
-        .with_aka(parsed.aka_count);
+        .with_aka(parsed.aka_count)
+        .with_nukidora(args.nuki);
+
+    if args.sanma {
+        context = context.with_rules(Rules::sanma());
+    }
 
     // If winning tile is specified, use it; otherwise we'll infer it later
     let explicit_winning_tile = winning_tile;
@@ -551,6 +571,11 @@ fn main() {
         context = context.renhou().with_rules(rules);
     }
 
+    if !shanten_mode && let Err(e) = validate_hand_with_context(&parsed, &context) {
+        eprintln!("{} {}", "❌ Invalid hand:".red().bold(), e);
+        process::exit(1);
+    }
+
     // Convert to tile counts (for hand decomposition)
     let counts = to_counts(&parsed.tiles);
 
@@ -582,12 +607,17 @@ fn main() {
     // Shanten mode: calculate shanten and optionally ukeire
     if shanten_mode {
         let called_melds_count = parsed.called_melds.len() as u8;
+        if let Err(e) = validate_tiles_and_calls(&parsed, &context.rules) {
+            eprintln!("{} {}", "❌ Invalid hand:".red().bold(), e);
+            process::exit(1);
+        }
         if args.json {
             print_shanten_json(
                 &counts,
                 called_melds_count,
                 ukeire_mode,
                 visible_counts.as_ref(),
+                &context.rules,
             );
         } else {
             print_header(use_unicode);
@@ -597,6 +627,7 @@ fn main() {
                 ukeire_mode,
                 use_unicode,
                 visible_counts.as_ref(),
+                &context.rules,
             );
             print_footer(use_unicode);
         }
@@ -711,6 +742,7 @@ fn main() {
                         regular: yaku_result.regular_dora,
                         ura: yaku_result.ura_dora,
                         aka: yaku_result.aka_dora,
+                        nuki: yaku_result.nuki_dora,
                         total: yaku_result.dora_count,
                     },
                     han: score.han,
@@ -762,6 +794,8 @@ fn main() {
             tenhou: context.is_tenhou,
             chiihou: context.is_chiihou,
             renhou: context.rules.renhou.filter(|_| context.is_renhou),
+            sanma: context.rules.variant == Variant::Sanma,
+            nukidora: context.nukidora,
         };
 
         let output = JsonOutput {
@@ -789,7 +823,7 @@ fn main() {
         print_hand(structure, use_unicode);
         print_context(&context, &parsed, use_unicode);
         print_yaku(yaku_result, &context);
-        print_score(score);
+        print_score(score, context.rules.players());
     }
 
     print_footer(use_unicode);
@@ -1107,6 +1141,10 @@ fn print_context(context: &GameContext, parsed: &agari::parse::ParsedHand, use_u
     };
     println!("   {}: {}", "Win Type".dimmed(), win_str);
 
+    if context.rules.variant == Variant::Sanma {
+        println!("   {}: {}", "Game".dimmed(), "Sanma (three players)".bold());
+    }
+
     println!(
         "   {}: {}",
         "Round Wind".dimmed(),
@@ -1173,6 +1211,14 @@ fn print_context(context: &GameContext, parsed: &agari::parse::ParsedHand, use_u
         );
     }
 
+    if context.nukidora > 0 {
+        println!(
+            "   {}: {}",
+            "Nukidora".dimmed(),
+            context.nukidora.to_string().bold()
+        );
+    }
+
     if let Some(wt) = context.winning_tile {
         println!("   {}: {}", "Winning Tile".dimmed(), format_tile(&wt));
     }
@@ -1233,9 +1279,17 @@ fn print_yaku(yaku_result: &agari::yaku::YakuResult, context: &GameContext) {
             format!("({} han)", yaku_result.aka_dora).dimmed()
         );
     }
+    if yaku_result.nuki_dora > 0 {
+        println!(
+            "   {} {} {}",
+            "•".white(),
+            "Nukidora".white(),
+            format!("({} han)", yaku_result.nuki_dora).dimmed()
+        );
+    }
 }
 
-fn print_score(score: &ScoringResult) {
+fn print_score(score: &ScoringResult, players: u32) {
     println!("\n{}", "💰 Score:".yellow().bold());
 
     // Han and Fu
@@ -1296,9 +1350,10 @@ fn print_score(score: &ScoringResult) {
     } else if score.is_dealer {
         if let Some(from_each) = score.payment.from_non_dealer {
             println!(
-                "   {}: {} all (×3 players)",
+                "   {}: {} all (×{} players)",
                 "Tsumo".green(),
-                from_each.to_string().bright_white()
+                from_each.to_string().bright_white(),
+                players - 1
             );
         }
     } else if let (Some(from_dealer), Some(from_non_dealer)) =
@@ -1351,6 +1406,7 @@ fn print_shanten(
     show_ukeire: bool,
     use_unicode: bool,
     visible_counts: Option<&TileCounts>,
+    rules: &Rules,
 ) {
     let result = calculate_shanten_with_melds(counts, called_melds);
 
@@ -1397,11 +1453,7 @@ fn print_shanten(
 
     // Ukeire (tile acceptance)
     if show_ukeire && result.shanten >= 0 {
-        let ukeire = if let Some(vc) = visible_counts {
-            calculate_ukeire_with_melds_and_visible(counts, called_melds, vc)
-        } else {
-            calculate_ukeire_with_melds(counts, called_melds)
-        };
+        let ukeire = calculate_ukeire_with_rules(counts, called_melds, visible_counts, rules);
 
         let label = if visible_counts.is_some() {
             "🀄 Ukeire (Practical — accounting for visible tiles):"
@@ -1450,6 +1502,7 @@ fn print_shanten_json(
     called_melds: u8,
     show_ukeire: bool,
     visible_counts: Option<&TileCounts>,
+    rules: &Rules,
 ) {
     let result = calculate_shanten_with_melds(counts, called_melds);
 
@@ -1468,11 +1521,7 @@ fn print_shanten_json(
     };
 
     let ukeire_data = if show_ukeire && result.shanten >= 0 {
-        let ukeire = if let Some(vc) = visible_counts {
-            calculate_ukeire_with_melds_and_visible(counts, called_melds, vc)
-        } else {
-            calculate_ukeire_with_melds(counts, called_melds)
-        };
+        let ukeire = calculate_ukeire_with_rules(counts, called_melds, visible_counts, rules);
         Some(JsonUkeire {
             tile_count: ukeire.tiles.len(),
             total_available: ukeire.total_count,

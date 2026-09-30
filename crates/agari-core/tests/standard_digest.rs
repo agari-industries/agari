@@ -1,15 +1,18 @@
 //! Pins standard scoring. Legal winning hands are built by construction from
-//! a fixed seed, scored under default rules, and hashed into one digest.
+//! a fixed seed, scored under default rules, and hashed into one digest. A
+//! second run does the same for sanma, with its own seed and digest.
 //!
-//! A change to standard scoring must update EXPECTED_DIGEST in the same
-//! commit and say why. To find which hand moved, save the output of
+//! A change to either must update its digest in the same commit and say why.
+//! To find which hand moved, save the output of
 //! `cargo test -p agari --test standard_digest -- --ignored --nocapture`
 //! from the old code, then rerun on the new code with
-//! `AGARI_DIGEST_BASELINE=<that file>`.
+//! `AGARI_DIGEST_BASELINE=<that file>`; set `AGARI_DIGEST_SANMA=1` for the
+//! sanma hands.
 
 use agari::context::{GameContext, WinType};
 use agari::hand::{HandStructure, KanType, Meld, decompose_hand, decompose_hand_with_melds};
-use agari::parse::to_counts;
+use agari::parse::{CalledMeld, ParsedHand, to_counts, validate_hand_with_context};
+use agari::rules::Rules;
 use agari::scoring::calculate_score;
 use agari::tile::{Honor, Suit, Tile};
 use agari::yaku::detect_yaku_with_context;
@@ -17,8 +20,11 @@ use sha2::{Digest, Sha256};
 
 const EXPECTED_DIGEST: &str = "5df875f25b2e61ebdab6c122836e02d5f251823c1b71c2e588d10b88d3b173b0";
 
+const SANMA_DIGEST: &str = "2a96f8f3060d2ef423dc168c64e14b763c352e7b4380f17eff678fdbd54cd3a4";
+
 const HANDS: usize = 100_000;
 const SEED: u64 = 0x6167_6172_6931;
+const SANMA_SEED: u64 = 0x7361_6e6d_6131;
 
 /// SplitMix64. Hand-rolled so the hands never depend on a crate's RNG.
 struct Rng(u64);
@@ -55,6 +61,7 @@ const HONORS: [Honor; 7] = [
     Honor::Red,
 ];
 const WINDS: [Honor; 4] = [Honor::East, Honor::South, Honor::West, Honor::North];
+const SANMA_WINDS: [Honor; 3] = [Honor::East, Honor::South, Honor::West];
 
 /// Tiles are indexed 0..34: man, pin, sou (value - 1 within each), honors.
 fn tile(index: usize) -> Tile {
@@ -95,15 +102,26 @@ enum Group {
     Kan(usize),
 }
 
-/// Tiles a generator may draw from, and whether it may form sequences.
+/// Tiles a generator may draw from, whether it may form sequences, and
+/// whether a sequence may be called (no chi in sanma).
 struct Pool {
     tiles: Vec<usize>,
     sequences: bool,
+    chi: bool,
 }
 
 impl Pool {
     fn new(tiles: Vec<usize>, sequences: bool) -> Self {
-        Pool { tiles, sequences }
+        Pool {
+            tiles,
+            sequences,
+            chi: true,
+        }
+    }
+
+    fn without_chi(mut self) -> Self {
+        self.chi = false;
+        self
     }
 
     fn seq_starts(&self) -> Vec<usize> {
@@ -148,13 +166,18 @@ fn terminal_tiles() -> Vec<usize> {
     vec![0, 8, 9, 17, 18, 26]
 }
 
+/// Sanma leaves 2m-8m out of the wall.
+fn sanma_tiles() -> Vec<usize> {
+    (0..34).filter(|t| !(1..=7).contains(t)).collect()
+}
+
 /// A winning hand before its situation is chosen.
 struct Shape {
     concealed: Vec<Tile>,
     called: Vec<Meld>,
 }
 
-fn shape_from_groups(rng: &mut Rng, groups: &[Group], pair: usize) -> Option<Shape> {
+fn shape_from_groups(rng: &mut Rng, groups: &[Group], pair: usize, chi: bool) -> Option<Shape> {
     let mut counts = [0u8; 34];
     counts[pair] += 2;
     for g in groups {
@@ -178,7 +201,7 @@ fn shape_from_groups(rng: &mut Rng, groups: &[Group], pair: usize) -> Option<Sha
     for g in groups {
         let call = calls_allowed && rng.chance(35);
         match *g {
-            Group::Seq(t) if call => called.push(Meld::shuntsu_open(tile(t))),
+            Group::Seq(t) if call && chi => called.push(Meld::shuntsu_open(tile(t))),
             Group::Trip(t) if call => called.push(Meld::koutsu_open(tile(t))),
             Group::Seq(t) => concealed.extend([tile(t), tile(t + 1), tile(t + 2)]),
             Group::Trip(t) => concealed.extend([tile(t); 3]),
@@ -207,7 +230,7 @@ fn standard_shape(rng: &mut Rng, pool: &Pool, fixed: &[Group], pairs: &[usize]) 
     loop {
         let groups = random_groups(rng, pool, fixed);
         let pair = rng.pick(pairs);
-        if let Some(shape) = shape_from_groups(rng, &groups, pair) {
+        if let Some(shape) = shape_from_groups(rng, &groups, pair, pool.chi) {
             return shape;
         }
     }
@@ -238,8 +261,8 @@ fn kokushi_shape(rng: &mut Rng) -> Shape {
     }
 }
 
-fn chuuren_shape(rng: &mut Rng) -> Shape {
-    let base = rng.below(3) * 9;
+fn chuuren_shape(rng: &mut Rng, suits: &[usize]) -> Shape {
+    let base = rng.pick(suits) * 9;
     let mut concealed = Vec::new();
     for v in [0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 8] {
         concealed.push(tile(base + v));
@@ -303,7 +326,7 @@ fn tail_shape(rng: &mut Rng) -> Shape {
             let pairs: Vec<usize> = if n == 3 { vec![30] } else { all_tiles() };
             standard_shape(rng, &Pool::new(all_tiles(), true), &fixed, &pairs)
         }
-        9 => chuuren_shape(rng),
+        9 => chuuren_shape(rng, &[0, 1, 2]),
         10 => {
             let start = rng.below(7);
             let fixed = [
@@ -339,6 +362,33 @@ fn shape(rng: &mut Rng) -> Shape {
     }
 }
 
+fn sanma_shape(rng: &mut Rng) -> Shape {
+    let tiles = sanma_tiles();
+    let roll = rng.below(100);
+    if roll < 70 {
+        standard_shape(
+            rng,
+            &Pool::new(tiles.clone(), true).without_chi(),
+            &[],
+            &tiles,
+        )
+    } else if roll < 80 {
+        chiitoitsu_shape(rng, &tiles)
+    } else if roll < 83 {
+        kokushi_shape(rng)
+    } else if roll < 86 {
+        chuuren_shape(rng, &[1, 2])
+    } else if roll < 93 {
+        let suit = 1 + rng.below(2);
+        let one_suit: Vec<usize> = suit_tiles(suit).into_iter().chain(27..34).collect();
+        let pool = Pool::new(one_suit.clone(), true).without_chi();
+        standard_shape(rng, &pool, &[], &one_suit)
+    } else {
+        let honors = honor_tiles();
+        standard_shape(rng, &Pool::new(honors.clone(), false), &[], &honors)
+    }
+}
+
 fn meld_tiles(meld: &Meld) -> Vec<Tile> {
     match *meld {
         Meld::Shuntsu(t, _) => {
@@ -357,11 +407,11 @@ struct Case {
     context: GameContext,
 }
 
-fn random_indicators(rng: &mut Rng, counts: &mut [u8; 34], n: usize) -> Vec<Tile> {
+fn random_indicators(rng: &mut Rng, counts: &mut [u8; 34], n: usize, sanma: bool) -> Vec<Tile> {
     let mut indicators = Vec::new();
     while indicators.len() < n {
         let t = rng.below(34);
-        if counts[t] < 4 {
+        if counts[t] < 4 && !(sanma && (1..=7).contains(&t)) {
             counts[t] += 1;
             indicators.push(tile(t));
         }
@@ -369,7 +419,7 @@ fn random_indicators(rng: &mut Rng, counts: &mut [u8; 34], n: usize) -> Vec<Tile
     indicators
 }
 
-fn situate(rng: &mut Rng, shape: Shape) -> Case {
+fn situate(rng: &mut Rng, shape: Shape, sanma: bool) -> Case {
     let Shape { concealed, called } = shape;
     let mut all: Vec<Tile> = concealed.clone();
     for m in &called {
@@ -388,8 +438,9 @@ fn situate(rng: &mut Rng, shape: Shape) -> Case {
     } else {
         WinType::Ron
     };
-    let round_wind = rng.pick(&WINDS);
-    let seat_wind = rng.pick(&WINDS);
+    let winds: &[Honor] = if sanma { &SANMA_WINDS } else { &WINDS };
+    let round_wind = rng.pick(winds);
+    let seat_wind = rng.pick(winds);
 
     let mut context =
         GameContext::new(win_type, round_wind, seat_wind).with_winning_tile(winning_tile);
@@ -426,10 +477,10 @@ fn situate(rng: &mut Rng, shape: Shape) -> Case {
     }
 
     let dora_count = 1 + rng.below(5);
-    let dora = random_indicators(rng, &mut counts, dora_count);
+    let dora = random_indicators(rng, &mut counts, dora_count, sanma);
     context = context.with_dora(dora);
     if context.is_riichi {
-        let ura = random_indicators(rng, &mut counts, dora_count);
+        let ura = random_indicators(rng, &mut counts, dora_count, sanma);
         context = context.with_ura_dora(ura);
     }
 
@@ -440,6 +491,12 @@ fn situate(rng: &mut Rng, shape: Shape) -> Case {
         }
     }
     context = context.with_aka(aka);
+
+    if sanma {
+        let north = index_of(Tile::honor(Honor::North));
+        let nukidora = rng.below(5 - counts[north] as usize) as u8;
+        context = context.with_rules(Rules::sanma()).with_nukidora(nukidora);
+    }
 
     Case {
         concealed,
@@ -479,10 +536,25 @@ fn context_text(c: &GameContext) -> String {
     )
 }
 
-fn score_lines(case: &Case) -> Vec<String> {
+fn score_lines(case: &Case, sanma: bool) -> Vec<String> {
     let mut all = case.concealed.clone();
     for m in &case.called {
         all.extend(meld_tiles(m));
+    }
+    if sanma {
+        let parsed = ParsedHand {
+            tiles: case.concealed.clone(),
+            aka_count: case.context.aka_count,
+            called_melds: case
+                .called
+                .iter()
+                .map(|m| CalledMeld {
+                    meld: m.clone(),
+                    tiles: meld_tiles(m),
+                })
+                .collect(),
+        };
+        validate_hand_with_context(&parsed, &case.context).expect("generated sanma hand is legal");
     }
     let all_counts = to_counts(&all);
     let hand_counts = to_counts(&case.concealed);
@@ -498,20 +570,29 @@ fn score_lines(case: &Case) -> Vec<String> {
         case.called
     );
 
-    let prefix = format!(
+    let mut prefix = format!(
         "{} {:?} | {}",
         tiles_text(&case.concealed),
         case.called,
         context_text(&case.context)
     );
+    // Sanma lines carry the pulled Norths; standard lines stay as they were.
+    if sanma {
+        prefix += &format!(" nukidora={}", case.context.nukidora);
+    }
     let mut lines: Vec<String> = structures
         .iter()
         .map(|structure| {
             let y = detect_yaku_with_context(structure, &all_counts, &case.context);
             let s = calculate_score(structure, &y, &case.context);
             let p = &s.payment;
+            let nuki = if sanma {
+                format!(" nuki={}", y.nuki_dora)
+            } else {
+                String::new()
+            };
             format!(
-                "{prefix} | {structure:?} | {:?} han={} dora={}/{}/{}/{} yakuman={} | fu={} {:?} han={} {:?} basic={} pay={}/{:?}/{:?}/{:?} dealer={} counted={}",
+                "{prefix} | {structure:?} | {:?} han={} dora={}/{}/{}/{}{nuki} yakuman={} | fu={} {:?} han={} {:?} basic={} pay={}/{:?}/{:?}/{:?} dealer={} counted={}",
                 y.yaku_list,
                 y.total_han,
                 y.dora_count,
@@ -537,41 +618,58 @@ fn score_lines(case: &Case) -> Vec<String> {
     lines
 }
 
-fn all_lines() -> Vec<Vec<String>> {
-    let mut rng = Rng(SEED);
+fn all_lines(sanma: bool) -> Vec<Vec<String>> {
+    let mut rng = Rng(if sanma { SANMA_SEED } else { SEED });
     (0..HANDS)
         .map(|_| {
-            let shape = shape(&mut rng);
-            let case = situate(&mut rng, shape);
-            score_lines(&case)
+            let shape = if sanma {
+                sanma_shape(&mut rng)
+            } else {
+                shape(&mut rng)
+            };
+            let case = situate(&mut rng, shape, sanma);
+            score_lines(&case, sanma)
         })
         .collect()
 }
 
-#[test]
-fn standard_digest() {
+fn digest(sanma: bool) -> String {
     let mut hasher = Sha256::new();
-    for lines in all_lines() {
+    for lines in all_lines(sanma) {
         for line in lines {
             hasher.update(line.as_bytes());
             hasher.update(b"\n");
         }
     }
-    let digest: String = hasher
+    hasher
         .finalize()
         .iter()
         .map(|b| format!("{b:02x}"))
-        .collect();
+        .collect()
+}
+
+#[test]
+fn standard_digest() {
     assert_eq!(
-        digest, EXPECTED_DIGEST,
+        digest(false),
+        EXPECTED_DIGEST,
         "standard scoring changed; see the module doc to find the first differing hand"
+    );
+}
+
+#[test]
+fn sanma_digest() {
+    assert_eq!(
+        digest(true),
+        SANMA_DIGEST,
+        "sanma scoring changed; see the module doc to find the first differing hand"
     );
 }
 
 #[test]
 #[ignore]
 fn standard_digest_diff() {
-    let hands = all_lines();
+    let hands = all_lines(std::env::var("AGARI_DIGEST_SANMA").as_deref() == Ok("1"));
     let Ok(path) = std::env::var("AGARI_DIGEST_BASELINE") else {
         for (i, lines) in hands.iter().enumerate() {
             for line in lines {

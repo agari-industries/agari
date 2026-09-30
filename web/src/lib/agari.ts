@@ -51,6 +51,8 @@ export interface ScoreRequest {
   is_chankan: boolean;
   is_tenhou: boolean;
   is_chiihou: boolean;
+  rules?: { variant: "Sanma" };
+  nukidora: number;
 }
 
 export interface ScoreResponse {
@@ -84,6 +86,7 @@ export interface DoraInfo {
   regular: number;
   ura: number;
   aka: number;
+  nuki: number;
   total: number;
 }
 
@@ -164,14 +167,17 @@ export function calculateShanten(hand: string): ShantenResponse {
 /**
  * Calculate ukeire (tile acceptance) for a hand
  */
-export function calculateUkeire(hand: string): UkeireResponse {
+export function calculateUkeire(
+  hand: string,
+  sanma?: boolean,
+): UkeireResponse {
   if (!wasmModule) {
     return {
       success: false,
       error: "WASM module not loaded. Call initAgari() first.",
     };
   }
-  return wasmModule.calculate_ukeire_js(hand) as UkeireResponse;
+  return wasmModule.calculate_ukeire_js(hand, sanma) as UkeireResponse;
 }
 
 /**
@@ -210,6 +216,7 @@ export function createDefaultRequest(hand: string): ScoreRequest {
     is_chankan: false,
     is_tenhou: false,
     is_chiihou: false,
+    nukidora: 0,
   };
 }
 

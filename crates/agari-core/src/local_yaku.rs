@@ -53,6 +53,7 @@ fn renhou(result: &mut YakuResult, value: Renhou) {
                 result.regular_dora = 0;
                 result.ura_dora = 0;
                 result.aka_dora = 0;
+                result.nuki_dora = 0;
             }
         }
         // Yakuman stack in agari (ScoreLevel::Yakuman counts units), so a

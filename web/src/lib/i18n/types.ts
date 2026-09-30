@@ -61,11 +61,13 @@ export interface Translations {
   fu: string;
   pts: string;
   all: string;
+  twoPayers: string;
   dealer: string;
   dealerOya: string;
   yaku: string;
   ura: string;
   aka: string;
+  nukidora: string;
   fuBreakdown: string;
   fuBase: string;
   fuMenzenRon: string;
@@ -79,6 +81,9 @@ export interface Translations {
 
   // Options
   options: string;
+  game: string;
+  fourPlayers: string;
+  threePlayers: string;
   winType: string;
   ron: string;
   tsumo: string;

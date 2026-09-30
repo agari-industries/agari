@@ -7,6 +7,7 @@
     tileCounts?: Record<string, number>;
     showRedFives?: boolean;
     disabledTiles?: Set<string>;
+    sanma?: boolean;
   }
 
   let {
@@ -14,9 +15,12 @@
     tileCounts = {},
     showRedFives = true,
     disabledTiles = new Set(),
+    sanma = false,
   }: Props = $props();
 
-  const manTiles = ALL_TILES.filter((t) => t.endsWith('m'));
+  const manTiles = $derived(
+    ALL_TILES.filter((t) => t.endsWith('m') && (!sanma || t === '1m' || t === '9m')),
+  );
   const pinTiles = ALL_TILES.filter((t) => t.endsWith('p'));
   const souTiles = ALL_TILES.filter((t) => t.endsWith('s'));
   const honorTiles = ALL_TILES.filter((t) => t.endsWith('z'));
@@ -56,7 +60,7 @@
           onclick={() => handleClick(tile)}
         />
       {/each}
-      {#if showRedFives}
+      {#if showRedFives && !sanma}
         <Tile
           tile="5m"
           size="md"

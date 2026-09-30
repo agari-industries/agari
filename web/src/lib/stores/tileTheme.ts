@@ -2,7 +2,7 @@
  * Tile theme store for Agari WebUI
  *
  * Uses Svelte writable store for reactivity and localStorage for persistence.
- * Allows switching between light (default) and dark tile themes.
+ * Allows switching between light and dark (default) tile themes.
  */
 
 import { writable, get } from "svelte/store";
@@ -22,10 +22,10 @@ export const availableTileThemes: {
 ];
 
 /**
- * Get the initial tile theme from localStorage or default to 'light'
+ * Get the initial tile theme from localStorage or default to 'dark'
  */
 function getInitialTileTheme(): TileTheme {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return "dark";
 
   const stored = localStorage.getItem(TILE_THEME_STORAGE_KEY);
   if (stored && (stored === "light" || stored === "dark")) {
