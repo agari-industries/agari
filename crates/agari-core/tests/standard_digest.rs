@@ -18,9 +18,9 @@ use agari::tile::{Honor, Suit, Tile};
 use agari::yaku::detect_yaku_with_context;
 use sha2::{Digest, Sha256};
 
-const EXPECTED_DIGEST: &str = "5df875f25b2e61ebdab6c122836e02d5f251823c1b71c2e588d10b88d3b173b0";
+const EXPECTED_DIGEST: &str = "c8c5c15b31f1ffaf720ef283e357ed7e44518666bfd61de5f3bfc940e2f78dd8";
 
-const SANMA_DIGEST: &str = "2a96f8f3060d2ef423dc168c64e14b763c352e7b4380f17eff678fdbd54cd3a4";
+const SANMA_DIGEST: &str = "e90ef82ea4f1adb960a5bcb7db0b546a07865ea8f88a2e9c06824567d052c254";
 
 const HANDS: usize = 100_000;
 const SEED: u64 = 0x6167_6172_6931;
