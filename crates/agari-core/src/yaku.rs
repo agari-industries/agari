@@ -379,8 +379,9 @@ pub fn detect_yaku_with_context(
                 yaku_list.push(Yaku::Riichi);
             }
 
-            // Ippatsu (only with riichi)
-            if context.is_ippatsu {
+            // Ippatsu (only with riichi); a rinshan win follows the winner's
+            // own kan, which breaks ippatsu
+            if context.is_ippatsu && !(context.is_rinshan && context.win_type == WinType::Tsumo) {
                 yaku_list.push(Yaku::Ippatsu);
             }
         }
@@ -400,8 +401,9 @@ pub fn detect_yaku_with_context(
             yaku_list.push(Yaku::Chankan);
         }
 
-        // Haitei Raoyue (tsumo on last drawable tile)
-        if context.is_last_tile && context.win_type == WinType::Tsumo {
+        // Haitei Raoyue (tsumo on last drawable tile); a replacement tile is
+        // never the haitei tile, even when it is the last tile of the hand
+        if context.is_last_tile && context.win_type == WinType::Tsumo && !context.is_rinshan {
             yaku_list.push(Yaku::HaiteiRaoyue);
         }
 
@@ -1465,6 +1467,35 @@ mod tests {
         let context = GameContext::new(WinType::Ron, Honor::East, Honor::East).rinshan();
         let results = get_yaku_with_context("123m456p789s11122z", &context);
         assert!(!has_yaku(&results, Yaku::RinshanKaihou));
+    }
+
+    #[test]
+    fn haitei_not_awarded_on_rinshan_win() {
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .rinshan()
+            .last_tile();
+        let results = get_yaku_with_context("123m456p789s11122z", &context);
+        assert!(has_yaku(&results, Yaku::RinshanKaihou));
+        assert!(!has_yaku(&results, Yaku::HaiteiRaoyue));
+    }
+
+    #[test]
+    fn ippatsu_not_awarded_on_rinshan_win() {
+        let context = GameContext::new(WinType::Tsumo, Honor::East, Honor::East)
+            .riichi()
+            .ippatsu()
+            .rinshan();
+        let results = get_yaku_with_context("123m456p789s11122z", &context);
+        assert!(has_yaku(&results, Yaku::RinshanKaihou));
+        assert!(!has_yaku(&results, Yaku::Ippatsu));
+
+        // the rinshan flag means nothing on a ron
+        let context = GameContext::new(WinType::Ron, Honor::East, Honor::East)
+            .riichi()
+            .ippatsu()
+            .rinshan();
+        let results = get_yaku_with_context("123m456p789s11122z", &context);
+        assert!(has_yaku(&results, Yaku::Ippatsu));
     }
 
     #[test]

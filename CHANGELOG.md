@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Rinshan kaihou with haitei or ippatsu**: A win on a kan replacement tile no longer also scores haitei or ippatsu. The replacement tile is never the haitei tile, and the winner's own kan breaks ippatsu.
+
 ## [0.26.0]
 
 ### Added
